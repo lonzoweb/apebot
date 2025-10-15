@@ -22,7 +22,7 @@ AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo"]
 DAILY_COMMAND_ROLE = "Patrizio"
 ROLE_ADD_QUOTE = "Caporegime"
 
-DB_FILE = "quotes.db"
+DB_FILE = "/app/data/quotes.db"
 
 intents = discord.Intents.default()
 intents.message_content = True
