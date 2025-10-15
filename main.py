@@ -11,7 +11,7 @@ if channel_id_str is None:
     raise ValueError("CHANNEL_ID environment variable is missing!")
 CHANNEL_ID = int(channel_id_str)
 POST_HOUR = int(os.getenv("POST_HOUR", 9))
-AUTHORIZED_ROLES = ["Caporegime", "Capo", "Sottocapo"]
+AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo"]
 
 QUOTES = [
     "When I get a bitch, I get a bitch. – Pretty Tony",
