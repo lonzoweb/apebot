@@ -2,10 +2,11 @@ import discord
 from discord.ext import commands, tasks
 import random
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import os
 import sqlite3
+from io import BytesIO
 from dotenv import load_dotenv
 
 # ==== CONFIG ====
@@ -22,7 +23,7 @@ TEST_CHANNEL_ID = int(test_channel_id_str) if test_channel_id_str else None
 
 AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo"]
 DAILY_COMMAND_ROLE = "Patrizio"  # role for using .daily
-ROLE_ADD_QUOTE = "Caporegime"    # Only this role or admin can add quotes
+ROLE_ADD_QUOTE = "Caporegime"    # Only this role or admin can add/edit quotes
 
 DB_FILE = "quotes.db"
 
@@ -38,7 +39,6 @@ QUOTES = []
 
 # ---- DB Helpers ----
 def init_db():
-    """Initialize the DB if it doesn't exist."""
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("""
@@ -65,6 +65,13 @@ def add_quote_to_db(text):
     conn.commit()
     conn.close()
 
+def update_quote_in_db(qid, new_text):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("UPDATE quotes SET text = ? WHERE id = ?", (new_text, qid))
+    conn.commit()
+    conn.close()
+
 # ---- EVENTS ----
 @bot.event
 async def on_ready():
@@ -79,7 +86,6 @@ async def on_ready():
 async def quote_command(ctx, *, keyword: str = None):
     global QUOTES
     if keyword is None:
-        # Random quote
         if ctx.author.guild_permissions.administrator or any(role.name in AUTHORIZED_ROLES for role in ctx.author.roles):
             quote = random.choice(QUOTES)
             embed = discord.Embed(
@@ -91,7 +97,6 @@ async def quote_command(ctx, *, keyword: str = None):
         else:
             await ctx.send("🚫 Peasant Detected")
     else:
-        # Keyword search
         matches = [q for q in QUOTES if keyword.lower() in q.lower()]
         if matches:
             for match in matches:
@@ -135,7 +140,7 @@ async def daily_command(ctx):
     else:
         await ctx.send("🚫 Peasant Detected")
 
-# ---- EDIT QUOTE COMMAND ----
+# ---- EDIT QUOTE ----
 @bot.command(name="editquote")
 async def edit_quote(ctx, *, keyword: str):
     if not (ctx.author.guild_permissions.administrator or any(role.name == ROLE_ADD_QUOTE for role in ctx.author.roles)):
@@ -152,7 +157,6 @@ async def edit_quote(ctx, *, keyword: str):
         conn.close()
         return
 
-    # Show matches in an embed
     embed = discord.Embed(title="📝 Found Quotes", color=discord.Color.blue())
     for i, (qid, text) in enumerate(results, start=1):
         embed.add_field(name=f"{i}", value=text, inline=False)
@@ -194,11 +198,10 @@ async def edit_quote(ctx, *, keyword: str):
         return
 
     new_text = new_msg.content.strip()
-    c.execute("UPDATE quotes SET text = ? WHERE id = ?", (new_text, quote_id))
-    conn.commit()
+    update_quote_in_db(quote_id, new_text)
     conn.close()
 
-    # Update in-memory quotes
+    # Update in-memory list
     global QUOTES
     QUOTES = load_quotes_from_db()
 
@@ -210,11 +213,28 @@ async def edit_quote(ctx, *, keyword: str):
     embed.set_footer(text=f"Edited by {ctx.author.display_name}")
     await ctx.send(embed=embed)
 
+# ---- LIST QUOTES (send via DM) ----
+@bot.command(name="listquotes")
+async def list_quotes(ctx):
+    if not (ctx.author.guild_permissions.administrator or any(role.name == ROLE_ADD_QUOTE for role in ctx.author.roles)):
+        await ctx.send("🚫 Peasant Detected")
+        return
+
+    global QUOTES
+    file_content = "\n".join(QUOTES)
+    file_buffer = BytesIO(file_content.encode('utf-8'))
+    discord_file = discord.File(fp=file_buffer, filename="quotes.txt")
+
+    try:
+        await ctx.author.send("📄 Here are all the quotes:", file=discord_file)
+        await ctx.send("✅ Quotes sent to your DMs!")
+    except discord.Forbidden:
+        await ctx.send("⚠️ Unable to send DM. Please allow DMs from this server.")
+
 # ---- DAILY AUTO QUOTE ----
 @tasks.loop(minutes=1)
 async def daily_quote():
     global daily_quote_of_the_day
-
     main_channel = bot.get_channel(CHANNEL_ID)
     test_channel = bot.get_channel(TEST_CHANNEL_ID) if TEST_CHANNEL_ID else None
 
@@ -225,7 +245,7 @@ async def daily_quote():
     now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
     current_time = now_pt.strftime("%H:%M")
 
-    # Morning (10 AM PT)
+    # Morning 10 AM PT
     if current_time == "10:00":
         daily_quote_of_the_day = random.choice(QUOTES)
         embed = discord.Embed(
@@ -234,23 +254,19 @@ async def daily_quote():
             color=discord.Color.gold()
         )
         embed.set_footer(text="🕊️ Quote")
-        if main_channel:
-            await main_channel.send(embed=embed)
-        if test_channel:
-            await test_channel.send(embed=embed)
+        if main_channel: await main_channel.send(embed=embed)
+        if test_channel: await test_channel.send(embed=embed)
         print("✅ Sent 10AM quote")
 
-    # Evening (6 PM PT)
+    # Evening 6 PM PT
     elif current_time == "18:00" and daily_quote_of_the_day:
         embed = discord.Embed(
             description=daily_quote_of_the_day,
             color=discord.Color.dark_gold()
         )
         embed.set_footer(text="🌇 Quote")
-        if main_channel:
-            await main_channel.send(embed=embed)
-        if test_channel:
-            await test_channel.send(embed=embed)
+        if main_channel: await main_channel.send(embed=embed)
+        if test_channel: await test_channel.send(embed=embed)
         print("✅ Sent 6PM quote")
 
 @daily_quote.before_loop
