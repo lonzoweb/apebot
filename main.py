@@ -5,6 +5,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import os
+import sqlite3
 
 # ==== CONFIG ====
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -20,8 +21,7 @@ AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo"]
 DAILY_COMMAND_ROLE = "Patrizio"  # role for using .daily
 ROLE_ADD_QUOTE = "Caporegime"  # Only this role or admin can add quotes
 
-QUOTES_FILE = "quotes.txt"
-POST_HOUR = 17  # 10 AM PT currently
+DB_FILE = "/app/data/quotes.db"  # SQLite database file
 # =================
 
 intents = discord.Intents.default()
@@ -32,56 +32,60 @@ intents.members = True
 bot = commands.Bot(command_prefix=".", intents=intents)
 
 daily_quote_of_the_day = None
-QUOTES = []
 
-# ---- Quote cleaning helpers ----
-QUOTE_EDGE_CHARS = ('"', "'", "“", "”", "‘", "’")
+# ---- Database setup ----
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS quotes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            text TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-def clean_quote_text(s: str) -> str:
-    """Trim whitespace, remove surrounding or trailing quote-like chars, commas, and extra punctuation."""
-    if s is None:
-        return s
-    s = s.strip()
-    # Strip leading quote chars
-    while s and s[0] in QUOTE_EDGE_CHARS:
-        s = s[1:].lstrip()
-    # Strip trailing quote chars, commas, periods, and spaces
-    while s and s[-1] in QUOTE_EDGE_CHARS + (',', '.', ' '):
-        s = s[:-1].rstrip()
-    return s
-
-# ---- Load & Save Quotes ----
-def load_quotes():
-    global QUOTES
-    QUOTES = []
-    if os.path.exists(QUOTES_FILE):
-        with open(QUOTES_FILE, "r", encoding="utf-8") as f:
-            for line in f:
-                clean = clean_quote_text(line)
-                if clean:
-                    QUOTES.append(clean)
-    else:
-        print("⚠️ No quotes file found. Starting with an empty database.")
-
-def save_quote(quote):
-    """Append a cleaned quote to file (and keep in memory)."""
-    clean = clean_quote_text(quote)
-    if not clean:
+def add_quote_to_db(quote_text):
+    quote_text = quote_text.strip()
+    if not quote_text:
         return
-    QUOTES.append(clean)
-    with open(QUOTES_FILE, "a", encoding="utf-8") as f:
-        f.write(f"{clean}\n")
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("INSERT INTO quotes (text) VALUES (?)", (quote_text,))
+    conn.commit()
+    conn.close()
+
+def get_all_quotes():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT text FROM quotes")
+    rows = c.fetchall()
+    conn.close()
+    return [row[0] for row in rows]
+
+def find_quotes_by_keyword(keyword):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT text FROM quotes WHERE text LIKE ?", (f"%{keyword}%",))
+    rows = c.fetchall()
+    conn.close()
+    return [row[0] for row in rows]
 
 # ---- Helper ----
 async def send_random_quote(channel):
     global daily_quote_of_the_day
-    daily_quote_of_the_day = random.choice(QUOTES)
+    quotes = get_all_quotes()
+    if not quotes:
+        await channel.send("⚠️ No quotes available.")
+        return
+    daily_quote_of_the_day = random.choice(quotes)
     await channel.send(f"📜 {daily_quote_of_the_day}")
 
 # ---- EVENTS ----
 @bot.event
 async def on_ready():
-    load_quotes()
+    init_db()
     print(f"✅ Logged in as {bot.user}")
     daily_quote.start()
 
@@ -91,23 +95,25 @@ async def quote_command(ctx, *, keyword: str = None):
     if keyword is None:
         if (ctx.author.guild_permissions.administrator or
             any(role.name in AUTHORIZED_ROLES for role in ctx.author.roles)):
-            quote = random.choice(QUOTES)
-            formatted_quote = "\n".join(line.strip() for line in quote.splitlines())
+            quotes = get_all_quotes()
+            if not quotes:
+                await ctx.send("⚠️ No quotes available.")
+                return
+            quote = random.choice(quotes)
             embed = discord.Embed(
                 title="📜 Quote",
-                description=formatted_quote,
+                description=quote,
                 color=discord.Color.gold()
             )
             await ctx.send(embed=embed)
         else:
             await ctx.send("🚫 Peasant Detected")
     else:
-        matches = [q for q in QUOTES if keyword.lower() in q.lower()]
+        matches = find_quotes_by_keyword(keyword)
         if matches:
             for match in matches:
-                formatted_match = "\n".join(line.strip() for line in match.splitlines())
                 embed = discord.Embed(
-                    description=f"📜 {formatted_match}",
+                    description=f"📜 {match}",
                     color=discord.Color.gold()
                 )
                 await ctx.send(embed=embed)
@@ -117,18 +123,11 @@ async def quote_command(ctx, *, keyword: str = None):
 @bot.command(name="addquote")
 async def add_quote_command(ctx, *, quote_text: str):
     if ctx.author.guild_permissions.administrator or any(role.name == ROLE_ADD_QUOTE for role in ctx.author.roles):
-        # Support multi-line quotes
-        lines = quote_text.splitlines()
-        cleaned_lines = [clean_quote_text(line) for line in lines if clean_quote_text(line)]
-        cleaned_quote = "\n".join(cleaned_lines)
-
+        cleaned_quote = quote_text.strip()
         if not cleaned_quote:
             await ctx.send("🚫 Quote is empty or invalid.")
             return
-
-        # Save cleaned quote
-        save_quote(cleaned_quote)
-
+        add_quote_to_db(cleaned_quote)
         embed = discord.Embed(
             title="✅ Quote Added",
             description=f"“{cleaned_quote}”",
@@ -143,33 +142,15 @@ async def add_quote_command(ctx, *, quote_text: str):
 async def daily_command(ctx):
     if ctx.author.guild_permissions.administrator or any(role.name == DAILY_COMMAND_ROLE for role in ctx.author.roles):
         if daily_quote_of_the_day:
-            formatted_quote = "\n".join(line.strip() for line in daily_quote_of_the_day.splitlines())
             embed = discord.Embed(
                 title="🌅 Blessings to Apeiron",
-                description=f"📜 {formatted_quote}",
+                description=f"📜 {daily_quote_of_the_day}",
                 color=discord.Color.gold()
             )
             embed.set_footer(text="🕊️ Daily Quote Recall")
             await ctx.send(embed=embed)
         else:
             await ctx.send("⚠️ The daily quote has not been generated yet today.")
-    else:
-        await ctx.send("🚫 Peasant Detected")
-
-@bot.command(name="normalizequotes")
-async def normalize_quotes_command(ctx):
-    if ctx.author.guild_permissions.administrator or any(role.name == ROLE_ADD_QUOTE for role in ctx.author.roles):
-        if not os.path.exists(QUOTES_FILE):
-            await ctx.send("⚠️ No quotes file to normalize.")
-            return
-        with open(QUOTES_FILE, "r", encoding="utf-8") as f:
-            lines = [clean_quote_text(line) for line in f]
-        cleaned = [l for l in lines if l]
-        with open(QUOTES_FILE, "w", encoding="utf-8") as f:
-            for q in cleaned:
-                f.write(q + "\n")
-        load_quotes()
-        await ctx.send(f"🔁 Normalized quotes file. {len(cleaned)} quotes saved.")
     else:
         await ctx.send("🚫 Peasant Detected")
 
@@ -190,11 +171,13 @@ async def daily_quote():
 
     # Morning (10 AM PT)
     if current_time == "10:00":
-        daily_quote_of_the_day = random.choice(QUOTES)
-        formatted_quote = "\n".join(line.strip() for line in daily_quote_of_the_day.splitlines())
+        quotes = get_all_quotes()
+        if not quotes:
+            return
+        daily_quote_of_the_day = random.choice(quotes)
         embed = discord.Embed(
             title="🌅 Blessings to Apeiron",
-            description=f"\n📜 {formatted_quote}\n",
+            description=f"\n📜 {daily_quote_of_the_day}\n",
             color=discord.Color.gold()
         )
         embed.set_footer(text="🕊️ Quote")
@@ -208,9 +191,8 @@ async def daily_quote():
 
     # Evening (6 PM PT)
     elif current_time == "18:00" and daily_quote_of_the_day:
-        formatted_quote = "\n".join(line.strip() for line in daily_quote_of_the_day.splitlines())
         embed = discord.Embed(
-            description=f"\n📜 {formatted_quote}\n",
+            description=f"\n📜 {daily_quote_of_the_day}\n",
             color=discord.Color.dark_gold()
         )
         embed.set_footer(text="🌇 Quote")
