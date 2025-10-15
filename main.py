@@ -79,6 +79,47 @@ async def quote_command(ctx, *, keyword: str = None):
         matches = [q for q in QUOTES if keyword.lower() in q.lower()]
         if matches:
             for match in matches:
+                embed = discord.Embed(
+                    description=f"📜 {match}",
+                    color=discord.Color.gold()
+                )
+                await ctx.send(embed=embed)
+        else:
+            await ctx.send(f"🔍 No quotes found containing “{keyword}.”")
+
+@bot.command(name="addquote")
+async def add_quote_command(ctx, *, quote_text: str):
+    if (ctx.author.guild_permissions.administrator or
+        any(role.name == ROLE_ADD_QUOTE for role in ctx.author.roles)):
+        QUOTES.append(quote_text)
+        save_quote(quote_text)
+        embed = discord.Embed(
+            title="✅ Quote Added",
+            description=f"“{quote_text}”",
+            color=discord.Color.green()
+        )
+        embed.set_footer(text=f"Added by {ctx.author.display_name}")
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send("🚫 Peasant Detected")
+
+@bot.command(name="daily")
+async def daily_command(ctx):
+    if (ctx.author.guild_permissions.administrator or
+        any(role.name == DAILY_COMMAND_ROLE for role in ctx.author.roles)):
+        if daily_quote_of_the_day:
+            embed = discord.Embed(
+                title="🌅 Blessings to Apeiron",
+                description=f"📜 {daily_quote_of_the_day}",
+                color=discord.Color.gold()
+            )
+            embed.set_footer(text="🕊️ Daily Quote Recall")
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send("⚠️ The daily quote has not been generated yet today.")
+    else:
+        await ctx.send("🚫 Peasant Detected")
+
 
 # ---- DAILY AUTO QUOTE ----
 @tasks.loop(minutes=1)
