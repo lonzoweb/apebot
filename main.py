@@ -38,15 +38,15 @@ QUOTES = []
 QUOTE_EDGE_CHARS = ('"', "'", "“", "”", "‘", "’")
 
 def clean_quote_text(s: str) -> str:
-    """Trim whitespace and strip any surrounding or trailing quote-like characters."""
+    """Trim whitespace, remove surrounding or trailing quote-like chars, commas, and extra punctuation."""
     if s is None:
         return s
     s = s.strip()
     # Strip leading quote chars
     while s and s[0] in QUOTE_EDGE_CHARS:
         s = s[1:].lstrip()
-    # Strip trailing quote chars (even after dash or punctuation)
-    while s and s[-1] in QUOTE_EDGE_CHARS + (' ',):
+    # Strip trailing quote chars, commas, periods, and spaces
+    while s and s[-1] in QUOTE_EDGE_CHARS + (',', '.', ' '):
         s = s[:-1].rstrip()
     return s
 
@@ -127,9 +127,7 @@ async def add_quote_command(ctx, *, quote_text: str):
             return
 
         # Save cleaned quote
-        QUOTES.append(cleaned_quote)
-        with open(QUOTES_FILE, "a", encoding="utf-8") as f:
-            f.write(cleaned_quote + "\n")
+        save_quote(cleaned_quote)
 
         embed = discord.Embed(
             title="✅ Quote Added",
