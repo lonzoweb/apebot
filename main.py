@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands, tasks
 import random
 import asyncio
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo  # Python 3.9+
 import os
 
 # ==== CONFIG ====
@@ -10,9 +12,9 @@ channel_id_str = os.getenv("CHANNEL_ID")
 if channel_id_str is None:
     raise ValueError("CHANNEL_ID environment variable is missing!")
 CHANNEL_ID = int(channel_id_str)
-POST_HOUR = int(os.getenv("POST_HOUR", 17))
-AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo"]
 
+AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo"]
+DAILY_COMMAND_ROLE = "Patrizio"  # role for using .daily
 QUOTES = [
     "When I get a bitch, I get a bitch. – Pretty Tony",
     "Be a sucker for a bitch and she'll suck your dick. I know he loves her, I don't doubt him. She pulled out his money, said ‘I love things about him’. – Too $hort",
@@ -37,6 +39,8 @@ QUOTES = [
     "Cattle and fat sheep can all be had for the raiding, tripods all for the trading, and tawny-headed stallions. But a man’s life breath cannot come back again. – Achilles",
     "A man can have sex with animals such as sheep, cows, camels and so on. However, he should kill the animal after he has his orgasm. He should not sell the meat to the people in his own village, but selling the meat to a neighboring village is reasonable. – Ayatollah Khomeini"
 ]
+
+POST_HOUR = 17  # 10 AM California PDT (UTC-7) right now
 # =================
 
 intents = discord.Intents.default()
@@ -46,23 +50,44 @@ intents.members = True
 
 bot = commands.Bot(command_prefix=".", intents=intents)
 
+# Store the daily quote so .daily can access it
+daily_quote_of_the_day = None
+
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
     daily_quote.start()
 
+# ---- Helper Function ----
 async def send_random_quote(channel):
-    quote = random.choice(QUOTES)
-    await channel.send(f"{quote}")
+    global daily_quote_of_the_day
+    daily_quote_of_the_day = random.choice(QUOTES)
+    await channel.send(f"{daily_quote_of_the_day}")
 
+# ---- Manual Command ----
 @bot.command(name="quote")
 async def manual_quote(ctx):
     if (ctx.author.guild_permissions.administrator or
         any(role.name in AUTHORIZED_ROLES for role in ctx.author.roles)):
-        await send_random_quote(ctx.channel)
+        # Manual quote is separate, still random
+        quote = random.choice(QUOTES)
+        await ctx.send(f"📜 **Quote:** {quote}")
     else:
         await ctx.send("🚫 Peasant Detected")
 
+# ---- Daily Command ----
+@bot.command(name="daily")
+async def daily_command(ctx):
+    if (ctx.author.guild_permissions.administrator or
+        any(role.name == DAILY_COMMAND_ROLE for role in ctx.author.roles)):
+        if daily_quote_of_the_day:
+            await ctx.send(f"{daily_quote_of_the_day}")
+        else:
+            await ctx.send("⚠️ The daily quote has not been generated yet today.")
+    else:
+        await ctx.send("🚫 You don’t have permission to use this command.")
+
+# ---- Daily Automatic Quote ----
 @tasks.loop(hours=24)
 async def daily_quote():
     channel = bot.get_channel(CHANNEL_ID)
@@ -74,12 +99,19 @@ async def daily_quote():
 @daily_quote.before_loop
 async def before_daily_quote():
     await bot.wait_until_ready()
-    now = discord.utils.utcnow().replace(tzinfo=None)
-    target = now.replace(hour=POST_HOUR, minute=0, second=0, microsecond=0)
-    if target < now:
-        target = target.replace(day=now.day + 1)
-    wait_time = (target - now).total_seconds()
-    print(f"⏳ Waiting {wait_time/3600:.2f} hours until first daily quote.")
-    await asyncio.sleep(wait_time)
+
+    now_utc = datetime.utcnow()
+    now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
+
+    # Next post hour in PT
+    target_pt = now_pt.replace(hour=10, minute=0, second=0, microsecond=0)
+    if target_pt < now_pt:
+        target_pt += timedelta(days=1)
+
+    # Convert to UTC for sleep
+    target_utc = target_pt.astimezone(ZoneInfo("UTC"))
+    wait_seconds = (target_utc - now_utc).total_seconds()
+    print(f"⏳ Waiting {wait_seconds/3600:.2f} hours until first daily quote.")
+    await asyncio.sleep(wait_seconds)
 
 bot.run(TOKEN)
