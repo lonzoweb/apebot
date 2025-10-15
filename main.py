@@ -13,6 +13,9 @@ if channel_id_str is None:
     raise ValueError("CHANNEL_ID environment variable is missing!")
 CHANNEL_ID = int(channel_id_str)
 
+test_channel_id_str = os.getenv("TEST_CHANNEL_ID")
+TEST_CHANNEL_ID = int(test_channel_id_str) if test_channel_id_str else None
+
 AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo"]
 DAILY_COMMAND_ROLE = "Patrizio"  # role for using .daily
 ROLE_ADD_QUOTE = "Caporegime"  # Only this role or admin can add quotes
@@ -126,9 +129,11 @@ async def daily_command(ctx):
 async def daily_quote():
     global daily_quote_of_the_day
 
-    channel = bot.get_channel(CHANNEL_ID)
-    if not channel:
-        print("⚠️ Channel not found.")
+    main_channel = bot.get_channel(CHANNEL_ID)
+    test_channel = bot.get_channel(TEST_CHANNEL_ID) if TEST_CHANNEL_ID else None
+
+    if not main_channel and not test_channel:
+        print("⚠️ No valid channel found.")
         return
 
     now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
@@ -137,14 +142,17 @@ async def daily_quote():
     # Morning (10 AM PT)
     if current_time == "10:00":
         daily_quote_of_the_day = random.choice(QUOTES)
-
         embed = discord.Embed(
             title="🌅 Blessings to Apeiron",
             description=f"📜 {daily_quote_of_the_day}",
             color=discord.Color.gold()
         )
         embed.set_footer(text="🕊️ Quote")
-        await channel.send(embed=embed)
+
+        if main_channel:
+            await main_channel.send(embed=embed)
+        if test_channel:
+            await test_channel.send(embed=embed)
 
         print("✅ Sent 10AM quote")
 
@@ -155,7 +163,11 @@ async def daily_quote():
             color=discord.Color.dark_gold()
         )
         embed.set_footer(text="🌇 Quote")
-        await channel.send(embed=embed)
+
+        if main_channel:
+            await main_channel.send(embed=embed)
+        if test_channel:
+            await test_channel.send(embed=embed)
 
         print("✅ Sent 6PM quote")
 
@@ -163,7 +175,6 @@ async def daily_quote():
 async def before_daily_quote():
     await bot.wait_until_ready()
     print("⏳ Waiting for the next scheduled quote...")
-
 
 
 bot.run(TOKEN)
