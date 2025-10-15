@@ -38,13 +38,15 @@ QUOTES = []
 QUOTE_EDGE_CHARS = ('"', "'", "“", "”", "‘", "’")
 
 def clean_quote_text(s: str) -> str:
-    """Trim whitespace and strip any surrounding quote-like characters."""
+    """Trim whitespace and strip any surrounding or trailing quote-like characters."""
     if s is None:
         return s
     s = s.strip()
+    # Strip leading quote chars
     while s and s[0] in QUOTE_EDGE_CHARS:
         s = s[1:].lstrip()
-    while s and s[-1] in QUOTE_EDGE_CHARS:
+    # Strip trailing quote chars (even after dash or punctuation)
+    while s and s[-1] in QUOTE_EDGE_CHARS + (' ',):
         s = s[:-1].rstrip()
     return s
 
