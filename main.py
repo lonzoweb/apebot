@@ -36,7 +36,7 @@ QUOTES = [
     "Weak, like clock radio speakers. – GZA",
     "You should never have time on your hands. It's like having your hands on your cock. - Titan",
     "Ignorant kinds, I free ‘em. – Pharoahe Monch",
-    "He proves by algebra that Hamlet's grandson is Shakespeare's grandfather and that he himselfis the ghost of his own father. - Mulligan",
+    "He proves by algebra that Hamlet's grandson is Shakespeare's grandfather and that he himself is the ghost of his own father. - Mulligan",
     "All them no like da funny man, putcha gunz up ‘na air. - Masta Simon",
     "But there is neither East nor West, Border, nor Breed, nor Birth, When two strong men stand face to face, though they come from the ends of the earth! - Kipling",
     "Limb by limb we gon cut em down. – Cutty Ranks",
