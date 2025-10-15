@@ -2,28 +2,25 @@ import discord
 from discord.ext import commands, tasks
 import random
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
 import sqlite3
 from io import BytesIO
-from dotenv import load_dotenv
 
 # ==== CONFIG ====
-load_dotenv()
-
 TOKEN = os.getenv("DISCORD_TOKEN")
-channel_id_str = os.getenv("CHANNEL_ID")
-if channel_id_str is None:
-    raise ValueError("CHANNEL_ID environment variable is missing!")
-CHANNEL_ID = int(channel_id_str)
+if TOKEN is None:
+    raise ValueError("DISCORD_TOKEN environment variable is missing!")
+
+CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 
 test_channel_id_str = os.getenv("TEST_CHANNEL_ID")
 TEST_CHANNEL_ID = int(test_channel_id_str) if test_channel_id_str else None
 
 AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo"]
-DAILY_COMMAND_ROLE = "Patrizio"  # role for using .daily
-ROLE_ADD_QUOTE = "Caporegime"    # Only this role or admin can add/edit quotes
+DAILY_COMMAND_ROLE = "Patrizio"
+ROLE_ADD_QUOTE = "Caporegime"
 
 DB_FILE = "quotes.db"
 
@@ -88,11 +85,7 @@ async def quote_command(ctx, *, keyword: str = None):
     if keyword is None:
         if ctx.author.guild_permissions.administrator or any(role.name in AUTHORIZED_ROLES for role in ctx.author.roles):
             quote = random.choice(QUOTES)
-            embed = discord.Embed(
-                title="📜 Quote",
-                description=quote,
-                color=discord.Color.gold()
-            )
+            embed = discord.Embed(title="📜 Quote", description=quote, color=discord.Color.gold())
             await ctx.send(embed=embed)
         else:
             await ctx.send("🚫 Peasant Detected")
@@ -100,10 +93,7 @@ async def quote_command(ctx, *, keyword: str = None):
         matches = [q for q in QUOTES if keyword.lower() in q.lower()]
         if matches:
             for match in matches:
-                embed = discord.Embed(
-                    description=f"📜 {match}",
-                    color=discord.Color.gold()
-                )
+                embed = discord.Embed(description=f"📜 {match}", color=discord.Color.gold())
                 await ctx.send(embed=embed)
         else:
             await ctx.send(f"🔍 No quotes found containing “{keyword}.”")
@@ -114,11 +104,7 @@ async def add_quote_command(ctx, *, quote_text: str):
     if ctx.author.guild_permissions.administrator or any(role.name == ROLE_ADD_QUOTE for role in ctx.author.roles):
         add_quote_to_db(quote_text)
         QUOTES.append(quote_text)
-        embed = discord.Embed(
-            title="✅ Quote Added",
-            description=quote_text,
-            color=discord.Color.green()
-        )
+        embed = discord.Embed(title="✅ Quote Added", description=quote_text, color=discord.Color.green())
         embed.set_footer(text=f"Added by {ctx.author.display_name}")
         await ctx.send(embed=embed)
     else:
@@ -128,11 +114,7 @@ async def add_quote_command(ctx, *, quote_text: str):
 async def daily_command(ctx):
     if ctx.author.guild_permissions.administrator or any(role.name == DAILY_COMMAND_ROLE for role in ctx.author.roles):
         if daily_quote_of_the_day:
-            embed = discord.Embed(
-                title="🌅 Blessings to Apeiron",
-                description=daily_quote_of_the_day,
-                color=discord.Color.gold()
-            )
+            embed = discord.Embed(title="🌅 Blessings to Apeiron", description=daily_quote_of_the_day, color=discord.Color.gold())
             embed.set_footer(text="🕊️ Daily Quote Recall")
             await ctx.send(embed=embed)
         else:
@@ -163,8 +145,7 @@ async def edit_quote(ctx, *, keyword: str):
     embed.set_footer(text="Reply with the number of the quote to edit, or 'cancel'.")
     await ctx.send(embed=embed)
 
-    def check(m):
-        return m.author == ctx.author and m.channel == ctx.channel
+    def check(m): return m.author == ctx.author and m.channel == ctx.channel
 
     try:
         reply = await bot.wait_for('message', check=check, timeout=60)
@@ -201,19 +182,15 @@ async def edit_quote(ctx, *, keyword: str):
     update_quote_in_db(quote_id, new_text)
     conn.close()
 
-    # Update in-memory list
+    # Update in-memory
     global QUOTES
     QUOTES = load_quotes_from_db()
 
-    embed = discord.Embed(
-        title="✅ Quote Updated",
-        description=new_text,
-        color=discord.Color.green()
-    )
+    embed = discord.Embed(title="✅ Quote Updated", description=new_text, color=discord.Color.green())
     embed.set_footer(text=f"Edited by {ctx.author.display_name}")
     await ctx.send(embed=embed)
 
-# ---- LIST QUOTES (send via DM) ----
+# ---- LIST QUOTES (admin only, DM) ----
 @bot.command(name="listquotes")
 async def list_quotes(ctx):
     if not ctx.author.guild_permissions.administrator:
@@ -245,25 +222,16 @@ async def daily_quote():
     now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
     current_time = now_pt.strftime("%H:%M")
 
-    # Morning 10 AM PT
     if current_time == "10:00":
         daily_quote_of_the_day = random.choice(QUOTES)
-        embed = discord.Embed(
-            title="🌅 Blessings to Apeiron",
-            description=daily_quote_of_the_day,
-            color=discord.Color.gold()
-        )
+        embed = discord.Embed(title="🌅 Blessings to Apeiron", description=daily_quote_of_the_day, color=discord.Color.gold())
         embed.set_footer(text="🕊️ Quote")
         if main_channel: await main_channel.send(embed=embed)
         if test_channel: await test_channel.send(embed=embed)
         print("✅ Sent 10AM quote")
 
-    # Evening 6 PM PT
     elif current_time == "18:00" and daily_quote_of_the_day:
-        embed = discord.Embed(
-            description=daily_quote_of_the_day,
-            color=discord.Color.dark_gold()
-        )
+        embed = discord.Embed(description=daily_quote_of_the_day, color=discord.Color.dark_gold())
         embed.set_footer(text="🌇 Quote")
         if main_channel: await main_channel.send(embed=embed)
         if test_channel: await test_channel.send(embed=embed)
