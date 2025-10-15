@@ -216,8 +216,8 @@ async def edit_quote(ctx, *, keyword: str):
 # ---- LIST QUOTES (send via DM) ----
 @bot.command(name="listquotes")
 async def list_quotes(ctx):
-    if not (ctx.author.guild_permissions.administrator or any(role.name == ROLE_ADD_QUOTE for role in ctx.author.roles)):
-        await ctx.send("🚫 Peasant Detected")
+    if not ctx.author.guild_permissions.administrator:
+        await ctx.send("🚫 Only admins can use this command.")
         return
 
     global QUOTES
