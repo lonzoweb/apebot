@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands, tasks
 import random
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo  # Python 3.9+
 import os
 
@@ -100,7 +100,7 @@ async def daily_quote():
 async def before_daily_quote():
     await bot.wait_until_ready()
 
-    now_utc = datetime.utcnow()
+    now_utc = datetime.now(timezone.utc)
     now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
 
     # Next post hour in PT
