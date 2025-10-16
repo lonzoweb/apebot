@@ -236,7 +236,7 @@ async def blessing_command(ctx):
 
     embed = discord.Embed(
         title="",
-        description="<a:3bluefire:1332813616696524914> Blessings to Apeiron <a:3bluefire:1332813616696524914>",
+        description="**<a:3bluefire:1332813616696524914> Blessings to Apeiron <a:3bluefire:1332813616696524914>**",
         color=discord.Color.gold()
     )
     main_channel = bot.get_channel(CHANNEL_ID)
