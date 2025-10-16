@@ -1,19 +1,35 @@
 import sqlite3
+import os
 
 DB_FILE = "/app/data/quotes.db"
 
 conn = sqlite3.connect(DB_FILE)
 c = conn.cursor()
 
-# Fetch all quotes
+# Delete duplicate rows (case-insensitive, trimmed)
+c.execute("""
+DELETE FROM quotes
+WHERE id NOT IN (
+  SELECT MIN(id)
+  FROM quotes
+  GROUP BY TRIM(LOWER(text))
+)
+""")
+
+conn.commit()
+
+# Clean trailing or extra quotes
 c.execute("SELECT id, text FROM quotes")
 rows = c.fetchall()
-
-for qid, text in rows:
-    cleaned = text.strip().strip('"').rstrip(',')
-    if cleaned != text:
-        c.execute("UPDATE quotes SET text = ? WHERE id = ?", (cleaned, qid))
+cleaned = 0
+for rid, text in rows:
+    cleaned_text = text.strip().strip('"').strip("'").strip()
+    if cleaned_text != text:
+        c.execute("UPDATE quotes SET text = ? WHERE id = ?", (cleaned_text, rid))
+        cleaned += 1
 
 conn.commit()
 conn.close()
-print("✅ Cleaned all existing quotes in the database")
+
+print("✅ Database cleaned.")
+print(f"Removed duplicates and fixed {cleaned} quotes.")
