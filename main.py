@@ -11,7 +11,7 @@ import os
 TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 TEST_CHANNEL_ID = int(os.getenv("TEST_CHANNEL_ID", CHANNEL_ID))
-DB_FILE = os.getenv("DB_FILE", "/data/quotes.db")  # persistent storage on Railway
+DB_FILE = os.getenv("DB_FILE", "/app/data/quotes.db")  # persistent storage on Railway
 AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo"]
 ROLE_ADD_QUOTE = "Caporegime"
 ADMIN_ROLE = "Patrizio"
