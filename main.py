@@ -1,36 +1,32 @@
 import discord
 from discord.ext import commands, tasks
 import random
-import asyncio
 import sqlite3
+import asyncio
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
 
 # ==== CONFIG ====
 TOKEN = os.getenv("DISCORD_TOKEN")
-channel_id_str = os.getenv("CHANNEL_ID")
-if channel_id_str is None:
-    raise ValueError("CHANNEL_ID environment variable is missing!")
-CHANNEL_ID = int(channel_id_str)
-
-test_channel_id_str = os.getenv("TEST_CHANNEL_ID")
-TEST_CHANNEL_ID = int(test_channel_id_str) if test_channel_id_str else None
-
-DB_FILE = os.getenv("DB_FILE", "/data/quotes.db")  # Persistent path for Railway
+CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
+TEST_CHANNEL_ID = int(os.getenv("TEST_CHANNEL_ID", CHANNEL_ID))
+DB_FILE = os.getenv("DB_FILE", "/data/quotes.db")  # persistent storage on Railway
 AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo"]
-DAILY_COMMAND_ROLE = "Patrizio"
 ROLE_ADD_QUOTE = "Caporegime"
+ADMIN_ROLE = "Patrizio"
 # =================
 
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True
 intents.guilds = True
+intents.members = True
 bot = commands.Bot(command_prefix=".", intents=intents)
 
+QUOTES = []
 daily_quote_of_the_day = None
-last_reload_time = None
+last_sent_day = {"morning": None, "evening": None}
+
 
 # ---- Database ----
 def init_db():
@@ -45,219 +41,187 @@ def init_db():
     conn.commit()
     conn.close()
 
-def fetch_all_quotes():
+
+def load_quotes():
+    global QUOTES
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("SELECT text FROM quotes")
-    rows = [row[0] for row in c.fetchall()]
+    QUOTES = [row[0].strip() for row in c.fetchall()]
     conn.close()
-    return rows
 
-def add_quote_to_db(text):
+
+def add_quote_to_db(quote_text):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO quotes (text) VALUES (?)", (text,))
+    try:
+        c.execute("INSERT OR IGNORE INTO quotes (text) VALUES (?)", (quote_text.strip(),))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def update_quote_in_db(old_text, new_text):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("UPDATE quotes SET text = ? WHERE text = ?", (new_text.strip(), old_text.strip()))
     conn.commit()
     conn.close()
 
-def search_quotes(keyword):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT text FROM quotes WHERE text LIKE ?", (f"%{keyword}%",))
-    results = [row[0] for row in c.fetchall()]
-    conn.close()
-    return results
 
-def update_quote(old_text, new_text):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("UPDATE quotes SET text = ? WHERE text = ?", (new_text, old_text))
-    conn.commit()
-    conn.close()
+# ---- UTIL ----
+async def send_quote_embed(channel, title, quote, color):
+    embed = discord.Embed(title=title, description=f"📜 {quote}", color=color)
+    embed.set_footer(text="🕊️ Quote")
+    await channel.send(embed=embed)
 
-# ---- Helper ----
-def clean_quote(quote):
-    quote = quote.strip()
-    if quote.startswith('"') and quote.endswith('"'):
-        quote = quote[1:-1]
-    if quote.endswith('",'):
-        quote = quote[:-2]
-    return quote.strip()
 
-# ---- Reload Quotes Cache ----
-def reload_quotes():
-    global QUOTES, last_reload_time
-    QUOTES = [clean_quote(q) for q in fetch_all_quotes()]
-    last_reload_time = datetime.now(ZoneInfo("America/Los_Angeles"))
-
-# ---- Events ----
-@bot.event
-async def on_ready():
-    init_db()
-    reload_quotes()
-    print(f"✅ Logged in as {bot.user}")
-    daily_quote.start()
-
-# ---- Commands ----
+# ---- COMMANDS ----
 @bot.command(name="quote")
 async def quote_command(ctx, *, keyword: str = None):
+    if not QUOTES:
+        load_quotes()
+
     if keyword is None:
-        if not QUOTES:
-            await ctx.send("⚠️ No quotes found in the database.")
-            return
-        if (ctx.author.guild_permissions.administrator or
-            any(role.name in AUTHORIZED_ROLES for role in ctx.author.roles)):
+        if ctx.author.guild_permissions.administrator or any(r.name in AUTHORIZED_ROLES for r in ctx.author.roles):
             quote = random.choice(QUOTES)
-            embed = discord.Embed(
-                title="📜 Quote",
-                description=quote,
-                color=discord.Color.gold()
-            )
+            embed = discord.Embed(title="📜 Quote", description=quote, color=discord.Color.gold())
             await ctx.send(embed=embed)
         else:
-            await ctx.send("🚫 Peasant Detected")
+            await ctx.send("🚫 Peasant detected.")
     else:
         matches = [q for q in QUOTES if keyword.lower() in q.lower()]
         if matches:
-            for match in matches:
-                embed = discord.Embed(
-                    description=f"📜 {match}",
-                    color=discord.Color.gold()
-                )
+            for match in matches[:5]:
+                embed = discord.Embed(title="📜 Matching Quote", description=match, color=discord.Color.gold())
                 await ctx.send(embed=embed)
         else:
-            await ctx.send(f"🔍 No quotes found containing “{keyword}.”")
+            await ctx.send("No matches found.")
+
 
 @bot.command(name="addquote")
-async def add_quote_command(ctx, *, quote_text: str):
-    if (ctx.author.guild_permissions.administrator or
-        any(role.name == ROLE_ADD_QUOTE for role in ctx.author.roles)):
-        quote_text = clean_quote(quote_text)
-        add_quote_to_db(quote_text)
-        reload_quotes()
-        embed = discord.Embed(
-            title="✅ Quote Added",
-            description=f"“{quote_text}”",
-            color=discord.Color.green()
-        )
-        embed.set_footer(text=f"Added by {ctx.author.display_name}")
-        await ctx.send(embed=embed)
-    else:
-        await ctx.send("🚫 Peasant Detected")
+async def addquote_command(ctx, *, quote: str):
+    if not (ctx.author.guild_permissions.administrator or any(r.name == ROLE_ADD_QUOTE for r in ctx.author.roles)):
+        await ctx.send("🚫 You lack permission to add quotes.")
+        return
+    add_quote_to_db(quote)
+    load_quotes()
+    await ctx.send(f"✅ Quote added: {quote}")
+
 
 @bot.command(name="editquote")
-async def edit_quote_command(ctx, *, keyword: str):
-    matches = search_quotes(keyword)
+async def editquote_command(ctx, *, keyword: str):
+    matches = [q for q in QUOTES if keyword.lower() in q.lower()]
     if not matches:
-        await ctx.send(f"🔍 No quotes found containing “{keyword}.”")
+        await ctx.send("No matching quotes found.")
         return
 
     if len(matches) > 1:
-        await ctx.send(f"Found {len(matches)} quotes. Please refine your keyword.")
-        return
+        msg = "\n".join([f"{i+1}. {q}" for i, q in enumerate(matches[:5])])
+        await ctx.send(f"Multiple matches found:\n```{msg}```\nReply with the number to edit.")
+        try:
+            reply = await bot.wait_for(
+                "message",
+                check=lambda m: m.author == ctx.author and m.channel == ctx.channel,
+                timeout=30
+            )
+            idx = int(reply.content.strip()) - 1
+            if idx < 0 or idx >= len(matches):
+                await ctx.send("Invalid selection.")
+                return
+            target = matches[idx]
+        except asyncio.TimeoutError:
+            await ctx.send("⏰ Timeout.")
+            return
+    else:
+        target = matches[0]
 
-    old_quote = matches[0]
-    await ctx.send(f"✏️ Editing this quote:\n> {old_quote}\n\nPlease reply with the new version.")
-
-    def check(m):
-        return m.author == ctx.author and m.channel == ctx.channel
+    await ctx.send(f"Editing quote:\n```{target}```\nSend the updated version:")
 
     try:
-        msg = await bot.wait_for("message", timeout=60.0, check=check)
-        new_quote = clean_quote(msg.content)
-        update_quote(old_quote, new_quote)
-        reload_quotes()
-        await ctx.send("✅ Quote updated successfully.")
+        reply = await bot.wait_for(
+            "message",
+            check=lambda m: m.author == ctx.author and m.channel == ctx.channel,
+            timeout=120
+        )
+        new_quote = reply.content.strip()
+        update_quote_in_db(target, new_quote)
+        load_quotes()
+        await ctx.send(f"✅ Quote updated:\n```{new_quote}```")
     except asyncio.TimeoutError:
-        await ctx.send("⌛ Edit timed out.")
+        await ctx.send("⏰ Timeout.")
+
 
 @bot.command(name="listquotes")
-async def list_quotes_command(ctx):
-    if not ctx.author.guild_permissions.administrator:
-        await ctx.send("🚫 Peasant Detected")
+async def listquotes_command(ctx):
+    if not (ctx.author.guild_permissions.administrator or any(r.name == ADMIN_ROLE for r in ctx.author.roles)):
+        await ctx.send("🚫 You lack permission to list quotes.")
         return
 
-    quotes = fetch_all_quotes()
-    if not quotes:
-        await ctx.send("⚠️ No quotes found in the database.")
-        return
+    file_path = "/tmp/quotes_export.txt"
+    with open(file_path, "w", encoding="utf-8") as f:
+        for quote in QUOTES:
+            f.write(f"{quote}\n")
 
-    chunks = []
-    current_chunk = ""
-    for q in quotes:
-        line = f"• {q}\n"
-        if len(current_chunk) + len(line) > 1900:
-            chunks.append(current_chunk)
-            current_chunk = ""
-        current_chunk += line
-    if current_chunk:
-        chunks.append(current_chunk)
+    await ctx.author.send(file=discord.File(file_path))
+    await ctx.send("📨 Sent the quotes list to your DMs.")
 
-    try:
-        await ctx.author.send("📜 **Full Quote List:**")
-        for i, chunk in enumerate(chunks):
-            await ctx.author.send(chunk)
-        await ctx.send("✅ Sent the full quote list to your DMs.")
-        print(f"📤 Sent quote list to {ctx.author}")
-    except discord.Forbidden:
-        await ctx.send("❌ Unable to send DM. Please enable DMs from server members.")
 
-@bot.command(name="reloadquotes")
-async def reload_quotes_command(ctx):
-    if ctx.author.guild_permissions.administrator:
-        reload_quotes()
-        await ctx.send("🔄 Quotes reloaded from database.")
-    else:
-        await ctx.send("🚫 Peasant Detected")
-
-@bot.command(name="stats")
-async def stats_command(ctx):
-    total_quotes = len(QUOTES)
-    embed = discord.Embed(
-        title="📊 Bot Stats",
-        description=(
-            f"**Quotes Loaded:** {total_quotes}\n"
-            f"**Last Reload:** {last_reload_time.strftime('%Y-%m-%d %H:%M:%S') if last_reload_time else 'Never'}"
-        ),
-        color=discord.Color.blue()
-    )
-    await ctx.send(embed=embed)
-
-# ---- Daily Auto Post ----
+# ---- DAILY QUOTES ----
 @tasks.loop(minutes=1)
 async def daily_quote():
-    global daily_quote_of_the_day
+    global daily_quote_of_the_day, last_sent_day
 
-    main_channel = bot.get_channel(CHANNEL_ID)
-    test_channel = bot.get_channel(TEST_CHANNEL_ID) if TEST_CHANNEL_ID else None
+    channel = bot.get_channel(CHANNEL_ID)
+    test_channel = bot.get_channel(TEST_CHANNEL_ID)
+    if not channel:
+        print("⚠️ Channel not found.")
+        return
 
-    now_pt = datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%H:%M")
+    now = datetime.now(ZoneInfo("America/Los_Angeles"))
+    date_str = now.strftime("%Y-%m-%d")
+    hour = now.hour
 
-    # 10AM PT
-    if now_pt == "10:00":
+    # 10 AM Morning Quote
+    if hour >= 10 and last_sent_day["morning"] != date_str:
         daily_quote_of_the_day = random.choice(QUOTES)
-        embed = discord.Embed(
-            title="🌅 Blessings to Apeiron",
-            description=f"📜 {daily_quote_of_the_day}",
-            color=discord.Color.gold()
-        )
-        if main_channel: await main_channel.send(embed=embed)
-        if test_channel: await test_channel.send(embed=embed)
-        print("✅ Sent 10AM quote")
+        await send_quote_embed(channel, "🌅 Blessings to Apeiron", daily_quote_of_the_day, discord.Color.gold())
+        await send_quote_embed(test_channel, "🌅 Blessings to Apeiron", daily_quote_of_the_day, discord.Color.gold())
+        last_sent_day["morning"] = date_str
+        print("✅ Sent morning quote")
 
-    # 6PM PT
-    elif now_pt == "18:00" and daily_quote_of_the_day:
-        embed = discord.Embed(
-            description=f"📜 {daily_quote_of_the_day}",
-            color=discord.Color.dark_gold()
-        )
-        if main_channel: await main_channel.send(embed=embed)
-        if test_channel: await test_channel.send(embed=embed)
-        print("✅ Sent 6PM quote")
+    # 6 PM Evening Quote
+    if hour >= 18 and last_sent_day["evening"] != date_str:
+        if daily_quote_of_the_day:
+            await send_quote_embed(channel, "", daily_quote_of_the_day, discord.Color.dark_gold())
+            await send_quote_embed(test_channel, "", daily_quote_of_the_day, discord.Color.dark_gold())
+            last_sent_day["evening"] = date_str
+            print("✅ Sent evening quote")
+
 
 @daily_quote.before_loop
 async def before_daily_quote():
     await bot.wait_until_ready()
-    print("⏳ Waiting for the next scheduled quote...")
+    load_quotes()
+    print("⏳ Waiting for next scheduled quote...")
 
+
+# ---- AUTO-RELOAD QUOTES ----
+@tasks.loop(minutes=15)
+async def auto_reload_quotes():
+    load_quotes()
+    print("🔄 Quotes reloaded.")
+
+
+# ---- EVENTS ----
+@bot.event
+async def on_ready():
+    init_db()
+    load_quotes()
+    daily_quote.start()
+    auto_reload_quotes.start()
+    print(f"✅ Logged in as {bot.user}")
+
+
+# ---- RUN ----
 bot.run(TOKEN)
