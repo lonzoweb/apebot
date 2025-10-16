@@ -235,9 +235,9 @@ async def blessing_command(ctx):
         return
 
     embed = discord.Embed(
-        title="Blessings to Apeiron ",
-        description="May your day be prosperous and your sword sharp.",
-        color=discord.Color.purple()
+        title="",
+        description="<a:3bluefire:1332813616696524914> Blessings to Apeiron <a:3bluefire:1332813616696524914>",
+        color=discord.Color.Purple()
     )
     main_channel = bot.get_channel(CHANNEL_ID)
     test_channel = bot.get_channel(TEST_CHANNEL_ID) if TEST_CHANNEL_ID else None
