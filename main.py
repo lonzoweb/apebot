@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import os
 import sqlite3
 import time
+import aiohttp
 
 # ==== CONFIG ====
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -96,6 +97,26 @@ async def on_ready():
     daily_quote.start()
 
 # ---- COMMANDS ----
+
+@bot.command(name="ud")
+async def urban_command(ctx, *, term: str):
+    url = f"https://api.urbandictionary.com/v0/define?term={term}"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            data = await resp.json()
+    if not data.get("list"):
+        await ctx.send(f"No definition found for **{term}**.")
+        return
+    first = data["list"][0]
+    definition = first["definition"]
+    example   = first.get("example", "")
+    embed = discord.Embed(
+        title=f"Definition of {term}",
+        description=f"{definition}\n\n*Example: {example}*",
+        color=discord.Color.dark_purple()
+    )
+    await ctx.send(embed=embed)
+    
 @bot.command(name="quote")
 async def quote_command(ctx, *, keyword: str = None):
     quotes = load_quotes_from_db()
