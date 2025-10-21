@@ -99,23 +99,30 @@ async def on_ready():
 # ---- COMMANDS ----
 
 @bot.command(name="ud")
-async def urban_command(ctx, *, term: str):
+async def ud_command(ctx, *, term: str):
     url = f"https://api.urbandictionary.com/v0/define?term={term}"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
+            if resp.status != 200:
+                await ctx.send("⚠️ Could not fetch definition.")
+                return
             data = await resp.json()
-    if not data.get("list"):
-        await ctx.send(f"No definition found for **{term}**.")
-        return
-    first = data["list"][0]
-    definition = first["definition"]
-    example   = first.get("example", "")
-    embed = discord.Embed(
-        title=f"Definition of {term}",
-        description=f"{definition}\n\n*Example: {example}*",
-        color=discord.Color.dark_purple()
-    )
-    await ctx.send(embed=embed)
+            defs = data.get("list", [])
+            if not defs:
+                await ctx.send(f"🔍 No Urban Dictionary entry found for **{term}**.")
+                return
+
+            # pick the definition with the most thumbs_up
+            best = max(defs, key=lambda d: d.get("thumbs_up", 0))
+
+            embed = discord.Embed(
+                title=f"📚 {best['word']}",
+                description=best['definition'],
+                color=discord.Color.green()
+            )
+            embed.add_field(name="Example", value=best.get('example', 'No example available.'), inline=False)
+            embed.set_footer(text=f"👍 {best.get('thumbs_up',0)}   👎 {best.get('thumbs_down',0)}")
+            await ctx.send(embed=embed)
     
 @bot.command(name="quote")
 async def quote_command(ctx, *, keyword: str = None):
