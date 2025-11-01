@@ -121,6 +121,30 @@ async def send_random_quote(channel, blessing=False):
     await channel.send(embed=embed)
 
 async def lookup_location(query):
+    # Try original query
+    timezone_name, city = await try_lookup(query)
+    if timezone_name:
+        return timezone_name, city
+
+    # Fallback 1: remove numbers (likely ZIP)
+    import re
+    query_no_numbers = re.sub(r"\d+", "", query).strip()
+    if query_no_numbers != query:
+        timezone_name, city = await try_lookup(query_no_numbers)
+        if timezone_name:
+            return timezone_name, city
+
+    # Fallback 2: just first word (maybe city only)
+    first_word = query.split()[0]
+    if first_word.lower() != query.lower():
+        timezone_name, city = await try_lookup(first_word)
+        if timezone_name:
+            return timezone_name, city
+
+    # Nothing found
+    return None, None
+
+async def try_lookup(query):
     url = f"https://api.opencagedata.com/geocode/v1/json?q={query}&key={OPENCAGE_KEY}"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
@@ -132,6 +156,7 @@ async def lookup_location(query):
         city = components.get("city") or components.get("town") or components.get("village") or components.get("state") or query
         return timezone_name, city
     return None, None
+
 
 def has_authorized_role(member):
     return any(role.name in AUTHORIZED_ROLES for role in member.roles) or member.guild_permissions.administrator
