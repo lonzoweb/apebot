@@ -27,6 +27,8 @@ AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo", "Caporegime"]
 DAILY_COMMAND_ROLE = "Patrizio"  # role for using .daily
 ROLE_ADD_QUOTE = "Caporegime"    # Only this role or admin can add/edit quotes
 
+
+os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
 DB_FILE = "/app/data/quotes.db"  # Make sure this path matches Railway volume
 
 # =================
@@ -458,5 +460,101 @@ async def db_check(ctx):
 async def show_quotes(ctx):
     quotes = load_quotes_from_db()
     await ctx.send(f"Loaded {len(quotes)} quotes.\nExample:\n{quotes[-3:]}")
+    
+@bot.command(name="delquote")
+async def delete_quote(ctx, *, keyword: str):
+    """Delete a quote by keyword with confirmation."""
+    import asyncio
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT id, quote FROM quotes WHERE quote LIKE ?", (f"%{keyword}%",))
+    results = c.fetchall()
+    conn.close()
+
+    if not results:
+        await ctx.send(f"🔍 No quotes found containing “{keyword}.”")
+        return
+
+    if len(results) > 1:
+        formatted = "\n".join(f"{i+1}. {r[1][:80]}" for i, r in enumerate(results))
+        await ctx.send(
+            f"⚠️ Multiple quotes found containing “{keyword}.”\n"
+            f"Type the number of the one you want to delete (1–{len(results)}), or `cancel`."
+        )
+
+        def check(m):
+            return m.author == ctx.author and m.channel == ctx.channel
+
+        try:
+            reply = await bot.wait_for("message", timeout=30.0, check=check)
+        except asyncio.TimeoutError:
+            await ctx.send("⌛ Timed out. No quotes deleted.")
+            return
+
+        if reply.content.lower() == "cancel":
+            await ctx.send("❎ Cancelled.")
+            return
+
+        if not reply.content.isdigit() or not (1 <= int(reply.content) <= len(results)):
+            await ctx.send("❌ Invalid selection. Cancelled.")
+            return
+
+        quote_id, quote_text = results[int(reply.content) - 1]
+    else:
+        quote_id, quote_text = results[0]
+
+    # Ask for typed confirmation
+    await ctx.send(f"🗑️ Delete this quote?\n“{quote_text}”\nType `yes` to confirm.")
+
+    def check_confirm(m):
+        return m.author == ctx.author and m.channel == ctx.channel
+
+    try:
+        confirm = await bot.wait_for("message", timeout=30.0, check=check_confirm)
+    except asyncio.TimeoutError:
+        await ctx.send("⌛ Timed out. Quote not deleted.")
+        return
+
+    if confirm.content.lower() != "yes":
+        await ctx.send("❎ Cancelled.")
+        return
+
+    # Delete confirmed
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("DELETE FROM quotes WHERE id = ?", (quote_id,))
+    conn.commit()
+    conn.close()
+
+    await ctx.send(f"✅ Deleted quote:\n“{quote_text}”")
+    
+@bot.command(name="dbcheckwrite")
+async def db_check_write(ctx, *, quote_text: str = "test write"):
+    import sqlite3, os
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (quote_text,))
+        conn.commit()
+        conn.close()
+        await ctx.send(f"✅ Successfully wrote “{quote_text}” to {DB_FILE}")
+    except Exception as e:
+        await ctx.send(f"❌ Write failed: {e}")
+
+@bot.command(name="fixdb")
+async def fix_db(ctx):
+    import shutil
+    if os.path.exists(DB_FILE):
+        backup_path = f"{DB_FILE}.bak"
+        shutil.copy2(DB_FILE, backup_path)
+        await ctx.send(f"📦 Backed up old DB to {backup_path}")
+
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("DROP TABLE IF EXISTS quotes")
+    c.execute("CREATE TABLE quotes (id INTEGER PRIMARY KEY AUTOINCREMENT, quote TEXT UNIQUE)")
+    conn.commit()
+    conn.close()
+    await ctx.send(f"✅ Reinitialized quotes table at {DB_FILE}")
     
 bot.run(TOKEN)
