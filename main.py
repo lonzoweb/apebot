@@ -557,5 +557,36 @@ async def fix_db(ctx):
     conn.commit()
     conn.close()
     await ctx.send(f"✅ Reinitialized quotes table at {DB_FILE}")
-    
+
+@bot.command(name="mergequotes")
+async def merge_quotes(ctx):
+    import sqlite3, os, shutil
+    old_db = f"{DB_FILE}.bak"
+    if not os.path.exists(old_db):
+        await ctx.send("❌ No backup file found to merge.")
+        return
+
+    conn_new = sqlite3.connect(DB_FILE)
+    conn_old = sqlite3.connect(old_db)
+    c_new = conn_new.cursor()
+    c_old = conn_old.cursor()
+
+    try:
+        c_old.execute("SELECT quote FROM quotes")
+        rows = c_old.fetchall()
+        count = 0
+        for (quote,) in rows:
+            try:
+                c_new.execute("INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (quote,))
+                count += 1
+            except Exception:
+                pass
+        conn_new.commit()
+        await ctx.send(f"✅ Merged {count} quotes from backup into the new database.")
+    except Exception as e:
+        await ctx.send(f"❌ Error merging: {e}")
+    finally:
+        conn_old.close()
+        conn_new.close()
+        
 bot.run(TOKEN)
