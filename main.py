@@ -447,4 +447,11 @@ async def before_daily_quote():
     await bot.wait_until_ready()
     print("⏳ Waiting for the next scheduled quote...")
 
+@bot.command(name="dbcheck")
+async def db_check(ctx):
+    import os
+    exists = os.path.exists(DB_FILE)
+    size = os.path.getsize(DB_FILE) if exists else 0
+    await ctx.send(f"🗄️ DB file: {DB_FILE}\nExists: {exists}\nSize: {size} bytes")
+    
 bot.run(TOKEN)
