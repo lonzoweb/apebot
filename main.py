@@ -28,8 +28,9 @@ DAILY_COMMAND_ROLE = "Patrizio"  # role for using .daily
 ROLE_ADD_QUOTE = "Caporegime"    # Only this role or admin can add/edit quotes
 
 
-os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
+
 DB_FILE = "/app/data/quotes.db"  # Make sure this path matches Railway volume
+os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
 
 # =================
 
