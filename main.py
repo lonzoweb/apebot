@@ -404,51 +404,7 @@ async def time_command(ctx, member: discord.Member = None):
     except Exception as e:
         await ctx.send(f"❌ Error getting time: {e}")
 
-# ---- DAILY AUTO QUOTE ----
-@tasks.loop(minutes=1)
-async def daily_quote():
-    global daily_quote_of_the_day
-    main_channel = bot.get_channel(CHANNEL_ID)
-    test_channel = bot.get_channel(TEST_CHANNEL_ID) if TEST_CHANNEL_ID else None
-    if not main_channel and not test_channel:
-        print("⚠️ No valid channels found for daily quote.")
-        return
-
-    now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
-    current_time = now_pt.strftime("%H:%M")
-
-    # Morning (10 AM PT)
-    if current_time == "10:00":
-        quotes = load_quotes_from_db()
-        if quotes:
-            daily_quote_of_the_day = random.choice(quotes)
-            embed = discord.Embed(
-                title="🌅 Blessings to Apeiron",
-                description=f"📜 {daily_quote_of_the_day}",
-                color=discord.Color.gold()
-            )
-            embed.set_footer(text="🕊️ Quote")
-            for ch in [main_channel, test_channel]:
-                if ch:
-                    await ch.send(embed=embed)
-            print("✅ Sent 10AM quote")
-
-    # Evening (6 PM PT)
-    elif current_time == "18:00" and daily_quote_of_the_day:
-        embed = discord.Embed(
-            description=f"📜 {daily_quote_of_the_day}",
-            color=discord.Color.dark_gold()
-        )
-        embed.set_footer(text="🌇 Quote")
-        for ch in [main_channel, test_channel]:
-            if ch:
-                await ch.send(embed=embed)
-        print("✅ Sent 6PM quote")
-
-@daily_quote.before_loop
-async def before_daily_quote():
-    await bot.wait_until_ready()
-    print("⏳ Waiting for the next scheduled quote...")
+# ---- UTIL CMDS ----
 
 @bot.command(name="dbcheck")
 async def db_check(ctx):
@@ -588,5 +544,51 @@ async def merge_quotes(ctx):
     finally:
         conn_old.close()
         conn_new.close()
-        
+
+# ---- DAILY AUTO QUOTE ----
+@tasks.loop(minutes=1)
+async def daily_quote():
+    global daily_quote_of_the_day
+    main_channel = bot.get_channel(CHANNEL_ID)
+    test_channel = bot.get_channel(TEST_CHANNEL_ID) if TEST_CHANNEL_ID else None
+    if not main_channel and not test_channel:
+        print("⚠️ No valid channels found for daily quote.")
+        return
+
+    now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
+    current_time = now_pt.strftime("%H:%M")
+
+    # Morning (10 AM PT)
+    if current_time == "10:00":
+        quotes = load_quotes_from_db()
+        if quotes:
+            daily_quote_of_the_day = random.choice(quotes)
+            embed = discord.Embed(
+                title="🌅 Blessings to Apeiron",
+                description=f"📜 {daily_quote_of_the_day}",
+                color=discord.Color.gold()
+            )
+            embed.set_footer(text="🕊️ Quote")
+            for ch in [main_channel, test_channel]:
+                if ch:
+                    await ch.send(embed=embed)
+            print("✅ Sent 10AM quote")
+
+    # Evening (6 PM PT)
+    elif current_time == "18:00" and daily_quote_of_the_day:
+        embed = discord.Embed(
+            description=f"📜 {daily_quote_of_the_day}",
+            color=discord.Color.dark_gold()
+        )
+        embed.set_footer(text="🌇 Quote")
+        for ch in [main_channel, test_channel]:
+            if ch:
+                await ch.send(embed=embed)
+        print("✅ Sent 6PM quote")
+
+@daily_quote.before_loop
+async def before_daily_quote():
+    await bot.wait_until_ready()
+    print("⏳ Waiting for the next scheduled quote...")
+
 bot.run(TOKEN)
