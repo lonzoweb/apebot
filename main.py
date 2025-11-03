@@ -453,5 +453,10 @@ async def db_check(ctx):
     exists = os.path.exists(DB_FILE)
     size = os.path.getsize(DB_FILE) if exists else 0
     await ctx.send(f"🗄️ DB file: {DB_FILE}\nExists: {exists}\nSize: {size} bytes")
+
+@bot.command(name="showquotes")
+async def show_quotes(ctx):
+    quotes = load_quotes_from_db()
+    await ctx.send(f"Loaded {len(quotes)} quotes.\nExample:\n{quotes[-3:]}")
     
 bot.run(TOKEN)
