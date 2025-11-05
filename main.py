@@ -10,7 +10,7 @@ import time
 import aiohttp
 import json
 import shutil
-from icrawler.builtin import YandexImageCrawler
+from icrawler.builtin import BingImageCrawler
 
 # ==== CONFIG ====
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -397,13 +397,31 @@ async def commands_command(ctx):
         await ctx.send("⚠️ I cannot DM you. Please check your privacy settings.")
 
 # ---- reverse command ----
+
 @bot.command(name="reverse")
 async def reverse_command(ctx):
-    await ctx.send("Looking for an image...")
+    import shutil
+    import os
+    import aiohttp
+    import json
 
+    # Check attachments / embeds
+    async def extract_image(msg: discord.Message):
+        if msg.attachments:
+            for a in msg.attachments:
+                if a.filename.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+                    return a.url
+        for e in msg.embeds:
+            if e.url:
+                return e.url
+            if e.image and e.image.url:
+                return e.image.url
+            if e.thumbnail and e.thumbnail.url:
+                return e.thumbnail.url
+        return None
+
+    # Find image in reply or last 20 messages
     image_url = None
-
-    # 1️⃣ Check if this message is a reply
     if ctx.message.reference:
         try:
             replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
@@ -411,7 +429,6 @@ async def reverse_command(ctx):
         except:
             pass
 
-    # 2️⃣ If no image in reply, check last 20 messages
     if not image_url:
         async for msg in ctx.channel.history(limit=20):
             image_url = await extract_image(msg)
@@ -419,43 +436,53 @@ async def reverse_command(ctx):
                 break
 
     if not image_url:
-        await ctx.send("No image found.")
+        await ctx.send("⚠️ No image found.")
         return
 
-    await ctx.send("Image found. Running Yandex reverse search...")
+    await ctx.send("✅ Image found.\n⏳ Running Bing reverse search...")
 
-    # Download image
+    # Download image locally
+    local_image_path = "query_image.jpg"
     async with aiohttp.ClientSession() as session:
         async with session.get(image_url) as resp:
             img_bytes = await resp.read()
-
-    local_image_path = "query_image.jpg"
     with open(local_image_path, "wb") as f:
         f.write(img_bytes)
 
-    # Run reverse search in executor to avoid blocking
-    result = await bot.loop.run_in_executor(None, reverse_search, local_image_path)
+    # Remove previous results folder
+    if os.path.exists("results"):
+        shutil.rmtree("results")
 
-    if not result:
-        await ctx.send("No useful match results.")
+    # Run Bing crawler (max_num=1 to get first match)
+    crawler = BingImageCrawler(storage={"root_dir": "results"})
+    crawler.crawl(
+        keyword="", 
+        max_num=1, 
+        feeder_kwargs={"file_urls": [local_image_path]}
+    )
+
+    # Read results (first JSON)
+    result_json = None
+    for root, _, files in os.walk("results"):
+        for file in files:
+            if file.endswith(".json"):
+                with open(os.path.join(root, file), "r") as f:
+                    result_json = json.load(f)
+                    break
+        if result_json:
+            break
+
+    if not result_json:
+        await ctx.send("❌ No results found.")
         return
 
     # Beautify output
     try:
-        data = json.loads(result)
-        title = data.get("title", "Unknown")
-        page_url = data.get("page_url", "No page found")
-        similarity = data.get("similarity")
-        similarity = f"{similarity*100:.0f}%" if similarity else "Unknown"
-        tags = ", ".join(data.get("tags", [])) or "None"
-
-        output_msg = f"Possible match found!\n" \
-                     f"Title: {title}\n" \
-                     f"Page: {page_url}\n" \
-                     f"Similarity: {similarity}\n" \
-                     f"Tags: {tags}"
+        output_msg = f"🔗 **Possible match found!**\n" \
+                     f"**Name / Title:** {result_json.get('file_name', 'Unknown')}\n" \
+                     f"**URL:** {result_json.get('file_url', 'No page found')}\n"
     except Exception:
-        output_msg = f"Possible match:\n```\n{result}\n```"
+        output_msg = f"🔗 Result:\n```\n{result_json}\n```"
 
     await ctx.send(output_msg)
     
