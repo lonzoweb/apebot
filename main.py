@@ -8,6 +8,9 @@ import os
 import sqlite3
 import time
 import aiohttp
+import json
+import shutil
+from icrawler.builtin import YandexImageCrawler
 
 # ==== CONFIG ====
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -124,6 +127,47 @@ async def send_random_quote(channel, blessing=False):
     embed.set_footer(text="🕊️ Daily Quote" if blessing else "🌇 Quote")
     await channel.send(embed=embed)
 
+async def reverse_search(image_path):
+    # Remove previous results
+    if os.path.exists("results"):
+        shutil.rmtree("results")
+
+    try:
+        crawler = YandexImageCrawler(storage={"root_dir": "results"})
+        crawler.crawl(
+            keyword="",
+            max_num=1,
+            feeder_kwargs={"file_urls": [image_path]}
+        )
+    except:
+        return None
+
+    # Return the first .json metadata file
+    for root, _, files in os.walk("results"):
+        for file in files:
+            if file.endswith(".json"):
+                with open(os.path.join(root, file), "r") as f:
+                    return f.read()
+    return None
+
+async def extract_image(msg: discord.Message):
+    # Check attachments
+    if msg.attachments:
+        for a in msg.attachments:
+            if a.filename.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+                return a.url
+
+    # Check embeds
+    for e in msg.embeds:
+        if e.url:
+            return e.url
+        if e.image and e.image.url:
+            return e.image.url
+        if e.thumbnail and e.thumbnail.url:
+            return e.thumbnail.url
+
+    return None
+    
 async def lookup_location(query):
     url = f"https://api.opencagedata.com/geocode/v1/json?q={query}&key={OPENCAGE_KEY}"
     async with aiohttp.ClientSession() as session:
@@ -352,6 +396,69 @@ async def commands_command(ctx):
     except discord.Forbidden:
         await ctx.send("⚠️ I cannot DM you. Please check your privacy settings.")
 
+# ---- reverse command ----
+@bot.command(name="reverse")
+async def reverse_command(ctx):
+    await ctx.send("Looking for an image...")
+
+    image_url = None
+
+    # 1️⃣ Check if this message is a reply
+    if ctx.message.reference:
+        try:
+            replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+            image_url = await extract_image(replied)
+        except:
+            pass
+
+    # 2️⃣ If no image in reply, check last 20 messages
+    if not image_url:
+        async for msg in ctx.channel.history(limit=20):
+            image_url = await extract_image(msg)
+            if image_url:
+                break
+
+    if not image_url:
+        await ctx.send("No image found.")
+        return
+
+    await ctx.send("Image found. Running Yandex reverse search...")
+
+    # Download image
+    async with aiohttp.ClientSession() as session:
+        async with session.get(image_url) as resp:
+            img_bytes = await resp.read()
+
+    local_image_path = "query_image.jpg"
+    with open(local_image_path, "wb") as f:
+        f.write(img_bytes)
+
+    # Run reverse search in executor to avoid blocking
+    result = await bot.loop.run_in_executor(None, reverse_search, local_image_path)
+
+    if not result:
+        await ctx.send("No useful match results.")
+        return
+
+    # Beautify output
+    try:
+        data = json.loads(result)
+        title = data.get("title", "Unknown")
+        page_url = data.get("page_url", "No page found")
+        similarity = data.get("similarity")
+        similarity = f"{similarity*100:.0f}%" if similarity else "Unknown"
+        tags = ", ".join(data.get("tags", [])) or "None"
+
+        output_msg = f"Possible match found!\n" \
+                     f"Title: {title}\n" \
+                     f"Page: {page_url}\n" \
+                     f"Similarity: {similarity}\n" \
+                     f"Tags: {tags}"
+    except Exception:
+        output_msg = f"Possible match:\n```\n{result}\n```"
+
+    await ctx.send(output_msg)
+    
 # ---- LOCATION COMMAND ----
 @bot.command(name="location")
 async def location_command(ctx, *, args: str):
