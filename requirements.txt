@@ -1,3 +1,3 @@
-discord.py
-icrawler
+icrawler==0.6
 aiohttp
+discord.py
