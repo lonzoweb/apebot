@@ -459,6 +459,11 @@ async def reverse_command(ctx):
 
     await ctx.send(output_msg)
     
+@bot.command(name="checkicrawler")
+async def check_icrawler(ctx):
+    import icrawler
+    await ctx.send(f"icrawler version: {icrawler.__version__}")
+    
 # ---- LOCATION COMMAND ----
 @bot.command(name="location")
 async def location_command(ctx, *, args: str):
