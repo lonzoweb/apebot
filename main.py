@@ -10,6 +10,7 @@ import time
 import aiohttp
 import json
 import shutil
+import io
 from icrawler.builtin import BingImageCrawler
 
 # ==== CONFIG ====
@@ -126,38 +127,15 @@ async def send_random_quote(channel, blessing=False):
     )
     embed.set_footer(text="🕊️ Daily Quote" if blessing else "🌇 Quote")
     await channel.send(embed=embed)
-
-async def reverse_search(image_path):
-    # Remove previous results
-    if os.path.exists("results"):
-        shutil.rmtree("results")
-
-    try:
-        crawler = YandexImageCrawler(storage={"root_dir": "results"})
-        crawler.crawl(
-            keyword="",
-            max_num=1,
-            feeder_kwargs={"file_urls": [image_path]}
-        )
-    except:
-        return None
-
-    # Return the first .json metadata file
-    for root, _, files in os.walk("results"):
-        for file in files:
-            if file.endswith(".json"):
-                with open(os.path.join(root, file), "r") as f:
-                    return f.read()
-    return None
-
+    
 async def extract_image(msg: discord.Message):
-    # Check attachments
+    """
+    Extract the first image URL from a message's attachments or embeds.
+    """
     if msg.attachments:
         for a in msg.attachments:
             if a.filename.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
                 return a.url
-
-    # Check embeds
     for e in msg.embeds:
         if e.url:
             return e.url
@@ -165,7 +143,6 @@ async def extract_image(msg: discord.Message):
             return e.image.url
         if e.thumbnail and e.thumbnail.url:
             return e.thumbnail.url
-
     return None
     
 async def lookup_location(query):
@@ -400,27 +377,7 @@ async def commands_command(ctx):
 
 @bot.command(name="reverse")
 async def reverse_command(ctx):
-    import shutil
-    import os
-    import aiohttp
-    import json
-
-    # Check attachments / embeds
-    async def extract_image(msg: discord.Message):
-        if msg.attachments:
-            for a in msg.attachments:
-                if a.filename.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
-                    return a.url
-        for e in msg.embeds:
-            if e.url:
-                return e.url
-            if e.image and e.image.url:
-                return e.image.url
-            if e.thumbnail and e.thumbnail.url:
-                return e.thumbnail.url
-        return None
-
-    # Find image in reply or last 20 messages
+    # 1️⃣ Find image in reply or recent messages
     image_url = None
     if ctx.message.reference:
         try:
@@ -441,27 +398,30 @@ async def reverse_command(ctx):
 
     await ctx.send("✅ Image found.\n⏳ Running Bing reverse search...")
 
-    # Download image locally
-    local_image_path = "query_image.jpg"
+    # 2️⃣ Download image into memory
     async with aiohttp.ClientSession() as session:
         async with session.get(image_url) as resp:
             img_bytes = await resp.read()
-    with open(local_image_path, "wb") as f:
-        f.write(img_bytes)
 
-    # Remove previous results folder
+    img_file = io.BytesIO(img_bytes)
+    img_file.name = "query_image.jpg"  # Required by icrawler
+
+    # 3️⃣ Remove previous results
     if os.path.exists("results"):
         shutil.rmtree("results")
 
-    # Run Bing crawler (max_num=1 to get first match)
-    crawler = BingImageCrawler(storage={"root_dir": "results"})
-    crawler.crawl(
-        keyword="", 
-        max_num=1, 
-        feeder_kwargs={"file_urls": [local_image_path]}
-    )
+    # 4️⃣ Run crawler in executor (non-blocking)
+    loop = asyncio.get_running_loop()
+    def run_crawler():
+        crawler = BingImageCrawler(storage={"root_dir": "results"})
+        crawler.crawl(
+            keyword="",
+            max_num=1,
+            feeder_kwargs={"file_urls": [img_file.name]}
+        )
+    await loop.run_in_executor(None, run_crawler)
 
-    # Read results (first JSON)
+    # 5️⃣ Read first JSON result
     result_json = None
     for root, _, files in os.walk("results"):
         for file in files:
@@ -476,7 +436,7 @@ async def reverse_command(ctx):
         await ctx.send("❌ No results found.")
         return
 
-    # Beautify output
+    # 6️⃣ Send result
     try:
         output_msg = f"🔗 **Possible match found!**\n" \
                      f"**Name / Title:** {result_json.get('file_name', 'Unknown')}\n" \
@@ -485,11 +445,6 @@ async def reverse_command(ctx):
         output_msg = f"🔗 Result:\n```\n{result_json}\n```"
 
     await ctx.send(output_msg)
-    
-@bot.command(name="checkicrawler")
-async def check_icrawler(ctx):
-    import icrawler
-    await ctx.send(f"icrawler version: {icrawler.__version__}")
     
 # ---- LOCATION COMMAND ----
 @bot.command(name="location")
