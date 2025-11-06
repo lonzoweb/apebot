@@ -118,66 +118,59 @@ def set_user_timezone(user_id, timezone_str, city):
 
 # ---- reverse ----
 
+# ---- helper section ----
+
+import aiohttp
+import tempfile
+from bs4 import BeautifulSoup
+
 async def yandex_fetch_top_results(image_url, limit=3):
     """
-    Fetch top results from Yandex Reverse Image Search using aiohttp.
-    Returns a dict: { 'results': [...], 'search_page': str }
+    Uploads an image to Yandex and parses the top `limit` results.
+    Returns a dict with results and search page link.
     """
     results = []
 
-    # Download image to temp file
-    tmp_file = None
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(image_url) as resp:
-                if resp.status != 200:
-                    return None
-                img_bytes = await resp.read()
+    # Download the image locally
+    async with aiohttp.ClientSession() as session:
+        async with session.get(image_url) as resp:
+            if resp.status != 200:
+                return None
+            img_bytes = await resp.read()
 
-        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-        tmp_file.write(img_bytes)
-        tmp_file.close()
+    # Save to temp file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+        tmp.write(img_bytes)
+        tmp_path = tmp.name
 
-        # Prepare multipart form data
-        import aiohttp
-        form = aiohttp.FormData()
-        form.add_field("upfile", open(tmp_file.name, "rb"), filename="image.jpg", content_type="image/jpeg")
+    # Prepare multipart form
+    form = aiohttp.FormData()
+    form.add_field("upfile", open(tmp_path, "rb"))
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                "https://yandex.com/images/search?rpt=imageview",
-                data=form
-            ) as r:
-                if r.status != 200:
-                    return None
-                html = await r.text()
-                search_page = str(r.url)
+    search_page_url = None
+    async with aiohttp.ClientSession() as session:
+        async with session.post("https://yandex.com/images/search", data=form) as resp:
+            if resp.status != 200:
+                return None
+            html = await resp.text()
+            search_page_url = str(resp.url)
 
-        # Parse HTML with BeautifulSoup
-        soup = BeautifulSoup(html, "html.parser")
-        links = soup.find_all("a", {"class": "CbirSites-SiteTitle"})
-        domains = soup.find_all("a", {"class": "CbirSites-Path"})
-        titles = soup.find_all("a", {"class": "CbirSites-Title"})
+    # Parse results with BeautifulSoup
+    soup = BeautifulSoup(html, "html.parser")
+    items = soup.select(".serp-item")[:limit]
+    for item in items:
+        title_tag = item.get("data-title") or item.get("data-bem")
+        link_tag = item.get("href") or item.get("data-url")
+        domain_tag = item.get("data-domain") or "Unknown"
 
-        for i in range(min(limit, len(links))):
+        if title_tag and link_tag:
             results.append({
-                "title": titles[i].get_text(strip=True) if i < len(titles) else "Unknown",
-                "domain": domains[i].get_text(strip=True) if i < len(domains) else "Unknown",
-                "link": links[i]["href"] if i < len(links) else "#"
+                "title": title_tag,
+                "link": link_tag,
+                "domain": domain_tag
             })
 
-        return {"results": results, "search_page": search_page}
-
-    except Exception as e:
-        print("Yandex fetch error:", e)
-        return None
-    finally:
-        if tmp_file:
-            try:
-                os.remove(tmp_file.name)
-            except:
-                pass
-
+    return {"results": results, "search_page": search_page_url}
 
 # ---- other ----
 
