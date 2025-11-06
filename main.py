@@ -1,19 +1,25 @@
 """
-APE BOT
+Discord Bot Main File
+Contains all bot commands and event handlers
 """
 
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 import random
 import asyncio
+import os
+import shutil
+import sqlite3
+import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
-import os
-import sqlite3
-import shutil
-import aiohttp
-import logging
-from contextlib import contextmanager
+
+# Import from other modules
+from config import *
+from database import *
+from helpers import *
+from api import *
+import tasks
 
 # ============================================================
 # LOGGING CONFIGURATION
@@ -26,38 +32,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# ENVIRONMENT VARIABLES & CONFIGURATION
-# ============================================================
-
-TOKEN = os.getenv("DISCORD_TOKEN")
-OPENCAGE_KEY = os.getenv("OPENCAGE_KEY")
-SERPAPI_KEY = os.getenv("SERPAPI_KEY")
-
-if not TOKEN:
-    raise ValueError("DISCORD_TOKEN environment variable is missing!")
-if not OPENCAGE_KEY:
-    raise ValueError("OPENCAGE_KEY environment variable is missing!")
-if not SERPAPI_KEY:
-    raise ValueError("SERPAPI_KEY environment variable is missing!")
-
-channel_id_str = os.getenv("CHANNEL_ID")
-if channel_id_str is None:
-    raise ValueError("CHANNEL_ID environment variable is missing!")
-CHANNEL_ID = int(channel_id_str)
-
-test_channel_id_str = os.getenv("TEST_CHANNEL_ID")
-TEST_CHANNEL_ID = int(test_channel_id_str) if test_channel_id_str else None
-
-# Role configurations
-AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo", "Caporegime"]
-DAILY_COMMAND_ROLE = "Patrizio"
-ROLE_ADD_QUOTE = "Caporegime"
-
-# Database configuration
-DB_FILE = "/app/data/quotes.db"
-os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
-
-# ============================================================
 # BOT SETUP
 # ============================================================
 
@@ -66,189 +40,8 @@ intents.message_content = True
 intents.guilds = True
 intents.members = True
 
-bot = commands.Bot(command_prefix=".", intents=intents)
-
-# Global variables
-daily_quote_of_the_day = None
+bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 bot_start_time = datetime.now()
-
-# ============================================================
-# DATABASE FUNCTIONS
-# ============================================================
-
-@contextmanager
-def get_db():
-    """Context manager for safe database connections"""
-    conn = sqlite3.connect(DB_FILE)
-    try:
-        yield conn
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Database error: {e}")
-        raise
-    finally:
-        conn.close()
-
-def init_db():
-    """Initialize database tables"""
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS quotes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                quote TEXT UNIQUE
-            )
-        """)
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS user_timezones (
-                user_id TEXT PRIMARY KEY,
-                timezone TEXT,
-                city TEXT
-            )
-        """)
-
-def load_quotes_from_db():
-    """Load all quotes from database"""
-    try:
-        with get_db() as conn:
-            c = conn.cursor()
-            c.execute("SELECT quote FROM quotes")
-            return [row[0] for row in c.fetchall()]
-    except Exception as e:
-        logger.error(f"Error loading quotes: {e}")
-        return []
-
-def add_quote_to_db(quote):
-    """Add a new quote to database"""
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute("INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (quote,))
-
-def update_quote_in_db(old_quote, new_quote):
-    """Update an existing quote"""
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute("UPDATE quotes SET quote = ? WHERE quote = ?", (new_quote, old_quote))
-
-def get_user_timezone(user_id):
-    """Get user's timezone settings"""
-    try:
-        with get_db() as conn:
-            c = conn.cursor()
-            c.execute("SELECT timezone, city FROM user_timezones WHERE user_id = ?", (str(user_id),))
-            row = c.fetchone()
-            if row:
-                return row[0], row[1]
-    except Exception as e:
-        logger.error(f"Error getting user timezone: {e}")
-    return None, None
-
-def set_user_timezone(user_id, timezone_str, city):
-    """Set user's timezone"""
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute("INSERT OR REPLACE INTO user_timezones (user_id, timezone, city) VALUES (?, ?, ?)",
-                  (str(user_id), timezone_str, city))
-
-# ============================================================
-# HELPER FUNCTIONS
-# ============================================================
-
-def has_authorized_role(member):
-    """Check if member has authorized role"""
-    return any(role.name in AUTHORIZED_ROLES for role in member.roles) or member.guild_permissions.administrator
-
-async def extract_image(message):
-    """Extract image URL from message attachments or embeds"""
-    if message.attachments:
-        for att in message.attachments:
-            if att.content_type and att.content_type.startswith("image"):
-                return att.url
-
-    if message.embeds:
-        for embed in message.embeds:
-            if embed.image:
-                return embed.image.url
-            if embed.thumbnail:
-                return embed.thumbnail.url
-
-    return None
-
-# ============================================================
-# API FUNCTIONS
-# ============================================================
-
-async def google_lens_fetch_results(image_url: str, limit: int = 3):
-    """Fetch reverse image search results from Google Lens via SerpApi"""
-    if not SERPAPI_KEY:
-        raise ValueError("SERPAPI_KEY environment variable not set")
-
-    search_url = "https://serpapi.com/search.json"
-    params = {
-        "engine": "google_lens",
-        "url": image_url,
-        "api_key": SERPAPI_KEY
-    }
-
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(search_url, params=params, timeout=30) as resp:
-                if resp.status != 200:
-                    error_text = await resp.text()
-                    raise RuntimeError(f"SerpApi returned HTTP {resp.status}: {error_text[:200]}")
-                data = await resp.json()
-    except asyncio.TimeoutError:
-        raise RuntimeError("Request to SerpApi timed out")
-    except aiohttp.ClientError as e:
-        raise RuntimeError(f"Network error: {e}")
-
-    results = []
-    visual_matches = data.get("visual_matches", [])
-    
-    for match in visual_matches[:limit]:
-        results.append({
-            "title": match.get("title", "Untitled"),
-            "link": match.get("link", ""),
-            "thumbnail": match.get("thumbnail", ""),
-            "source": match.get("source", "Unknown source")
-        })
-
-    search_metadata = data.get("search_metadata", {})
-    search_page = search_metadata.get("google_lens_url", "")
-
-    return {
-        "results": results,
-        "search_page": search_page
-    }
-
-async def lookup_location(query):
-    """Lookup timezone and city from location query using OpenCage API"""
-    url = "https://api.opencagedata.com/geocode/v1/json"
-    params = {"q": query, "key": OPENCAGE_KEY}
-    
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params, timeout=10) as resp:
-                if resp.status != 200:
-                    logger.error(f"OpenCage API returned {resp.status}")
-                    return None, None
-                data = await resp.json()
-    except asyncio.TimeoutError:
-        logger.error("OpenCage API timeout")
-        return None, None
-    except Exception as e:
-        logger.error(f"OpenCage API error: {e}")
-        return None, None
-        
-    if data.get("results"):
-        first = data["results"][0]
-        timezone_name = first["annotations"]["timezone"]["name"]
-        components = first["components"]
-        city = (components.get("city") or components.get("town") or 
-                components.get("village") or components.get("state") or query)
-        return timezone_name, city
-    return None, None
 
 # ============================================================
 # BOT EVENTS
@@ -259,7 +52,7 @@ async def on_ready():
     """Bot startup event"""
     init_db()
     logger.info(f"✅ Logged in as {bot.user}")
-    daily_quote.start()
+    tasks.setup_tasks(bot)
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -391,15 +184,7 @@ async def delete_quote(ctx, *, keyword: str):
     if not ctx.author.guild_permissions.administrator:
         return await ctx.send("🚫 Peasant Detected")
     
-    try:
-        with get_db() as conn:
-            c = conn.cursor()
-            c.execute("SELECT id, quote FROM quotes WHERE quote LIKE ?", (f"%{keyword}%",))
-            results = c.fetchall()
-    except Exception as e:
-        logger.error(f"Error searching quotes: {e}")
-        return await ctx.send("❌ Database error")
-
+    results = search_quotes_by_keyword(keyword)
     if not results:
         return await ctx.send(f"🔍 No quotes found containing '{keyword}'")
 
@@ -444,9 +229,7 @@ async def delete_quote(ctx, *, keyword: str):
 
     # Delete confirmed
     try:
-        with get_db() as conn:
-            c = conn.cursor()
-            c.execute("DELETE FROM quotes WHERE id = ?", (quote_id,))
+        delete_quote_by_id(quote_id)
         await ctx.send(f"✅ Deleted quote:\n\"{quote_text}\"")
     except Exception as e:
         logger.error(f"Error deleting quote: {e}")
@@ -484,10 +267,11 @@ async def list_quotes(ctx):
 async def daily_command(ctx):
     """Show today's quote"""
     if ctx.author.guild_permissions.administrator or any(role.name == DAILY_COMMAND_ROLE for role in ctx.author.roles):
-        if daily_quote_of_the_day:
+        daily_quote = tasks.get_daily_quote()
+        if daily_quote:
             embed = discord.Embed(
                 title="🌅 Blessings to Apeiron",
-                description=f"📜 {daily_quote_of_the_day}",
+                description=f"📜 {daily_quote}",
                 color=discord.Color.gold()
             )
             embed.set_footer(text="🕊️ Daily Quote Recall")
@@ -508,18 +292,10 @@ async def urban_command(ctx, *, term: str):
     if len(term) > 100:
         return await ctx.send("❌ Term too long (max 100 characters)")
     
-    url = "https://api.urbandictionary.com/v0/define"
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params={"term": term}, timeout=10) as resp:
-                if resp.status != 200:
-                    return await ctx.send(f"❌ API returned error {resp.status}")
-                data = await resp.json()
-    except asyncio.TimeoutError:
-        return await ctx.send("❌ Request timed out")
-    except Exception as e:
-        logger.error(f"Urban Dictionary error: {e}")
-        return await ctx.send("❌ An error occurred")
+    data = await urban_dictionary_lookup(term)
+    
+    if not data:
+        return await ctx.send("❌ Request timed out or an error occurred")
     
     if not data.get("list"):
         return await ctx.send(f"No definition found for **{term}**.")
@@ -542,6 +318,14 @@ async def flip_command(ctx):
     await asyncio.sleep(1)  # Dramatic pause
     result = random.choice(["Heads", "Tails"])
     await ctx.send(f"🪙 **{result}**")
+
+@bot.command(name="roll")
+@commands.cooldown(1, 5, commands.BucketType.user)
+async def roll_command(ctx):
+    """Roll a random number between 1-33"""
+    await asyncio.sleep(0.5)  # Brief pause
+    result = random.randint(1, 33)
+    await ctx.send(f"🎲 **{result}**")
 
 @bot.command(name="rev")
 @commands.cooldown(1, 30, commands.BucketType.user)
@@ -669,6 +453,7 @@ async def commands_command(ctx):
         "**Utility Commands:**",
         "`.rev` - Reverse image search",
         "`.flip` - Flip a coin",
+        "`.roll` - Roll 1-33",
         "`.ud <term>` - Urban Dictionary lookup",
         "`.location <city>` - Set your timezone",
         "`.time [@user]` - Check time for user",
@@ -836,60 +621,6 @@ async def merge_quotes(ctx):
     finally:
         conn_old.close()
         conn_new.close()
-
-# ============================================================
-# SCHEDULED TASKS
-# ============================================================
-
-@tasks.loop(minutes=1)
-async def daily_quote():
-    """Send daily quotes at scheduled times (10 AM and 6 PM PT)"""
-    global daily_quote_of_the_day
-    main_channel = bot.get_channel(CHANNEL_ID)
-    test_channel = bot.get_channel(TEST_CHANNEL_ID) if TEST_CHANNEL_ID else None
-    if not main_channel and not test_channel:
-        logger.warning("No valid channels found for daily quote.")
-        return
-
-    try:
-        now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
-        current_time = now_pt.strftime("%H:%M")
-
-        # Morning (10 AM PT)
-        if current_time == "10:00":
-            quotes = load_quotes_from_db()
-            if quotes:
-                daily_quote_of_the_day = random.choice(quotes)
-                embed = discord.Embed(
-                    title="🌅 Blessings to Apeiron",
-                    description=f"📜 {daily_quote_of_the_day}",
-                    color=discord.Color.gold()
-                )
-                embed.set_footer(text="🕊️ Quote")
-                for ch in [main_channel, test_channel]:
-                    if ch:
-                        await ch.send(embed=embed)
-                logger.info("✅ Sent 10AM quote")
-
-        # Evening (6 PM PT)
-        elif current_time == "18:00" and daily_quote_of_the_day:
-            embed = discord.Embed(
-                description=f"📜 {daily_quote_of_the_day}",
-                color=discord.Color.dark_gold()
-            )
-            embed.set_footer(text="🌇 Quote")
-            for ch in [main_channel, test_channel]:
-                if ch:
-                    await ch.send(embed=embed)
-            logger.info("✅ Sent 6PM quote")
-    except Exception as e:
-        logger.error(f"Error in daily_quote task: {e}")
-
-@daily_quote.before_loop
-async def before_daily_quote():
-    """Wait for bot to be ready before starting daily quote task"""
-    await bot.wait_until_ready()
-    logger.info("⏳ Daily quote task started")
 
 # ============================================================
 # RUN BOT
