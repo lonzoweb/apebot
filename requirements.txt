@@ -1,4 +1,3 @@
-beautifulsoup4
-lxml
+serpapi
 aiohttp
-discord.py>=2.3.2
+discord.py
