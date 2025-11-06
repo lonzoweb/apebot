@@ -116,34 +116,61 @@ def set_user_timezone(user_id, timezone_str, city):
 # ---- HELPER ----
 
 # ---- reverse ----
-# ---- helpers.py ----
-from serpapi.google_search_results import GoogleSearchResults
+import os
+import aiohttp
+from serpapi import GoogleSearch  # correct import
+import discord
 
-async def yandex_search(image_url, num_results=3):
-    """Search image via Yandex using SerpAPI and return top results."""
-    search_params = {
+async def extract_image(msg: discord.Message):
+    """Extract image URL from a message (attachments or embeds)."""
+    # Check attachments
+    if msg.attachments:
+        for a in msg.attachments:
+            if a.filename.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+                return a.url
+
+    # Check embeds
+    for e in msg.embeds:
+        if e.url:
+            return e.url
+        if e.image and e.image.url:
+            return e.image.url
+        if e.thumbnail and e.thumbnail.url:
+            return e.thumbnail.url
+    return None
+
+
+async def serpapi_yandex_image_search(image_url, num_results=3):
+    """Query Yandex via SerpApi and return top results."""
+    api_key = os.getenv("SERPAPI_KEY")
+    if not api_key:
+        raise ValueError("SERPAPI_KEY not set in environment")
+
+    params = {
         "engine": "yandex",
         "image_url": image_url,
-        "api_key": os.getenv("SERPAPI_KEY"),
+        "api_key": api_key,
         "num": num_results
     }
 
-    search = GoogleSearch(search_params)
-    results = search.get_dict()  # SerpAPI returns a dictionary
+    # SerpApi client is synchronous, so run in executor to avoid blocking
+    loop = discord.utils.get_event_loop() if hasattr(discord.utils, "get_event_loop") else None
 
-    # Extract top results
-    top_results = []
-    for r in results.get("images_results", [])[:num_results]:
-        top_results.append({
+    def run_search():
+        search = GoogleSearch(params)
+        return search.get_dict()
+
+    import asyncio
+    data = await asyncio.to_thread(run_search)
+
+    # Collect top results
+    results = []
+    images_results = data.get("images_results", [])
+    for r in images_results[:num_results]:
+        results.append({
             "title": r.get("title") or "No title",
-            "link": r.get("original") or r.get("link"),
-            "domain": r.get("source") or "Unknown"
-        })
+            "link": r.get("original")
 
-    return {
-        "results": top_results,
-        "search_page": results.get("search_metadata", {}).get("yandex_url", "")
-    }
 
 # ---- other ----
 
@@ -408,43 +435,46 @@ async def commands_command(ctx):
 # ---- reverse command ----
 
 # ---- commands.py ----
-from helpers import yandex_search
-
 @bot.command(name="rev")
 async def reverse_command(ctx):
-    await ctx.defer()  # optional for long-running operations
+    """Reverse image search using SerpApi (Yandex)."""
+    async with ctx.channel.typing():
+        # 1️⃣ Try reply first
+        image_url = None
+        if ctx.message.reference:
+            try:
+                replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+                image_url = await extract_image(replied)
+            except:
+                pass
 
-    # Extract image from reply or recent messages
-    image_url = None
-    if ctx.message.reference:
-        replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-        image_url = await extract_image(replied)
+        # 2️⃣ If no reply, check last 20 messages
+        if not image_url:
+            async for msg in ctx.channel.history(limit=20):
+                image_url = await extract_image(msg)
+                if image_url:
+                    break
 
-    if not image_url:
-        async for msg in ctx.channel.history(limit=20):
-            image_url = await extract_image(msg)
-            if image_url:
-                break
+        if not image_url:
+            return await ctx.reply("⚠️ No image found in the last 20 messages.")
 
-    if not image_url:
-        return await ctx.reply("⚠️ No image found in the last 20 messages.")
+        # 3️⃣ Perform Yandex search
+        try:
+            results = await serpapi_yandex_image_search(image_url, num_results=3)
+        except Exception as e:
+            return await ctx.reply(f"❌ Search failed: {str(e)}")
 
-    # Run Yandex search
-    data = await yandex_search(image_url, num_results=3)
-    if not data["results"]:
-        return await ctx.reply("❌ No matches found.")
+        if not results:
+            return await ctx.reply("❌ No matches found.")
 
-    text = "**🔍 Top Yandex Reverse Image Search Results:**\n\n"
-    for i, r in enumerate(data["results"], start=1):
-        text += f"**{i}.** {r['title']}\n"
-        text += f"🌐 {r['domain']}\n"
-        text += f"🔗 {r['link']}\n\n"
+        # 4️⃣ Build reply
+        text = "🔍 **Top Matches (Yandex Reverse Search)**\n\n"
+        for i, r in enumerate(results, start=1):
+            text += f"**{i}.** `{r['title']}`\n"
+            text += f"🌍 {r['domain']}\n"
+            text += f"🔗 <{r['link']}>\n\n"
 
-    if data["search_page"]:
-        text += f"📸 Full search → {data['search_page']}"
-
-    await ctx.reply(text)
-
+        await ctx.reply(text)
 
 # ---- LOCATION COMMAND ----
 @bot.command(name="location")
