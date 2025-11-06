@@ -141,6 +141,26 @@ async def sauce_search(image_url: str):
     if not results:
         return None
     return results[0]  # take the best match
+
+# --- Helper: Find image from message or reply ---
+async def find_image(ctx):
+    # 1. If user attached an image directly
+    if ctx.message.attachments:
+        for attachment in ctx.message.attachments:
+            if attachment.content_type and attachment.content_type.startswith("image/"):
+                return attachment.url
+
+    # 2. If user replied to a message with an image
+    if ctx.message.reference:
+        replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+        if replied.attachments:
+            for attachment in replied.attachments:
+                if attachment.content_type and attachment.content_type.startswith("image/"):
+                    return attachment.url
+
+    # 3. No image found
+    return None
+
     
 async def lookup_location(query):
     url = f"https://api.opencagedata.com/geocode/v1/json?q={query}&key={OPENCAGE_KEY}"
