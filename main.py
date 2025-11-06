@@ -418,9 +418,9 @@ async def commands_command(ctx):
 @bot.command(name="reverse")
 async def reverse_command(ctx):
     async with ctx.channel.typing():
+
         # Try to pull image from reply first
         image_url = None
-
         if ctx.message.reference:
             try:
                 replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
@@ -441,17 +441,20 @@ async def reverse_command(ctx):
         # Perform search
         data = await yandex_fetch_top_results(image_url, limit=3)
 
-        if not data or not data["results"]:
+        if not data or not data.get("results"):
             return await ctx.reply("❌ No matches found.")
 
         # Build output text
-text = "**Top Matches (Yandex Reverse Search)**\n\n"
-for i, r in enumerate(data["results"], start=1):
-    text += f"**{i}.** `{r['title']}`\n"
-    text += f"🌍 {r['domain']}\n"
-    text += f"🔗 <{r['link']}>\n\n"
+        text = "**Top Matches (Yandex Reverse Search)**\n\n"
+        for i, r in enumerate(data["results"], start=1):
+            text += f"**{i}.** `{r['title']}`\n"
+            text += f"🌍 {r['domain']}\n"
+            text += f"🔗 <{r['link']}>\n\n"
 
-text += f"📸 Full search → <{data['search_page']}>"
+        text += f"📸 Full search → <{data['search_page']}>"
+
+        await ctx.reply(text)
+
 
 
 # ---- LOCATION COMMAND ----
