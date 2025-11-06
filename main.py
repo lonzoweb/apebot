@@ -118,59 +118,55 @@ def set_user_timezone(user_id, timezone_str, city):
 
 # ---- reverse ----
 
-# ---- helper section ----
-
+# ---- helpers.py ----
 import aiohttp
-import tempfile
 from bs4 import BeautifulSoup
+import tempfile
+import os
 
 async def yandex_fetch_top_results(image_url, limit=3):
     """
-    Uploads an image to Yandex and parses the top `limit` results.
-    Returns a dict with results and search page link.
+    Performs a Yandex reverse image search and returns the top results.
+    Each result is a dict: {'title', 'domain', 'link'}
     """
     results = []
 
-    # Download the image locally
+    # Download image to a temp file
     async with aiohttp.ClientSession() as session:
         async with session.get(image_url) as resp:
             if resp.status != 200:
-                return None
+                return {"results": [], "search_page": ""}
             img_bytes = await resp.read()
 
-    # Save to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
         tmp.write(img_bytes)
         tmp_path = tmp.name
 
-    # Prepare multipart form
-    form = aiohttp.FormData()
-    form.add_field("upfile", open(tmp_path, "rb"))
+    try:
+        async with aiohttp.ClientSession() as session:
+            form = aiohttp.FormData()
+            form.add_field('upfile', open(tmp_path, 'rb'), filename=os.path.basename(tmp_path))
+            async with session.post("https://yandex.com/images/search?rpt=imageview", data=form) as resp:
+                html = await resp.text()
 
-    search_page_url = None
-    async with aiohttp.ClientSession() as session:
-        async with session.post("https://yandex.com/images/search", data=form) as resp:
-            if resp.status != 200:
-                return None
-            html = await resp.text()
-            search_page_url = str(resp.url)
+        soup = BeautifulSoup(html, "html.parser")
 
-    # Parse results with BeautifulSoup
-    soup = BeautifulSoup(html, "html.parser")
-    items = soup.select(".serp-item")[:limit]
-    for item in items:
-        title_tag = item.get("data-title") or item.get("data-bem")
-        link_tag = item.get("href") or item.get("data-url")
-        domain_tag = item.get("data-domain") or "Unknown"
+        # Scrape up to `limit` results
+        items = soup.select("a.serp-item__link") or soup.select("a.CbirCard-Preview")  # fallback selector
+        for item in items[:limit]:
+            title = item.get("title") or item.text.strip() or "Unknown"
+            link = item.get("href") or ""
+            domain = link.split("/")[2] if link.startswith("http") else "Unknown"
+            results.append({"title": title, "domain": domain, "link": link})
 
-        if title_tag and link_tag:
-            results.append({
-                "title": title_tag,
-                "link": link_tag,
-                "domain": domain_tag
-            })
+        # Full search page link
+        search_page = f"https://yandex.com/images/search?rpt=imageview&url={image_url}"
 
-    return {"results": results, "search_page": search_page_url}
+        return {"results": results, "search_page": search_page}
+
+    finally:
+        os.remove(tmp_path)
+
 
 # ---- other ----
 
@@ -433,47 +429,43 @@ async def commands_command(ctx):
         await ctx.send("⚠️ I cannot DM you. Please check your privacy settings.")
 
 # ---- reverse command ----
-
-# ---- reverse command ----
-from discord.ext import commands
+# ---- commands.py ----
 
 @bot.command(name="rev")
 async def reverse_command(ctx):
-    await ctx.send("🔍 Searching for image...")
+    async with ctx.typing():
+        # Try reply first
+        image_url = None
+        if ctx.message.reference:
+            try:
+                replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+                image_url = await extract_image(replied)
+            except:
+                pass
 
-    # 1️⃣ Try to pull image from reply first
-    image_url = None
-    if ctx.message.reference:
-        try:
-            replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-            image_url = await extract_image(replied)
-        except:
-            pass
+        # Scan recent 20 messages if no reply
+        if not image_url:
+            async for msg in ctx.channel.history(limit=20):
+                image_url = await extract_image(msg)
+                if image_url:
+                    break
 
-    # 2️⃣ If no reply → auto-scan recent chat
-    if not image_url:
-        async for msg in ctx.channel.history(limit=20):
-            image_url = await extract_image(msg)
-            if image_url:
-                break
+        if not image_url:
+            return await ctx.reply("⚠️ No image found in the last 20 messages.")
 
-    if not image_url:
-        return await ctx.reply("⚠️ No image found in the last 20 messages.")
+        # Perform Yandex reverse search
+        data = await yandex_fetch_top_results(image_url, limit=3)
 
-    # 3️⃣ Perform search
-    data = await yandex_fetch_top_results(image_url, limit=3)
-    if not data or not data["results"]:
-        return await ctx.reply("❌ No matches found.")
+        if not data["results"]:
+            return await ctx.reply("❌ No matches found.")
 
-    # 4️⃣ Build result text
-    text = "**Top Matches (Yandex Reverse Search)**\n\n"
-    for i, r in enumerate(data["results"], start=1):
-        text += f"**{i}.** {r['title']}\n"
-        text += f"{r['domain']}\n"
-        text += f"<{r['link']}>\n\n"
-    text += f"Full search page → <{data['search_page']}>"
+        text = "**🔍 Top Matches (Yandex Reverse Search)**\n\n"
+        for i, r in enumerate(data["results"], start=1):
+            text += f"**{i}.** `{r['title']}`\n🌍 {r['domain']}\n🔗 <{r['link']}>\n\n"
 
-    await ctx.reply(text)
+        text += f"📸 Full search → <{data['search_page']}>"
+
+        await ctx.reply(text)
 
 
 # ---- LOCATION COMMAND ----
