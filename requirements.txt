@@ -1,3 +1,4 @@
-saucenao_api
+beautifulsoup4
+lxml
 aiohttp
 discord.py
