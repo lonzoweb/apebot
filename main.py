@@ -418,7 +418,7 @@ async def commands_command(ctx):
 
 @bot.command(name="reverse")
 async def reverse_command(ctx):
-    await ctx.trigger_typing()
+    async with ctx.channel.typing():
 
     # Try to pull image from reply first
     image_url = None
