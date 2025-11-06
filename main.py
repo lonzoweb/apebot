@@ -11,7 +11,6 @@ import json
 import shutil
 import io
 import aiohttp
-from bs4 import BeautifulSoup
 import urllib.parse
 import tempfile
 
