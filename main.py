@@ -18,7 +18,7 @@ from contextlib import contextmanager
 
 # ==== LOGGING SETUP ====
 logging.basicConfig(
-    level=logging.WARNING,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -528,7 +528,7 @@ async def commands_command(ctx):
 
 # ---- REVERSE IMAGE SEARCH ----
 @bot.command(name="rev")
-@commands.cooldown(1, 30, commands.BucketType.user)
+@commands.cooldown(1, 10, commands.BucketType.user)
 async def reverse_command(ctx):
     """Reverse search the most relevant image in chat using Google Lens (via SerpApi)."""
     async with ctx.channel.typing():
