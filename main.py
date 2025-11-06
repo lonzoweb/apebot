@@ -117,7 +117,7 @@ def set_user_timezone(user_id, timezone_str, city):
 
 # ---- reverse ----
 # ---- helpers.py ----
-from serpapi import GoogleSearch
+from serpapi.google_search_results import GoogleSearchResults
 
 async def yandex_search(image_url, num_results=3):
     """Search image via Yandex using SerpAPI and return top results."""
