@@ -421,53 +421,52 @@ async def commands_command(ctx):
         await ctx.send("⚠️ I cannot DM you. Please check your privacy settings.")
 
 # ---- reverse command ----
-
-# ---- commands ----
-from discord.ext import commands
+# ---- reverse command ----
 
 @bot.command(name="rev")
 async def reverse_command(ctx):
-    """Reverse search the most relevant image in chat using Yandex (SerpApi)."""
+    """Reverse search the most relevant image in chat using Yandex (via SerpApi)."""
     async with ctx.channel.typing():
 
-    # Try to get image from reply first
-    image_url = None
-    if ctx.message.reference:
+        # Try to pull image from reply first
+        image_url = None
+        if ctx.message.reference:
+            try:
+                replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+                image_url = await extract_image(replied)
+            except:
+                pass
+
+        # If no reply → auto-scan recent chat for image
+        if not image_url:
+            async for msg in ctx.channel.history(limit=20):
+                image_url = await extract_image(msg)
+                if image_url:
+                    break
+
+        if not image_url:
+            return await ctx.reply("⚠️ No image found in the last 20 messages.")
+
+        # Perform Yandex search
         try:
-            replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-            image_url = await extract_image(replied)
-        except:
-            pass
+            data = await yandex_fetch_top_results(image_url, limit=3)
+        except Exception as e:
+            return await ctx.reply(f"❌ Yandex fetch error: {e}")
 
-    # If no image in reply → check last 20 messages
-    if not image_url:
-        async for msg in ctx.channel.history(limit=20):
-            image_url = await extract_image(msg)
-            if image_url:
-                break
+        if not data or not data.get("results"):
+            return await ctx.reply("❌ No matches found.")
 
-    if not image_url:
-        return await ctx.reply("⚠️ No image found in the last 20 messages.")
+        # Format results
+        text = "🔍 **Top Matches (Yandex Reverse Search)**\n\n"
+        for i, r in enumerate(data["results"], start=1):
+            text += f"**{i}.** `{r['title']}`\n"
+            text += f"🌍 {r['domain']}\n"
+            text += f"🔗 <{r['link']}>\n\n"
 
-    # Perform Yandex search
-    try:
-        data = await commands.bot.loop.run_in_executor(None, yandex_search, image_url, 3)
-    except Exception as e:
-        return await ctx.reply(f"❌ Error fetching results: {e}")
+        text += f"📸 Full search → <{data.get('search_page', 'N/A')}>"
 
-    if not data or not data["results"]:
-        return await ctx.reply("❌ No matches found.")
+        await ctx.reply(text)
 
-    text = "🔍 **Top Matches (Yandex Reverse Search)**\n\n"
-    for i, r in enumerate(data["results"], start=1):
-        text += f"**{i}.** `{r['title']}`\n"
-        text += f"🌍 {r['domain']}\n"
-        text += f"🔗 <{r['link']}>\n\n"
-
-    if data.get("search_page"):
-        text += f"📸 Full search → <{data['search_page']}>"
-
-    await ctx.reply(text)
 
 # ---- LOCATION COMMAND ----
 @bot.command(name="location")
