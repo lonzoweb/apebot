@@ -18,6 +18,11 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 OPENCAGE_KEY = os.getenv("OPENCAGE_KEY")
 if not OPENCAGE_KEY:
     raise ValueError("OPENCAGE_KEY environment variable is missing!")
+    
+SAUCENAO_KEY = os.getenv("SAUCENAO_KEY")
+if not SAUCENAO_KEY:
+    raise ValueError("SAUCENAO_KEY environment variable is missing!")
+
 
 channel_id_str = os.getenv("CHANNEL_ID")
 if channel_id_str is None:
@@ -128,22 +133,15 @@ async def send_random_quote(channel, blessing=False):
     embed.set_footer(text="🕊️ Daily Quote" if blessing else "🌇 Quote")
     await channel.send(embed=embed)
     
-async def extract_image(msg: discord.Message):
-    """
-    Extract the first image URL from a message's attachments or embeds.
-    """
-    if msg.attachments:
-        for a in msg.attachments:
-            if a.filename.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
-                return a.url
-    for e in msg.embeds:
-        if e.url:
-            return e.url
-        if e.image and e.image.url:
-            return e.image.url
-        if e.thumbnail and e.thumbnail.url:
-            return e.thumbnail.url
-    return None
+import aiohttp
+from saucenao_api import SauceNao  # assuming this wrapper
+
+async def sauce_search(image_url: str):
+    sauce = SauceNao(SAUCENAO_KEY)
+    results = await sauce.from_url(image_url)  # or whatever method the wrapper uses
+    if not results:
+        return None
+    return results[0]  # take the best match
     
 async def lookup_location(query):
     url = f"https://api.opencagedata.com/geocode/v1/json?q={query}&key={OPENCAGE_KEY}"
@@ -377,74 +375,22 @@ async def commands_command(ctx):
 
 @bot.command(name="reverse")
 async def reverse_command(ctx):
-    # 1️⃣ Find image in reply or recent messages
-    image_url = None
-    if ctx.message.reference:
-        try:
-            replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-            image_url = await extract_image(replied)
-        except:
-            pass
-
-    if not image_url:
-        async for msg in ctx.channel.history(limit=20):
-            image_url = await extract_image(msg)
-            if image_url:
-                break
-
+    image_url = await find_image(ctx)  # your earlier extract logic
     if not image_url:
         await ctx.send("⚠️ No image found.")
         return
 
-    await ctx.send("✅ Image found.\n⏳ Running Bing reverse search...")
+    await ctx.send("✅ Image found.\n⏳ Standby...")
 
-    # 2️⃣ Download image into memory
-    async with aiohttp.ClientSession() as session:
-        async with session.get(image_url) as resp:
-            img_bytes = await resp.read()
-
-    img_file = io.BytesIO(img_bytes)
-    img_file.name = "query_image.jpg"  # Required by icrawler
-
-    # 3️⃣ Remove previous results
-    if os.path.exists("results"):
-        shutil.rmtree("results")
-
-    # 4️⃣ Run crawler in executor (non-blocking)
-    loop = asyncio.get_running_loop()
-    def run_crawler():
-        crawler = BingImageCrawler(storage={"root_dir": "results"})
-        crawler.crawl(
-            keyword="",
-            max_num=1,
-            feeder_kwargs={"file_urls": [img_file.name]}
-        )
-    await loop.run_in_executor(None, run_crawler)
-
-    # 5️⃣ Read first JSON result
-    result_json = None
-    for root, _, files in os.walk("results"):
-        for file in files:
-            if file.endswith(".json"):
-                with open(os.path.join(root, file), "r") as f:
-                    result_json = json.load(f)
-                    break
-        if result_json:
-            break
-
-    if not result_json:
-        await ctx.send("❌ No results found.")
+    result = await sauce_search(image_url)
+    if not result:
+        await ctx.send("❌ No useful match results.")
         return
 
-    # 6️⃣ Send result
-    try:
-        output_msg = f"🔗 **Possible match found!**\n" \
-                     f"**Name / Title:** {result_json.get('file_name', 'Unknown')}\n" \
-                     f"**URL:** {result_json.get('file_url', 'No page found')}\n"
-    except Exception:
-        output_msg = f"🔗 Result:\n```\n{result_json}\n```"
-
-    await ctx.send(output_msg)
+    similarity = result.similarity  # as per wrapper
+    title = result.title
+    urls = result.urls  # list of urls
+    await ctx.send(f"🔗 Match found!\n**Title:** {title}\n**Similarity:** {similarity:.1f}%\n**URL:** {urls[0]}")
     
 # ---- LOCATION COMMAND ----
 @bot.command(name="location")
