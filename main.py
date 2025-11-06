@@ -117,49 +117,48 @@ def set_user_timezone(user_id, timezone_str, city):
 # ---- helpers ----
 import os
 import aiohttp
-from serpapi import GoogleSearch  # SerpApi wrapper
-from urllib.parse import quote
+import requests
+from urllib.parse import urlparse
 
-SERPAPI_KEY = os.getenv("SERPAPI_KEY")  # add this to Railway environment variables
+SERPAPI_KEY = os.getenv("SERPAPI_KEY")  # Set this in Railway variables
 
-async def yandex_reverse_search(image_url, limit=3):
-    """
-    Perform a Yandex reverse image search using SerpApi.
-    Returns a list of dicts with title, domain, and link.
-    """
-    if not SERPAPI_KEY:
-        return {"error": "SERPAPI_KEY not set."}
+async def extract_image(msg):
+    """Extract the first image URL from a message (attachments or embeds)."""
+    if msg.attachments:
+        for a in msg.attachments:
+            if a.filename.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+                return a.url
 
+    for e in msg.embeds:
+        if e.url:
+            return e.url
+        if e.image and e.image.url:
+            return e.image.url
+        if e.thumbnail and e.thumbnail.url:
+            return e.thumbnail.url
+    return None
+
+def yandex_search(image_url, limit=3):
+    """Search image on Yandex via SerpApi and return top results."""
     params = {
         "engine": "yandex_images",
         "image_url": image_url,
         "api_key": SERPAPI_KEY
     }
 
-    # SerpApi uses sync requests, so run in executor
-    from functools import partial
-    from concurrent.futures import ThreadPoolExecutor
-
-    def search_sync():
-        search = GoogleSearch(params)
-        return search.get_dict()
-
-    loop = asyncio.get_running_loop()
-    with ThreadPoolExecutor() as pool:
-        data = await loop.run_in_executor(pool, search_sync)
+    resp = requests.get("https://serpapi.com/search.json", params=params)
+    data = resp.json()
 
     results = []
-    if "image_results" in data:
-        for r in data["image_results"][:limit]:
-            results.append({
-                "title": r.get("title", "No title"),
-                "domain": r.get("domain", "No domain"),
-                "link": r.get("link", "No link")
-            })
+    for r in data.get("image_results", [])[:limit]:
+        results.append({
+            "title": r.get("title", "No title"),
+            "domain": r.get("domain", "No domain"),
+            "link": r.get("link", "No link")
+        })
 
     search_page = data.get("search_metadata", {}).get("url", "")
     return {"results": results, "search_page": search_page}
-
 
 # ---- other ----
 
@@ -423,43 +422,50 @@ async def commands_command(ctx):
 
 # ---- reverse command ----
 
-# ---- reverse command ----
+# ---- commands ----
+from discord.ext import commands
+
 @bot.command(name="rev")
 async def reverse_command(ctx):
-    # Pull image from reply first
+    """Reverse search the most relevant image in chat using Yandex (SerpApi)."""
+    await ctx.trigger_typing()
+
+    # Try to get image from reply first
     image_url = None
     if ctx.message.reference:
         try:
             replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-            if replied.attachments:
-                image_url = replied.attachments[0].url
+            image_url = await extract_image(replied)
         except:
             pass
 
-    # If no reply → check recent messages
+    # If no image in reply → check last 20 messages
     if not image_url:
         async for msg in ctx.channel.history(limit=20):
-            if msg.attachments:
-                image_url = msg.attachments[0].url
+            image_url = await extract_image(msg)
+            if image_url:
                 break
 
     if not image_url:
         return await ctx.reply("⚠️ No image found in the last 20 messages.")
 
-    await ctx.reply("🔍 Searching Yandex for similar images...")
+    # Perform Yandex search
+    try:
+        data = await commands.bot.loop.run_in_executor(None, yandex_search, image_url, 3)
+    except Exception as e:
+        return await ctx.reply(f"❌ Error fetching results: {e}")
 
-    data = await yandex_reverse_search(image_url, limit=3)
-    if "error" in data:
-        return await ctx.reply(f"❌ Error: {data['error']}")
-    if not data["results"]:
+    if not data or not data["results"]:
         return await ctx.reply("❌ No matches found.")
 
-    text = "**Top Matches (Yandex Reverse Search)**\n\n"
+    text = "🔍 **Top Matches (Yandex Reverse Search)**\n\n"
     for i, r in enumerate(data["results"], start=1):
         text += f"**{i}.** `{r['title']}`\n"
         text += f"🌍 {r['domain']}\n"
         text += f"🔗 <{r['link']}>\n\n"
-    text += f"📸 Full search → <{data['search_page']}>"
+
+    if data.get("search_page"):
+        text += f"📸 Full search → <{data['search_page']}>"
 
     await ctx.reply(text)
 
