@@ -335,7 +335,7 @@ async def quote_command(ctx, *, keyword: str = None):
             if len(matches) > 5:
                 await ctx.send(f"📊 Showing 5 of {len(matches)} matches. Be more specific!")
         else:
-            await ctx.send(f"🔍 No quotes found containing "{keyword}."")
+            await ctx.send(f"🔍 No quotes found containing '{keyword}'")
 
 @bot.command(name="addquote")
 async def add_quote_command(ctx, *, quote_text: str):
