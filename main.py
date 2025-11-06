@@ -120,7 +120,7 @@ import os
 import aiohttp
 import asyncio
 from discord import Message
-from serpapi import GoogleSearch
+from serpapi import GoogleSearchResults
 
 async def extract_image(msg: Message):
     # Check attachments
@@ -154,7 +154,7 @@ async def do_yandex_reverse(image_url):
 
     # Run in thread to avoid blocking
     def run():
-        return GoogleSearch(params).get_dict()
+        return GoogleSearchResults(params).get_dict()
 
     data = await asyncio.to_thread(run)
 
