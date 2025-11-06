@@ -117,21 +117,21 @@ def set_user_timezone(user_id, timezone_str, city):
 # ---- HELPER ----
 
 # ---- reverse ----
-
 # ---- helpers.py ----
 import aiohttp
 from bs4 import BeautifulSoup
 import tempfile
 import os
+from urllib.parse import quote_plus
 
-async def yandex_fetch_top_results(image_url, limit=3):
+async def yandex_fetch_similar(image_url, limit=3):
     """
-    Performs a Yandex reverse image search and returns the top results.
-    Each result is a dict: {'title', 'domain', 'link'}
+    Uploads the image to Yandex and fetches the top `limit` visually similar images.
+    Returns list of dicts: {'title', 'domain', 'link'}
     """
     results = []
 
-    # Download image to a temp file
+    # Download the image to a temp file
     async with aiohttp.ClientSession() as session:
         async with session.get(image_url) as resp:
             if resp.status != 200:
@@ -146,21 +146,23 @@ async def yandex_fetch_top_results(image_url, limit=3):
         async with aiohttp.ClientSession() as session:
             form = aiohttp.FormData()
             form.add_field('upfile', open(tmp_path, 'rb'), filename=os.path.basename(tmp_path))
+            # Upload image
             async with session.post("https://yandex.com/images/search?rpt=imageview", data=form) as resp:
                 html = await resp.text()
 
         soup = BeautifulSoup(html, "html.parser")
 
-        # Scrape up to `limit` results
-        items = soup.select("a.serp-item__link") or soup.select("a.CbirCard-Preview")  # fallback selector
-        for item in items[:limit]:
-            title = item.get("title") or item.text.strip() or "Unknown"
-            link = item.get("href") or ""
-            domain = link.split("/")[2] if link.startswith("http") else "Unknown"
+        # Grab first few "similar images" cards
+        # These are often in <div class="CbirSimilar-Item"> or similar classes
+        similar_items = soup.select("a.CbirSimilar-Item") or soup.select("a.serp-item__link")
+
+        for item in similar_items[:limit]:
+            link = item.get("href")
+            title = item.get("title") or "No title"
+            domain = link.split("/")[2] if link and link.startswith("http") else "Unknown"
             results.append({"title": title, "domain": domain, "link": link})
 
-        # Full search page link
-        search_page = f"https://yandex.com/images/search?rpt=imageview&url={image_url}"
+        search_page = f"https://yandex.com/images/search?rpt=imageview&url={quote_plus(image_url)}"
 
         return {"results": results, "search_page": search_page}
 
@@ -429,7 +431,6 @@ async def commands_command(ctx):
         await ctx.send("⚠️ I cannot DM you. Please check your privacy settings.")
 
 # ---- reverse command ----
-# ---- commands.py ----
 
 @bot.command(name="rev")
 async def reverse_command(ctx):
@@ -443,7 +444,7 @@ async def reverse_command(ctx):
             except:
                 pass
 
-        # Scan recent 20 messages if no reply
+        # Scan last 20 messages if no reply
         if not image_url:
             async for msg in ctx.channel.history(limit=20):
                 image_url = await extract_image(msg)
@@ -453,20 +454,19 @@ async def reverse_command(ctx):
         if not image_url:
             return await ctx.reply("⚠️ No image found in the last 20 messages.")
 
-        # Perform Yandex reverse search
-        data = await yandex_fetch_top_results(image_url, limit=3)
+        # Perform Yandex similar images search
+        data = await yandex_fetch_similar(image_url, limit=3)
 
         if not data["results"]:
-            return await ctx.reply("❌ No matches found.")
+            return await ctx.reply("❌ No similar images found.")
 
-        text = "**🔍 Top Matches (Yandex Reverse Search)**\n\n"
+        text = "**🔍 Top Similar Images (Yandex)**\n\n"
         for i, r in enumerate(data["results"], start=1):
             text += f"**{i}.** `{r['title']}`\n🌍 {r['domain']}\n🔗 <{r['link']}>\n\n"
 
         text += f"📸 Full search → <{data['search_page']}>"
 
         await ctx.reply(text)
-
 
 # ---- LOCATION COMMAND ----
 @bot.command(name="location")
