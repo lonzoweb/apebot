@@ -13,6 +13,8 @@ import io
 import aiohttp
 from bs4 import BeautifulSoup
 import urllib.parse
+import tempfile
+
 
 # ==== CONFIG ====
 TOKEN = os.getenv("DISCORD_TOKEN")
