@@ -114,51 +114,48 @@ def set_user_timezone(user_id, timezone_str, city):
     conn.close()
 
 # ---- HELPER ----
-# ---- helpers ----
-import os
+# ---- helper: Yandex search ----
 import aiohttp
-import requests
-from urllib.parse import urlparse
+import json
 
-SERPAPI_KEY = os.getenv("SERPAPI_KEY")  # Set this in Railway variables
+async def yandex_fetch_top_results(image_url: str, limit: int = 3):
+    """
+    Fetch top reverse image search results from Yandex via SerpApi.
+    Returns dict with 'results' (list) and 'search_page' (str)
+    """
+    SERPAPI_KEY = os.getenv("SERPAPI_KEY")
+    if not SERPAPI_KEY:
+        raise ValueError("SERPAPI_KEY environment variable not set")
 
-async def extract_image(msg):
-    """Extract the first image URL from a message (attachments or embeds)."""
-    if msg.attachments:
-        for a in msg.attachments:
-            if a.filename.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
-                return a.url
-
-    for e in msg.embeds:
-        if e.url:
-            return e.url
-        if e.image and e.image.url:
-            return e.image.url
-        if e.thumbnail and e.thumbnail.url:
-            return e.thumbnail.url
-    return None
-
-def yandex_search(image_url, limit=3):
-    """Search image on Yandex via SerpApi and return top results."""
+    # Build SerpApi URL
+    search_url = "https://serpapi.com/search.json"
     params = {
-        "engine": "yandex_images",
-        "image_url": image_url,
-        "api_key": SERPAPI_KEY
+        "engine": "yandex",
+        "url": image_url,
+        "api_key": SERPAPI_KEY,
+        "num": limit
     }
 
-    resp = requests.get("https://serpapi.com/search.json", params=params)
-    data = resp.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(search_url, params=params) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"SerpApi returned HTTP {resp.status}")
+            data = await resp.json()
 
+    # Parse top results
     results = []
-    for r in data.get("image_results", [])[:limit]:
+    yandex_results = data.get("images_results", [])
+    for r in yandex_results[:limit]:
         results.append({
             "title": r.get("title", "No title"),
-            "domain": r.get("domain", "No domain"),
-            "link": r.get("link", "No link")
+            "link": r.get("original", r.get("link", "No link")),
+            "domain": r.get("domain", "Unknown")
         })
 
-    search_page = data.get("search_metadata", {}).get("url", "")
-    return {"results": results, "search_page": search_page}
+    return {
+        "results": results,
+        "search_page": data.get("search_metadata", {}).get("yandex_url", "")
+    }
 
 # ---- other ----
 
