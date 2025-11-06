@@ -367,7 +367,7 @@ async def edit_quote_command(ctx, *, keyword: str):
     quotes = load_quotes_from_db()
     matches = [q for q in quotes if keyword.lower() in q.lower()]
     if not matches:
-        await ctx.send(f"🔍 No quotes found containing "{keyword}."")
+        await ctx.send(f"🔍 No quotes found containing '{keyword}'")
         return
 
     # Display matches with numbering
@@ -676,12 +676,12 @@ async def delete_quote(ctx, *, keyword: str):
         return await ctx.send("❌ Database error")
 
     if not results:
-        return await ctx.send(f"🔍 No quotes found containing "{keyword}."")
+        return await ctx.send(f"🔍 No quotes found containing '{keyword}'")
 
     if len(results) > 1:
         formatted = "\n".join(f"{i+1}. {r[1][:80]}..." if len(r[1]) > 80 else f"{i+1}. {r[1]}" for i, r in enumerate(results))
         await ctx.send(
-            f"⚠️ Multiple quotes found containing "{keyword}."\n{formatted}\n"
+            f"⚠️ Multiple quotes found containing '{keyword}'.\n{formatted}\n"
             f"Type the number (1–{len(results)}), or `cancel`."
         )
 
@@ -704,7 +704,7 @@ async def delete_quote(ctx, *, keyword: str):
         quote_id, quote_text = results[0]
 
     # Ask for typed confirmation
-    await ctx.send(f"🗑️ Delete this quote?\n"{quote_text}"\nType `yes` to confirm.")
+    await ctx.send(f"🗑️ Delete this quote?\n\"{quote_text}\"\nType `yes` to confirm.")
 
     def check_confirm(m):
         return m.author == ctx.author and m.channel == ctx.channel
@@ -722,7 +722,7 @@ async def delete_quote(ctx, *, keyword: str):
         with get_db() as conn:
             c = conn.cursor()
             c.execute("DELETE FROM quotes WHERE id = ?", (quote_id,))
-        await ctx.send(f"✅ Deleted quote:\n"{quote_text}"")
+        await ctx.send(f"✅ Deleted quote:\n\"{quote_text}\"")
     except Exception as e:
         logger.error(f"Error deleting quote: {e}")
         await ctx.send("❌ Error deleting quote")
@@ -735,7 +735,7 @@ async def db_check_write(ctx, *, quote_text: str = "test write"):
         with get_db() as conn:
             c = conn.cursor()
             c.execute("INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (quote_text,))
-        await ctx.send(f"✅ Successfully wrote "{quote_text}" to {DB_FILE}")
+        await ctx.send(f"✅ Successfully wrote \"{quote_text}\" to {DB_FILE}")
     except Exception as e:
         logger.error(f"DB write error: {e}")
         await ctx.send(f"❌ Write failed: {e}")
