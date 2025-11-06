@@ -127,35 +127,72 @@ async def yandex_fetch_top_results(image_url: str, limit: int = 3):
     if not SERPAPI_KEY:
         raise ValueError("SERPAPI_KEY environment variable not set")
 
-    # Build SerpApi URL
+    # Build SerpApi URL - FIXED: use yandex_images engine
     search_url = "https://serpapi.com/search.json"
     params = {
-        "engine": "yandex",
-        "url": image_url,
-        "api_key": SERPAPI_KEY,
-        "num": limit
+        "engine": "yandex_images",  # Changed from "yandex" to "yandex_images"
+        "image_url": image_url,      # Changed from "url" to "image_url"
+        "api_key": SERPAPI_KEY
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.get(search_url, params=params) as resp:
+        async with session.get(search_url, params=params, timeout=30) as resp:
             if resp.status != 200:
-                raise RuntimeError(f"SerpApi returned HTTP {resp.status}")
+                error_text = await resp.text()
+                raise RuntimeError(f"SerpApi returned HTTP {resp.status}: {error_text[:200]}")
             data = await resp.json()
 
-    # Parse top results
+    # Parse results - Yandex images returns similar images
     results = []
-    yandex_results = data.get("images_results", [])
-    for r in yandex_results[:limit]:
+    
+    # Check for similar images in the response
+    similar_images = data.get("similar_images", [])
+    
+    if not similar_images:
+        # Fallback: check inline_images
+        similar_images = data.get("inline_images", [])
+    
+    for img in similar_images[:limit]:
+        # Extract relevant info
+        title = img.get("title", "Untitled")
+        source_link = img.get("source", "")
+        thumbnail = img.get("thumbnail", "")
+        original = img.get("original", "")
+        
         results.append({
-            "title": r.get("title", "No title"),
-            "link": r.get("original", r.get("link", "No link")),
-            "domain": r.get("domain", "Unknown")
+            "title": title,
+            "link": original or source_link or "No link",
+            "thumbnail": thumbnail,
+            "source": img.get("source_name", "Unknown source")
         })
+
+    # Get the search page URL
+    search_metadata = data.get("search_metadata", {})
+    search_page = search_metadata.get("yandex_images_url", search_metadata.get("raw_html_file", ""))
 
     return {
         "results": results,
-        "search_page": data.get("search_metadata", {}).get("yandex_url", "")
+        "search_page": search_page
     }
+
+async def extract_image(message):
+    """Extract image URL from a message."""
+    # Check attachments first
+    if message.attachments:
+        for att in message.attachments:
+            if att.content_type and att.content_type.startswith("image"):
+                return att.url
+
+    # Check embeds
+    if message.embeds:
+        for embed in message.embeds:
+            if embed.image:
+                return embed.image.url
+            if embed.thumbnail:
+                return embed.thumbnail.url
+
+    return None
+
 
 # ---- other ----
 
@@ -418,21 +455,19 @@ async def commands_command(ctx):
         await ctx.send("⚠️ I cannot DM you. Please check your privacy settings.")
 
 # ---- reverse command ----
-# ---- reverse command ----
 
 @bot.command(name="rev")
 async def reverse_command(ctx):
     """Reverse search the most relevant image in chat using Yandex (via SerpApi)."""
     async with ctx.channel.typing():
-
         # Try to pull image from reply first
         image_url = None
         if ctx.message.reference:
             try:
                 replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
                 image_url = await extract_image(replied)
-            except:
-                pass
+            except Exception as e:
+                print(f"Error fetching replied message: {e}")
 
         # If no reply → auto-scan recent chat for image
         if not image_url:
@@ -447,24 +482,41 @@ async def reverse_command(ctx):
         # Perform Yandex search
         try:
             data = await yandex_fetch_top_results(image_url, limit=3)
+        except ValueError as e:
+            return await ctx.reply(f"❌ Configuration error: {e}")
+        except RuntimeError as e:
+            return await ctx.reply(f"❌ Search error: {e}")
         except Exception as e:
-            return await ctx.reply(f"❌ Yandex fetch error: {e}")
+            print(f"Unexpected error in reverse search: {e}")
+            return await ctx.reply(f"❌ Unexpected error: {type(e).__name__}")
 
         if not data or not data.get("results"):
-            return await ctx.reply("❌ No matches found.")
+            return await ctx.reply("❌ No similar images found.")
 
-        # Format results
-        text = "🔍 **Top Matches (Yandex Reverse Search)**\n\n"
+        # Format results with embeds for better presentation
+        embed = discord.Embed(
+            title="🔍 Yandex Reverse Image Search Results",
+            color=discord.Color.blue()
+        )
+        
         for i, r in enumerate(data["results"], start=1):
-            text += f"**{i}.** `{r['title']}`\n"
-            text += f"🌍 {r['domain']}\n"
-            text += f"🔗 <{r['link']}>\n\n"
-
-        text += f"📸 Full search → <{data.get('search_page', 'N/A')}>"
-
-        await ctx.reply(text)
-
-
+            field_name = f"{i}. {r['title'][:100]}"
+            field_value = f"📌 Source: {r['source']}\n🔗 [View Image]({r['link']})"
+            embed.add_field(name=field_name, value=field_value, inline=False)
+        
+        if data.get("search_page"):
+            embed.add_field(
+                name="🌐 Full Search Results",
+                value=f"[View on Yandex]({data['search_page']})",
+                inline=False
+            )
+        
+        embed.set_footer(text="Powered by SerpApi + Yandex")
+        
+        # Show the original image thumbnail
+        embed.set_thumbnail(url=image_url)
+        
+        await ctx.reply(embed=embed)
 # ---- LOCATION COMMAND ----
 @bot.command(name="location")
 async def location_command(ctx, *, args: str):
