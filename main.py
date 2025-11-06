@@ -115,14 +115,14 @@ def set_user_timezone(user_id, timezone_str, city):
 
 # ---- HELPER ----
 
-# ---- reverse ----
+# ---- Helpers Section ----
 import os
 import aiohttp
-from serpapi import GoogleSearch  # correct import
-import discord
+import asyncio
+from discord import Message
+from serpapi import GoogleSearch
 
-async def extract_image(msg: discord.Message):
-    """Extract image URL from a message (attachments or embeds)."""
+async def extract_image(msg: Message):
     # Check attachments
     if msg.attachments:
         for a in msg.attachments:
@@ -137,40 +137,36 @@ async def extract_image(msg: discord.Message):
             return e.image.url
         if e.thumbnail and e.thumbnail.url:
             return e.thumbnail.url
+
     return None
 
 
-async def serpapi_yandex_image_search(image_url, num_results=3):
-    """Query Yandex via SerpApi and return top results."""
+async def do_yandex_reverse(image_url):
     api_key = os.getenv("SERPAPI_KEY")
     if not api_key:
-        raise ValueError("SERPAPI_KEY not set in environment")
+        raise RuntimeError("Missing SERPAPI_KEY in environment")
 
     params = {
-        "engine": "yandex",
+        "engine": "yandex_reverse_image",
         "image_url": image_url,
         "api_key": api_key,
-        "num": num_results
     }
 
-    # SerpApi client is synchronous, so run in executor to avoid blocking
-    loop = discord.utils.get_event_loop() if hasattr(discord.utils, "get_event_loop") else None
+    # Run in thread to avoid blocking
+    def run():
+        return GoogleSearch(params).get_dict()
 
-    def run_search():
-        search = GoogleSearch(params)
-        return search.get_dict()
+    data = await asyncio.to_thread(run)
 
-    import asyncio
-    data = await asyncio.to_thread(run_search)
-
-    # Collect top results
+    similar = data.get("similar_images", [])
     results = []
-    images_results = data.get("images_results", [])
-    for r in images_results[:num_results]:
+    for item in similar[:3]:  # top 3 results
         results.append({
-            "title": r.get("title") or "No title",
-            "link": r.get("original")
-
+            "title": item.get("title") or "Unknown",
+            "image": item.get("thumbnail"),
+            "link": item.get("link") or item.get("source") or "No link"
+        })
+    return results
 
 # ---- other ----
 
@@ -434,12 +430,15 @@ async def commands_command(ctx):
 
 # ---- reverse command ----
 
-# ---- commands.py ----
-@bot.command(name="rev")
+# ---- Commands Section ----
+from discord.ext import commands
+
+bot = commands.Bot(command_prefix=".", intents=discord.Intents.all())
+
+@bot.command(name="reverse")
 async def reverse_command(ctx):
-    """Reverse image search using SerpApi (Yandex)."""
     async with ctx.channel.typing():
-        # 1️⃣ Try reply first
+        # 1️⃣ Try to get image from reply
         image_url = None
         if ctx.message.reference:
             try:
@@ -448,7 +447,7 @@ async def reverse_command(ctx):
             except:
                 pass
 
-        # 2️⃣ If no reply, check last 20 messages
+        # 2️⃣ If no reply → scan last 20 messages
         if not image_url:
             async for msg in ctx.channel.history(limit=20):
                 image_url = await extract_image(msg)
@@ -458,21 +457,23 @@ async def reverse_command(ctx):
         if not image_url:
             return await ctx.reply("⚠️ No image found in the last 20 messages.")
 
-        # 3️⃣ Perform Yandex search
+        # 3️⃣ Run Yandex reverse search
         try:
-            results = await serpapi_yandex_image_search(image_url, num_results=3)
+            results = await do_yandex_reverse(image_url)
         except Exception as e:
-            return await ctx.reply(f"❌ Search failed: {str(e)}")
+            return await ctx.reply(f"❌ Error fetching results: {e}")
 
         if not results:
             return await ctx.reply("❌ No matches found.")
 
         # 4️⃣ Build reply
-        text = "🔍 **Top Matches (Yandex Reverse Search)**\n\n"
+        text = "🔍 **Top Yandex Reverse Image Matches**\n\n"
         for i, r in enumerate(results, start=1):
             text += f"**{i}.** `{r['title']}`\n"
-            text += f"🌍 {r['domain']}\n"
-            text += f"🔗 <{r['link']}>\n\n"
+            text += f"🔗 {r['link']}\n"
+            if r["image"]:
+                text += f"🖼 <{r['image']}>\n"
+            text += "\n"
 
         await ctx.reply(text)
 
