@@ -445,9 +445,15 @@ async def reverse_command(ctx):
             return await ctx.reply("❌ No matches found.")
 
         # Build output text
-        text = "**Top Matches (Yandex Reverse Search)**\n\
+text = "**Top Matches (Yandex Reverse Search)**\n\n"
+for i, r in enumerate(data["results"], start=1):
+    text += f"**{i}.** `{r['title']}`\n"
+    text += f"🌍 {r['domain']}\n"
+    text += f"🔗 <{r['link']}>\n\n"
 
-    
+text += f"📸 Full search → <{data['search_page']}>"
+
+
 # ---- LOCATION COMMAND ----
 @bot.command(name="location")
 async def location_command(ctx, *, args: str):
