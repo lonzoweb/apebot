@@ -11,7 +11,6 @@ import aiohttp
 import json
 import shutil
 import io
-from icrawler.builtin import BingImageCrawler
 
 # ==== CONFIG ====
 TOKEN = os.getenv("DISCORD_TOKEN")
