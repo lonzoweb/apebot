@@ -7,10 +7,12 @@ from zoneinfo import ZoneInfo
 import os
 import sqlite3
 import time
-import aiohttp
 import json
 import shutil
 import io
+import aiohttp
+from bs4 import BeautifulSoup
+import urllib.parse
 
 # ==== CONFIG ====
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -18,11 +20,6 @@ OPENCAGE_KEY = os.getenv("OPENCAGE_KEY")
 if not OPENCAGE_KEY:
     raise ValueError("OPENCAGE_KEY environment variable is missing!")
     
-SAUCENAO_KEY = os.getenv("SAUCENAO_KEY")
-if not SAUCENAO_KEY:
-    raise ValueError("SAUCENAO_KEY environment variable is missing!")
-
-
 channel_id_str = os.getenv("CHANNEL_ID")
 if channel_id_str is None:
     raise ValueError("CHANNEL_ID environment variable is missing!")
@@ -116,6 +113,49 @@ def set_user_timezone(user_id, timezone_str, city):
     conn.close()
 
 # ---- HELPER ----
+
+# ---- reverse ----
+import aiohttp
+from bs4 import BeautifulSoup
+import urllib.parse
+
+async def yandex_fetch_top_results(image_url: str, limit=3):
+    encoded = urllib.parse.quote_plus(image_url)
+    search_url = f"https://yandex.com/images/search?rpt=imageview&url={encoded}"
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(search_url, headers={"User-Agent": "Mozilla/5.0"}) as resp:
+            html = await resp.text()
+
+    soup = BeautifulSoup(html, "lxml")
+
+    results = []
+    # Yandex result blocks commonly use this selector:
+    for link in soup.select("a.Link_theme_normal")[:limit]:
+        title = link.get_text(strip=True)
+        href = link.get("href")
+
+        if not href:
+            continue
+
+        if href.startswith("//"):
+            href = "https:" + href
+        elif href.startswith("/"):
+            href = "https://yandex.com" + href
+
+        domain = urllib.parse.urlparse(href).netloc.replace("www.", "")
+
+        results.append({
+            "title": title,
+            "link": href,
+            "domain": domain
+        })
+
+    return {
+        "results": results,
+        "search_page": search_url
+    }
+
 async def send_random_quote(channel, blessing=False):
     global daily_quote_of_the_day
     quotes = load_quotes_from_db()
@@ -131,36 +171,6 @@ async def send_random_quote(channel, blessing=False):
     )
     embed.set_footer(text="🕊️ Daily Quote" if blessing else "🌇 Quote")
     await channel.send(embed=embed)
-    
-import aiohttp
-from saucenao_api import SauceNao  # assuming this wrapper
-
-async def sauce_search(image_url: str):
-    sauce = SauceNao(SAUCENAO_KEY)
-    results = await sauce.from_url(image_url)  # or whatever method the wrapper uses
-    if not results:
-        return None
-    return results[0]  # take the best match
-
-# --- Helper: Find image from message or reply ---
-async def find_image(ctx):
-    # 1. If user attached an image directly
-    if ctx.message.attachments:
-        for attachment in ctx.message.attachments:
-            if attachment.content_type and attachment.content_type.startswith("image/"):
-                return attachment.url
-
-    # 2. If user replied to a message with an image
-    if ctx.message.reference:
-        replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-        if replied.attachments:
-            for attachment in replied.attachments:
-                if attachment.content_type and attachment.content_type.startswith("image/"):
-                    return attachment.url
-
-    # 3. No image found
-    return None
-
     
 async def lookup_location(query):
     url = f"https://api.opencagedata.com/geocode/v1/json?q={query}&key={OPENCAGE_KEY}"
@@ -178,6 +188,20 @@ async def lookup_location(query):
 def has_authorized_role(member):
     return any(role.name in AUTHORIZED_ROLES for role in member.roles) or member.guild_permissions.administrator
 
+async def extract_image(message):
+    if message.attachments:
+        for att in message.attachments:
+            if att.content_type and att.content_type.startswith("image"):
+                return att.url
+
+    if message.embeds:
+        for embed in message.embeds:
+            if embed.thumbnail:
+                return embed.thumbnail.url
+            if embed.image:
+                return embed.image.url
+
+    return None
 
 # ---- EVENTS ----
 @bot.event
@@ -394,22 +418,45 @@ async def commands_command(ctx):
 
 @bot.command(name="reverse")
 async def reverse_command(ctx):
-    image_url = await find_image(ctx)  # your earlier extract logic
+    await ctx.trigger_typing()
+
+    # Try to pull image from reply first
+    image_url = None
+
+    if ctx.message.reference:
+        try:
+            replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+            image_url = await extract_image(replied)
+        except:
+            pass
+
+    # If no reply → auto-scan recent chat for image
     if not image_url:
-        await ctx.send("⚠️ No image found.")
-        return
+        async for msg in ctx.channel.history(limit=20):
+            image_url = await extract_image(msg)
+            if image_url:
+                break
 
-    await ctx.send("✅ Image found.\n⏳ Standby...")
+    if not image_url:
+        return await ctx.reply("⚠️ No image found in the last 20 messages.")
 
-    result = await sauce_search(image_url)
-    if not result:
-        await ctx.send("❌ No useful match results.")
-        return
+    # Perform search
+    data = await yandex_fetch_top_results(image_url, limit=3)
 
-    similarity = result.similarity  # as per wrapper
-    title = result.title
-    urls = result.urls  # list of urls
-    await ctx.send(f"🔗 Match found!\n**Title:** {title}\n**Similarity:** {similarity:.1f}%\n**URL:** {urls[0]}")
+    if not data or not data["results"]:
+        return await ctx.reply("❌ No matches found.")
+
+    text = "🔍 **Top Matches (Yandex Reverse Search)**\n\n"
+
+    for i, r in enumerate(data["results"], start=1):
+        text += f"**{i}.** `{r['title']}`\n"
+        text += f"🌍 {r['domain']}\n"
+        text += f"🔗 <{r['link']}>\n\n"
+
+    text += f"📸 Full search → <{data['search_page']}>"
+
+    await ctx.reply(text)
+
     
 # ---- LOCATION COMMAND ----
 @bot.command(name="location")
