@@ -428,7 +428,7 @@ from discord.ext import commands
 @bot.command(name="rev")
 async def reverse_command(ctx):
     """Reverse search the most relevant image in chat using Yandex (SerpApi)."""
-    await ctx.trigger_typing()
+    async with ctx.channel.typing():
 
     # Try to get image from reply first
     image_url = None
