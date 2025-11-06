@@ -115,46 +115,71 @@ def set_user_timezone(user_id, timezone_str, city):
 # ---- HELPER ----
 
 # ---- reverse ----
-import aiohttp
-from bs4 import BeautifulSoup
-import urllib.parse
 
-async def yandex_fetch_top_results(image_url: str, limit=3):
-    encoded = urllib.parse.quote_plus(image_url)
-    search_url = f"https://yandex.com/images/search?rpt=imageview&url={encoded}"
+# ---- Extract image from message ----
+async def extract_image(msg: discord.Message):
+    # Check attachments
+    if msg.attachments:
+        for a in msg.attachments:
+            if a.filename.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+                return a.url
 
+    # Check embeds
+    for e in msg.embeds:
+        if e.image and e.image.url:
+            return e.image.url
+        if e.thumbnail and e.thumbnail.url:
+            return e.thumbnail.url
+        if e.url:
+            return e.url
+
+    return None
+
+# ---- Yandex reverse search ----
+async def yandex_fetch_top_results(image_url: str, limit: int = 3):
+    """
+    Returns top 'limit' results and full search page URL.
+    """
+    search_url = "https://yandex.com/images/search?rpt=imageview"
+
+    # Download image to temp file
     async with aiohttp.ClientSession() as session:
-        async with session.get(search_url, headers={"User-Agent": "Mozilla/5.0"}) as resp:
+        async with session.get(image_url) as resp:
+            if resp.status != 200:
+                return None
+            img_bytes = await resp.read()
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+        tmp.write(img_bytes)
+        tmp_path = tmp.name
+
+    # Post to Yandex
+    files = {"upfile": open(tmp_path, "rb")}
+    data = {"rpt": "imageview"}
+    async with aiohttp.ClientSession() as session:
+        async with session.post("https://yandex.com/images/search", data=data, files=files) as resp:
             html = await resp.text()
 
+    os.remove(tmp_path)
+
+    # Parse results
     soup = BeautifulSoup(html, "lxml")
-
     results = []
-    # Yandex result blocks commonly use this selector:
-    for link in soup.select("a.Link_theme_normal")[:limit]:
-        title = link.get_text(strip=True)
-        href = link.get("href")
 
-        if not href:
-            continue
-
-        if href.startswith("//"):
-            href = "https:" + href
-        elif href.startswith("/"):
-            href = "https://yandex.com" + href
-
-        domain = urllib.parse.urlparse(href).netloc.replace("www.", "")
-
-        results.append({
-            "title": title,
-            "link": href,
-            "domain": domain
-        })
+    # Yandex uses <a class="CbirItem-link" href="..."> for similar images
+    for link_tag in soup.select("a.CbirItem-link")[:limit]:
+        title = link_tag.get("title") or "No title"
+        href = link_tag.get("href")
+        domain = href.split("/")[2] if href else "Unknown"
+        results.append({"title": title, "domain": domain, "link": href})
 
     return {
         "results": results,
-        "search_page": search_url
+        "search_page": resp.url
     }
+
+
+# ---- other ----
 
 async def send_random_quote(channel, blessing=False):
     global daily_quote_of_the_day
@@ -415,11 +440,11 @@ async def commands_command(ctx):
         await ctx.send("⚠️ I cannot DM you. Please check your privacy settings.")
 
 # ---- reverse command ----
-@bot.command(name="reverse")
+
+@bot.command(name="rev")
 async def reverse_command(ctx):
     async with ctx.channel.typing():
-
-        # Try to pull image from reply first
+        # 1️⃣ Try reply first
         image_url = None
         if ctx.message.reference:
             try:
@@ -428,7 +453,7 @@ async def reverse_command(ctx):
             except:
                 pass
 
-        # If no reply → auto-scan recent chat for image
+        # 2️⃣ Scan last 20 messages if no image
         if not image_url:
             async for msg in ctx.channel.history(limit=20):
                 image_url = await extract_image(msg)
@@ -436,25 +461,22 @@ async def reverse_command(ctx):
                     break
 
         if not image_url:
-            return await ctx.reply("⚠️ No image found in the last 20 messages.")
+            return await ctx.reply("No image found in the last 20 messages.")
 
-        # Perform search
+        # 3️⃣ Yandex search
         data = await yandex_fetch_top_results(image_url, limit=3)
+        if not data or not data["results"]:
+            return await ctx.reply("No matches found.")
 
-        if not data or not data.get("results"):
-            return await ctx.reply("❌ No matches found.")
-
-        # Build output text
+        # 4️⃣ Build output
         text = "**Top Matches (Yandex Reverse Search)**\n\n"
         for i, r in enumerate(data["results"], start=1):
-            text += f"**{i}.** `{r['title']}`\n"
-            text += f"🌍 {r['domain']}\n"
-            text += f"🔗 <{r['link']}>\n\n"
-
-        text += f"📸 Full search → <{data['search_page']}>"
+            text += f"{i}. {r['title']}\n"
+            text += f"{r['domain']}\n"
+            text += f"<{r['link']}>\n\n"
+        text += f"Full search → <{data['search_page']}>"
 
         await ctx.reply(text)
-
 
 
 # ---- LOCATION COMMAND ----
