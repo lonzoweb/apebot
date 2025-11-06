@@ -415,47 +415,37 @@ async def commands_command(ctx):
         await ctx.send("⚠️ I cannot DM you. Please check your privacy settings.")
 
 # ---- reverse command ----
-
 @bot.command(name="reverse")
 async def reverse_command(ctx):
     async with ctx.channel.typing():
+        # Try to pull image from reply first
+        image_url = None
 
-    # Try to pull image from reply first
-    image_url = None
+        if ctx.message.reference:
+            try:
+                replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+                image_url = await extract_image(replied)
+            except:
+                pass
 
-    if ctx.message.reference:
-        try:
-            replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-            image_url = await extract_image(replied)
-        except:
-            pass
+        # If no reply → auto-scan recent chat for image
+        if not image_url:
+            async for msg in ctx.channel.history(limit=20):
+                image_url = await extract_image(msg)
+                if image_url:
+                    break
 
-    # If no reply → auto-scan recent chat for image
-    if not image_url:
-        async for msg in ctx.channel.history(limit=20):
-            image_url = await extract_image(msg)
-            if image_url:
-                break
+        if not image_url:
+            return await ctx.reply("⚠️ No image found in the last 20 messages.")
 
-    if not image_url:
-        return await ctx.reply("⚠️ No image found in the last 20 messages.")
+        # Perform search
+        data = await yandex_fetch_top_results(image_url, limit=3)
 
-    # Perform search
-    data = await yandex_fetch_top_results(image_url, limit=3)
+        if not data or not data["results"]:
+            return await ctx.reply("❌ No matches found.")
 
-    if not data or not data["results"]:
-        return await ctx.reply("❌ No matches found.")
-
-    text = "🔍 **Top Matches (Yandex Reverse Search)**\n\n"
-
-    for i, r in enumerate(data["results"], start=1):
-        text += f"**{i}.** `{r['title']}`\n"
-        text += f"🌍 {r['domain']}\n"
-        text += f"🔗 <{r['link']}>\n\n"
-
-    text += f"📸 Full search → <{data['search_page']}>"
-
-    await ctx.reply(text)
+        # Build output text
+        text = "**Top Matches (Yandex Reverse Search)**\n\
 
     
 # ---- LOCATION COMMAND ----
