@@ -117,3 +117,66 @@ def set_user_timezone(user_id, timezone_str, city):
         c = conn.cursor()
         c.execute("INSERT OR REPLACE INTO user_timezones (user_id, timezone, city) VALUES (?, ?, ?)",
                   (str(user_id), timezone_str, city))
+
+# ============================================================
+# GIF TRACKER FUNCTIONS
+# ============================================================
+
+def init_gif_table():
+    """Initialize GIF tracker table"""
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS gif_tracker (
+                gif_url TEXT PRIMARY KEY,
+                count INTEGER DEFAULT 1,
+                last_sent_by TEXT,
+                last_sent_at TIMESTAMP
+            )
+        """)
+
+def increment_gif_count(gif_url, user_id):
+    """Increment GIF count or add new entry"""
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO gif_tracker (gif_url, count, last_sent_by, last_sent_at)
+            VALUES (?, 1, ?, datetime('now'))
+            ON CONFLICT(gif_url) DO UPDATE SET
+                count = count + 1,
+                last_sent_by = ?,
+                last_sent_at = datetime('now')
+        """, (gif_url, str(user_id), str(user_id)))
+
+def get_top_gifs(limit=10):
+    """Get top GIFs by count"""
+    try:
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute("""
+                SELECT gif_url, count, last_sent_by 
+                FROM gif_tracker 
+                ORDER BY count DESC 
+                LIMIT ?
+            """, (limit,))
+            return c.fetchall()
+    except Exception as e:
+        logger.error(f"Error getting top GIFs: {e}")
+        return []
+
+def get_gif_by_rank(rank):
+    """Get GIF URL by its rank position"""
+    try:
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute("""
+                SELECT gif_url 
+                FROM gif_tracker 
+                ORDER BY count DESC 
+                LIMIT 1 OFFSET ?
+            """, (rank - 1,))
+            result = c.fetchone()
+            return result[0] if result else None
+    except Exception as e:
+        logger.error(f"Error getting GIF by rank: {e}")
+        return None
