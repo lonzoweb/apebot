@@ -51,8 +51,27 @@ bot_start_time = datetime.now()
 async def on_ready():
     """Bot startup event"""
     init_db()
+    init_gif_table()
     logger.info(f"✅ Logged in as {bot.user}")
     tasks.setup_tasks(bot)
+
+@bot.event
+async def on_message(message):
+    """Track GIFs from messages"""
+    # Ignore bot messages
+    if message.author.bot:
+        return
+    
+    # Check if message contains a GIF
+    gif_url = extract_gif_url(message)
+    if gif_url:
+        try:
+            increment_gif_count(gif_url, message.author.id)
+        except Exception as e:
+            logger.error(f"Error tracking GIF: {e}")
+    
+    # Process commands
+    await bot.process_commands(message)
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -327,6 +346,94 @@ async def roll_command(ctx):
     result = random.randint(1, 33)
     await ctx.send(f"🎲 **{result}**")
 
+@bot.command(name="8ball")
+@commands.cooldown(1, 5, commands.BucketType.user)
+async def eightball_command(ctx, *, question: str = None):
+    """Ask the magic 8-ball a question"""
+    if not question:
+        return await ctx.send("❌ You need to ask a question, genius.")
+    
+    responses = [
+        # Affirmative
+        "You bet your fucking life.",
+        "Absolutely, no doubt about it.",
+        "100%. Go for it.",
+        "Hell yeah.",
+        "Does a bear shit in the woods?",
+        "Is water wet? Yes.",
+        
+        # Non-committal  
+        "Maybe, maybe not. Figure it out yourself.",
+        "Ask me later, I'm busy.",
+        "Unclear. Try again when I care.",
+        "Eh, could go either way.",
+        "I'm not your therapist, nigger.",
+        
+        # Negative
+        "Hell no.",
+        "Not a chance in hell.",
+        "Absolutely fucking not.",
+        "Are you stupid? No.",
+        "In your dreams, maybe.",
+        "Nope. Don't even think about it.",
+    ]
+    
+    await asyncio.sleep(1)  # Dramatic pause
+    await ctx.send(f"🎱 **{random.choice(responses)}**")
+
+@bot.command(name="gifs")
+@commands.cooldown(1, 10, commands.BucketType.user)
+async def gifs_command(ctx):
+    """Show top 10 most sent GIFs"""
+    top_gifs = get_top_gifs(limit=10)
+    
+    if not top_gifs:
+        return await ctx.send("📊 No GIFs tracked yet. Send some GIFs!")
+    
+    # Build leaderboard
+    description = ""
+    medals = ["🥇", "🥈", "🥉"]
+    
+    for i, (gif_url, count, last_sent_by) in enumerate(top_gifs, start=1):
+        medal = medals[i-1] if i <= 3 else f"{i}."
+        shortened = shorten_gif_url(gif_url)
+        
+        # Try to get username
+        try:
+            user = await bot.fetch_user(int(last_sent_by))
+            username = user.display_name
+        except:
+            username = "Unknown"
+        
+        description += f"{medal} **{count} sends** - `{shortened}` - @{username}\n"
+    
+    embed = discord.Embed(
+        title="🏆 GIF SCOREBOARD",
+        description=description + "\n💡 React 1️⃣-🔟 to see a GIF!",
+        color=discord.Color.purple()
+    )
+    
+    msg = await ctx.send(embed=embed)
+    
+    # Add reaction numbers
+    reactions = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+    for i in range(min(len(top_gifs), 10)):
+        await msg.add_reaction(reactions[i])
+    
+    # Wait for reactions
+    def check(reaction, user):
+        return user == ctx.author and str(reaction.emoji) in reactions and reaction.message.id == msg.id
+    
+    try:
+        reaction, user = await bot.wait_for('reaction_add', timeout=60.0, check=check)
+        rank = reactions.index(str(reaction.emoji)) + 1
+        gif_url = get_gif_by_rank(rank)
+        
+        if gif_url:
+            await ctx.send(f"**#{rank} GIF:**\n{gif_url}")
+    except asyncio.TimeoutError:
+        pass  # Timeout is fine, just ignore
+
 @bot.command(name="rev")
 @commands.cooldown(1, 30, commands.BucketType.user)
 async def reverse_command(ctx):
@@ -454,6 +561,8 @@ async def commands_command(ctx):
         "`.rev` - Reverse image search",
         "`.flip` - Flip a coin",
         "`.roll` - Roll 1-33",
+        "`.8ball <question>` - Ask the magic 8-ball",
+        "`.gifs` - Top 10 most sent GIFs",
         "`.ud <term>` - Urban Dictionary lookup",
         "`.location <city>` - Set your timezone",
         "`.time [@user]` - Check time for user",
