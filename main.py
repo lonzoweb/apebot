@@ -347,11 +347,11 @@ async def roll_command(ctx):
     await ctx.send(f"🎲 **{result}**")
 
 @bot.command(name="8ball")
-@commands.cooldown(1, 5, commands.BucketType.user)
+@commands.cooldown(1, 6, commands.BucketType.user)
 async def eightball_command(ctx, *, question: str = None):
     """Ask the magic 8-ball a question"""
     if not question:
-        return await ctx.send("❌ You need to ask a question, genius.")
+        return await ctx.send("❌ Ask a question cuh.")
     
     responses = [
         # Affirmative
@@ -360,26 +360,32 @@ async def eightball_command(ctx, *, question: str = None):
         "100%. Go for it.",
         "Hell yeah.",
         "Does a bear shit in the woods?",
-        "Is water wet? Yes.",
+        "Is water wet cuh? Yes.",
         
         # Non-committal  
         "Maybe, maybe not. Figure it out yourself.",
         "Ask me later, I'm busy.",
-        "Unclear. Try again when I care.",
+        "Unclear. Try again when I care bitch.",
         "Eh, could go either way.",
-        "I'm not your therapist, nigger.",
+        "I'm not your therapist, dude.",
         
         # Negative
         "Hell no.",
         "Not a chance in hell.",
         "Absolutely fucking not.",
         "Are you stupid? No.",
-        "In your dreams, maybe.",
-        "Nope. Don't even think about it.",
+        "In your dreams cuh.",
+        "Nope. Don't even think about it cuh.",
     ]
     
-    await asyncio.sleep(1)  # Dramatic pause
-    await ctx.send(f"**{ctx.author.display_name}:** {question}\n🎱 **{random.choice(responses)}**")
+    # Send initial message with question
+    msg = await ctx.send(f"**{ctx.author.display_name}:** {question}\n🎱 *shaking...*")
+    
+    # Dramatic pause (shaking the 8-ball)
+    await asyncio.sleep(5)
+    
+    # Edit with the answer
+    await msg.edit(content=f"**{ctx.author.display_name}:** {question}\n🎱 **{random.choice(responses)}**")
 
 @bot.command(name="gifs")
 @commands.cooldown(1, 10, commands.BucketType.user)
@@ -408,7 +414,7 @@ async def gifs_command(ctx):
         description += f"{medal} **{count} sends** - `{shortened}` - @{username}\n"
     
     embed = discord.Embed(
-        title="🏆 GIF SCOREBOARD",
+        title="🏆 Top 10 Most Sent GIFs",
         description=description + "\n💡 React 1️⃣-🔟 to see a GIF!",
         color=discord.Color.purple()
     )
