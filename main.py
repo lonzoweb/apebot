@@ -367,7 +367,7 @@ async def eightball_command(ctx, *, question: str = None):
         "Ask me later, I'm busy.",
         "Unclear. Try again when I care bitch.",
         "Eh, could go either way.",
-        "I'm not your therapist, dude.",
+        "Sheeeeit, ion know",
         
         # Negative
         "Hell no.",
