@@ -379,7 +379,7 @@ async def eightball_command(ctx, *, question: str = None):
     ]
     
     await asyncio.sleep(1)  # Dramatic pause
-    await ctx.send(f"🎱 **{random.choice(responses)}**")
+    await ctx.send(f"**{ctx.author.display_name}:** {question}\n🎱 **{random.choice(responses)}**")
 
 @bot.command(name="gifs")
 @commands.cooldown(1, 10, commands.BucketType.user)
