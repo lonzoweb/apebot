@@ -431,7 +431,7 @@ def rotate_image(image_path):
 img = Image.open(image_path)
 rotated = img.rotate(180, expand=True)
 buffer = io.BytesIO()
-rotated.save(buffer, format=‘PNG’)
+rotated.save(buffer, format='PNG')
 buffer.seek(0)
 return buffer
 
