@@ -389,7 +389,7 @@ async def eightball_command(ctx, *, question: str = None):
     await msg.edit(content=f"**{ctx.author.display_name}:** {question}\n🎱 **{random.choice(responses)}**")
 
 @bot.command(name="tc")
-@commands.cooldown(1, 5, commands.BucketType.user)
+@commands.cooldown(10, 60, commands.BucketType.user)  # 10 uses per 60 seconds
 async def tarot_card(ctx, *, search: str = None):
     """Draw a random tarot card or search for a specific one"""
     if search:
