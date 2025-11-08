@@ -427,14 +427,14 @@ async def moon_command(ctx):
         phase_emoji = get_moon_phase_emoji(phase_name)
         
         # Get current zodiac sign
-        current_sign = get_zodiac_sign(moon.ra)
+        current_sign = get_zodiac_sign(ephem.Ecliptic(moon).lon)
         
         # Find next new moon
         next_new = ephem.next_new_moon(now)
         new_moon_date = ephem.Date(next_new)
         observer.date = new_moon_date
         new_moon = ephem.Moon(observer)
-        new_moon_sign = get_zodiac_sign(new_moon.ra)
+        new_moon_sign = get_zodiac_sign(ephem.Ecliptic(new_moon).lon)
         days_to_new = int((new_moon_date - now))
         
         # Find next full moon
@@ -442,7 +442,7 @@ async def moon_command(ctx):
         full_moon_date = ephem.Date(next_full)
         observer.date = full_moon_date
         full_moon = ephem.Moon(observer)
-        full_moon_sign = get_zodiac_sign(full_moon.ra)
+        full_moon_sign = get_zodiac_sign(ephem.Ecliptic(full_moon).lon)
         days_to_full = int((full_moon_date - now))
         
         # Format dates
