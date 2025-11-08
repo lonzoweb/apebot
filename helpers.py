@@ -178,3 +178,34 @@ def get_life_path_traits(number):
         33: "Master teacher, compassionate leader, spiritual uplifter (Master Number)"
     }
     return traits.get(number, "Unknown")
+
+# --- GEMATRIA HELPERS ---
+
+HEBREW_VALUES = {
+    'א': 1, 'ב': 2, 'ג': 3, 'ד': 4, 'ה': 5, 'ו': 6, 'ז': 7, 'ח': 8, 'ט': 9,
+    'י': 10, 'כ': 20, 'ך': 20, 'ל': 30, 'מ': 40, 'ם': 40, 'נ': 50, 'ן': 50,
+    'ס': 60, 'ע': 70, 'פ': 80, 'ף': 80, 'צ': 90, 'ץ': 90, 'ק': 100,
+    'ר': 200, 'ש': 300, 'ת': 400
+}
+
+def is_hebrew(text: str) -> bool:
+    return any(char in HEBREW_VALUES for char in text)
+
+def gematria_hebrew(text: str) -> int:
+    return sum(HEBREW_VALUES.get(char, 0) for char in text)
+
+# English Ordinal A=1..Z=26
+def gematria_ordinal(text: str) -> int:
+    return sum((ord(c)-96) for c in text.lower() if 'a' <= c <= 'z')
+
+# English Reduction (Pythagorean)
+def gematria_reduction(text: str) -> int:
+    return sum(((ord(c)-96-1) % 9 + 1) for c in text.lower() if 'a' <= c <= 'z')
+
+# Reverse Ordinal Z=1..A=26
+def gematria_reverse(text: str) -> int:
+    return sum((26 - (ord(c)-96)) for c in text.lower() if 'a' <= c <= 'z')
+
+# Reverse Reduction (Reverse + Pythagorean wrap)
+def gematria_reverse_reduction(text: str) -> int:
+    return sum(((26 - (ord(c)-96) -1) % 9 + 1) for c in text.lower() if 'a' <= c <= 'z')
