@@ -43,7 +43,7 @@ intents.message_content = True
 intents.guilds = True
 intents.members = True
 
-bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
+bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents, help_command=None)
 bot_start_time = datetime.now()
 
 # ============================================================
@@ -709,6 +709,8 @@ async def blessing_command(ctx):
         await ch.send(embed=embed)
     await ctx.send("✅ Blessings sent to channels.")
 
+# ---- cmds  # '''    
+'''
 @bot.command(name="commands")
 async def commands_command(ctx):
     """Show command list (Admin only)"""
@@ -750,7 +752,8 @@ async def commands_command(ctx):
         await ctx.send("📬 I've sent you a DM with the command list!")
     except discord.Forbidden:
         await ctx.send("⚠️ I cannot DM you. Please check your privacy settings.")
-
+--- #
+''' 
 # ============================================================
 # TIMEZONE COMMANDS
 # ============================================================
