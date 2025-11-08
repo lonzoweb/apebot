@@ -534,7 +534,7 @@ async def send_tarot_card(ctx, card_key=None):
     embed = discord.Embed(
         title=card_name,
         description=f"{emojis}  *({attribution})*\n\n{description}",
-        color=discord.Color.from_rgb(47, 49, 54)
+        color=discord.Color.from_rgb(0, 0, 128)
     )
     
     # Get image
