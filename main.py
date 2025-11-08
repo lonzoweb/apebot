@@ -696,7 +696,7 @@ async def gematria_command(ctx, *, text: str = None):
 
     embed = discord.Embed(
         title=f"Gematria for: {text}",
-        color=discord.Color.magenta()
+        color=discord.Color.dark_grey()
     )
 
     embed.add_field(name="Hebrew Gematria", value=str(results["hebrew"]), inline=False)
