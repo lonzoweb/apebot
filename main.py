@@ -414,12 +414,9 @@ async def moon_command(ctx):
         # Get current date
         now = ephem.now()
         
-        # Create observer (doesn't matter for moon phase)
-        observer = ephem.Observer()
-        observer.date = now
-        
-        # Get moon info
-        moon = ephem.Moon(observer)
+        # Get moon info for current time
+        moon = ephem.Moon()
+        moon.compute(now)
         
         # Current phase info
         illumination = moon.phase / 100.0
@@ -427,23 +424,24 @@ async def moon_command(ctx):
         phase_emoji = get_moon_phase_emoji(phase_name)
         
         # Get current zodiac sign
-        current_sign = get_zodiac_sign(ephem.Ecliptic(moon).lon)
+        moon_ecliptic = ephem.Ecliptic(moon)
+        current_sign = get_zodiac_sign(moon_ecliptic.lon)
         
         # Find next new moon
         next_new = ephem.next_new_moon(now)
-        new_moon_date = ephem.Date(next_new)
-        observer.date = new_moon_date
-        new_moon = ephem.Moon(observer)
-        new_moon_sign = get_zodiac_sign(ephem.Ecliptic(new_moon).lon)
-        days_to_new = int((new_moon_date - now))
+        new_moon = ephem.Moon()
+        new_moon.compute(next_new)
+        new_moon_ecliptic = ephem.Ecliptic(new_moon)
+        new_moon_sign = get_zodiac_sign(new_moon_ecliptic.lon)
+        days_to_new = int((ephem.Date(next_new) - ephem.Date(now)))
         
         # Find next full moon
         next_full = ephem.next_full_moon(now)
-        full_moon_date = ephem.Date(next_full)
-        observer.date = full_moon_date
-        full_moon = ephem.Moon(observer)
-        full_moon_sign = get_zodiac_sign(ephem.Ecliptic(full_moon).lon)
-        days_to_full = int((full_moon_date - now))
+        full_moon = ephem.Moon()
+        full_moon.compute(next_full)
+        full_moon_ecliptic = ephem.Ecliptic(full_moon)
+        full_moon_sign = get_zodiac_sign(full_moon_ecliptic.lon)
+        days_to_full = int((ephem.Date(next_full) - ephem.Date(now)))
         
         # Format dates
         new_date_str = ephem.Date(next_new).datetime().strftime("%B %d, %Y")
@@ -475,8 +473,8 @@ async def moon_command(ctx):
         await ctx.send(embed=embed)
         
     except Exception as e:
-        logger.error(f"Error in moon command: {e}")
-        await ctx.send("❌ Error calculating moon phase.")
+        logger.error(f"Error in moon command: {e}", exc_info=True)
+        await ctx.send(f"❌ Error calculating moon phase: {str(e)}")
 
 @bot.command(name="lp")
 @commands.cooldown(1, 5, commands.BucketType.user)
