@@ -682,63 +682,32 @@ async def stats_command(ctx):
     await ctx.send(embed=embed)
 
 @bot.command(name="gem")
-async def gematria_command(ctx, *, input_text: str = None):
+async def gematria_command(ctx, *, text: str = None):
+    # If the command is replying to a message → use that text instead
+    if ctx.message.reference:
+        reply_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+        text = reply_msg.content
 
-    # Check if user replied to a message and didn't type text
-    if input_text is None and ctx.message.reference:
-        try:
-            replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+    # Reject non-text (stickers, gifs, emojis, embeds, etc.)
+    if not text or not any(ch.isalnum() for ch in text):
+        return await ctx.reply("⚠️ No valid text found to evaluate.", mention_author=False)
 
-            # Must contain plain text only
-            if replied.content and replied.attachments == []:
-                # Reject if emojis detected
-                if any(char in replied.content for char in "🧿😀😁😂🤣😅😆😉😊😇🙂🙃😋😜😝😛🫠😎🤓🥸🤩🥳🙂🙁☹️"}):
-                    return await ctx.reply("⚠️ Replied message contains emojis. Text only.")
-                
-                input_text = replied.content.strip()
-            else:
-                return await ctx.reply("⚠️ Replied message is not plain text. Only text is allowed.")
-        except:
-            return await ctx.reply("⚠️ Unable to read replied message.")
+    results = calculate_all_gematria(text)
 
-    # If no text provided and no reply
-    if not input_text:
-        return await ctx.reply("Usage: `!gem <text>` or reply to a message using `!gem`")
-
-    # Normalize input
-    phrase = input_text.lower()
-
-    # ---- Gematria Calculations ----
-    english_ord = sum(ord(c) - 96 for c in phrase if c.isalpha())
-    english_rev = sum(27 - (ord(c) - 96) for c in phrase if c.isalpha())
-
-    def reduction(n):
-        while n > 9:
-            n = sum(int(d) for d in str(n))
-        return n
-
-    english_red = reduction(english_ord)
-    english_rev_red = reduction(english_rev)
-
-    # ---- Hebrew (basic transliteration mapping) ----
-    hebrew_map = {
-        'a': 1,'b': 2,'g': 3,'d': 4,'h': 5,'v': 6,'z': 7,'x': 8,'t': 9,
-        'y': 10,'k': 20,'l': 30,'m': 40,'n': 50,'s': 60,'p': 80,'q':100,'r':200,'w':300,'f':400
-    }
-
-    hebrew_value = sum(hebrew_map.get(c, 0) for c in phrase if c.isalpha())
-
-    # ---- Output ----
-    text = (
-        f"🔢 **Gematria for:** `{input_text}`\n\n"
-        f"**English Ordinal:** {english_ord}\n"
-        f"**English Reduction:** {english_red}\n"
-        f"**Reverse Ordinal:** {english_rev}\n"
-        f"**Reverse Reduction:** {english_rev_red}\n"
-        f"**Hebrew (Simple):** {hebrew_value}"
+    embed = discord.Embed(
+        title=f"Gematria for: {text}",
+        color=discord.Color.magenta()
     )
 
-    await ctx.reply(text)
+    embed.add_field(name="Hebrew Gematria", value=str(results["hebrew"]), inline=False)
+    embed.add_field(name="English Gematria (×6)", value=str(results["english"]), inline=False)
+    embed.add_field(name="Simple (Ordinal)", value=str(results["simple"]), inline=False)
+    embed.add_field(name="Reduction", value=str(results["reduction"]), inline=False)
+    embed.add_field(name="Reverse Ordinal", value=str(results["reverse"]), inline=False)
+    embed.add_field(name="Reverse Reduction", value=str(results["reverse_reduction"]), inline=False)
+
+    await ctx.reply(embed=embed, mention_author=False)
+
         
 @bot.command(name="blessing")
 async def blessing_command(ctx):
