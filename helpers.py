@@ -177,35 +177,49 @@ def get_life_path_traits(number):
         22: "Master builder, practical idealist, powerful manifester (Master Number)",
         33: "Master teacher, compassionate leader, spiritual uplifter (Master Number)"
     }
-    return traits.get(number, "Unknown")
 
-# --- GEMATRIA HELPERS ---
+import re
 
-HEBREW_VALUES = {
-    'א': 1, 'ב': 2, 'ג': 3, 'ד': 4, 'ה': 5, 'ו': 6, 'ז': 7, 'ח': 8, 'ט': 9,
-    'י': 10, 'כ': 20, 'ך': 20, 'ל': 30, 'מ': 40, 'ם': 40, 'נ': 50, 'ן': 50,
-    'ס': 60, 'ע': 70, 'פ': 80, 'ף': 80, 'צ': 90, 'ץ': 90, 'ק': 100,
-    'ר': 200, 'ש': 300, 'ת': 400
+# Hebrew Gematria letter map (Gematrix.org standard)
+HEBREW_MAP = {
+    'A':1,'B':2,'C':3,'D':4,'E':5,'F':6,'G':7,'H':8,'I':9,
+    'J':10,'K':20,'L':30,'M':40,'N':50,'O':60,'P':70,'Q':80,
+    'R':90,'S':100,'T':200,'U':300,'V':400,'W':406,'X':490,
+    'Y':20,'Z':14
 }
 
-def is_hebrew(text: str) -> bool:
-    return any(char in HEBREW_VALUES for char in text)
+LETTER_REGEX = re.compile(r'[A-Z]')
 
-def gematria_hebrew(text: str) -> int:
-    return sum(HEBREW_VALUES.get(char, 0) for char in text)
+def reduce_digit(n: int) -> int:
+    return sum(int(d) for d in str(n))
 
-# English Ordinal A=1..Z=26
-def gematria_ordinal(text: str) -> int:
-    return sum((ord(c)-96) for c in text.lower() if 'a' <= c <= 'z')
+def text_to_letters(text: str) -> str:
+    return ''.join(ch for ch in text.upper() if LETTER_REGEX.match(ch))
 
-# English Reduction (Pythagorean)
-def gematria_reduction(text: str) -> int:
-    return sum(((ord(c)-96-1) % 9 + 1) for c in text.lower() if 'a' <= c <= 'z')
+def ordinal_values(text: str):
+    return [ord(ch) - 64 for ch in text_to_letters(text)]
 
-# Reverse Ordinal Z=1..A=26
-def gematria_reverse(text: str) -> int:
-    return sum((26 - (ord(c)-96)) for c in text.lower() if 'a' <= c <= 'z')
+def reverse_values(text: str):
+    return [26 - (ord(ch) - 65) for ch in text_to_letters(text)]
 
-# Reverse Reduction (Reverse + Pythagorean wrap)
-def gematria_reverse_reduction(text: str) -> int:
-    return sum(((26 - (ord(c)-96) -1) % 9 + 1) for c in text.lower() if 'a' <= c <= 'z')
+def hebrew_values(text: str):
+    return [HEBREW_MAP.get(ch, 0) for ch in text_to_letters(text)]
+
+def english_gematria_values(text: str):
+    # English Gematria is just Ordinal * 6
+    return [v * 6 for v in ordinal_values(text)]
+
+def calculate_all_gematria(text: str):
+    ord_vals = ordinal_values(text)
+    rev_vals = reverse_values(text)
+    heb_vals = hebrew_values(text)
+    eng_vals = english_gematria_values(text)
+
+    return {
+        "hebrew": sum(heb_vals),
+        "english": sum(eng_vals),
+        "simple": sum(ord_vals),
+        "reduction": sum(reduce_digit(v) for v in ord_vals),
+        "reverse": sum(rev_vals),
+        "reverse_reduction": sum(reduce_digit(v) for v in rev_vals),
+    }
