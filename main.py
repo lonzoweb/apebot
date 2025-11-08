@@ -12,6 +12,8 @@ import shutil
 import sqlite3
 import tarot
 import logging
+import ephem
+from datetime import timedelta
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -403,6 +405,149 @@ async def tarot_card(ctx, *, search: str = None):
     else:
         # Draw random card
         await tarot.send_tarot_card(ctx)
+
+@bot.command(name="moon")
+@commands.cooldown(1, 10, commands.BucketType.user)
+async def moon_command(ctx):
+    """Show current moon phase and upcoming moons"""
+    try:
+        # Get current date
+        now = ephem.now()
+        
+        # Create observer (doesn't matter for moon phase)
+        observer = ephem.Observer()
+        observer.date = now
+        
+        # Get moon info
+        moon = ephem.Moon(observer)
+        
+        # Current phase info
+        illumination = moon.phase / 100.0
+        phase_name = get_moon_phase_name(illumination)
+        phase_emoji = get_moon_phase_emoji(phase_name)
+        
+        # Get current zodiac sign
+        current_sign = get_zodiac_sign(moon.ra)
+        
+        # Find next new moon
+        next_new = ephem.next_new_moon(now)
+        new_moon_date = ephem.Date(next_new)
+        observer.date = new_moon_date
+        new_moon = ephem.Moon(observer)
+        new_moon_sign = get_zodiac_sign(new_moon.ra)
+        days_to_new = int((new_moon_date - now))
+        
+        # Find next full moon
+        next_full = ephem.next_full_moon(now)
+        full_moon_date = ephem.Date(next_full)
+        observer.date = full_moon_date
+        full_moon = ephem.Moon(observer)
+        full_moon_sign = get_zodiac_sign(full_moon.ra)
+        days_to_full = int((full_moon_date - now))
+        
+        # Format dates
+        new_date_str = ephem.Date(next_new).datetime().strftime("%B %d, %Y")
+        full_date_str = ephem.Date(next_full).datetime().strftime("%B %d, %Y")
+        
+        # Build embed
+        embed = discord.Embed(
+            title="🌙 Moon Phase",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="Current",
+            value=f"{phase_emoji} **{phase_name}** ({int(illumination * 100)}% illuminated)\nMoon in: **{current_sign}**",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="📅 Upcoming",
+            value=(
+                f"**Next New Moon:** {new_date_str} (in {days_to_new} days)\n"
+                f"Moon in: **{new_moon_sign}**\n\n"
+                f"**Next Full Moon:** {full_date_str} (in {days_to_full} days)\n"
+                f"Moon in: **{full_moon_sign}**"
+            ),
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+        
+    except Exception as e:
+        logger.error(f"Error in moon command: {e}")
+        await ctx.send("❌ Error calculating moon phase.")
+
+@bot.command(name="lp")
+@commands.cooldown(1, 5, commands.BucketType.user)
+async def lifepathnumber_command(ctx, date: str = None):
+    """Calculate Life Path Number from birthdate"""
+    if not date:
+        return await ctx.send(
+            "❌ Please provide a date.\n"
+            "**Format:** `.lp MM/DD/YYYY`\n"
+            "**Example:** `.lp 05/15/1990`"
+        )
+    
+    try:
+        # Parse date
+        parts = date.split("/")
+        if len(parts) != 3:
+            raise ValueError("Invalid format")
+        
+        month = int(parts[0])
+        day = int(parts[1])
+        year = int(parts[2])
+        
+        # Validate
+        if not (1 <= month <= 12) or not (1 <= day <= 31) or not (1900 <= year <= 2100):
+            raise ValueError("Invalid date values")
+        
+        # Calculate life path
+        life_path = calculate_life_path(month, day, year)
+        traits = get_life_path_traits(life_path)
+        
+        # Format date nicely
+        date_obj = datetime(year, month, day)
+        formatted_date = date_obj.strftime("%B %d, %Y")
+        
+        # Check if master number
+        is_master = life_path in [11, 22, 33]
+        
+        embed = discord.Embed(
+            title="🔢 Life Path Number",
+            color=discord.Color.purple()
+        )
+        
+        embed.add_field(
+            name="📅 Birthday",
+            value=formatted_date,
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🔢 Life Path",
+            value=f"**{life_path}**" + (" (Master Number)" if is_master else ""),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="✨ Traits",
+            value=traits,
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+        
+    except ValueError:
+        await ctx.send(
+            "❌ Invalid date format.\n"
+            "**Format:** `.lp MM/DD/YYYY`\n"
+            "**Example:** `.lp 05/15/1990`"
+        )
+    except Exception as e:
+        logger.error(f"Error in life path command: {e}")
+        await ctx.send("❌ Error calculating life path number.")
         
 @bot.command(name="gifs")
 @commands.cooldown(1, 10, commands.BucketType.user)
