@@ -421,31 +421,31 @@ TAROT_DECK = {
 # ============================================================
 
 def get_image_path(card_key):
-"""Get the file path for a card image"""
-return f"images/tarot/{card_key}.png"
+    """Get the file path for a card image"""
+    return f"images/tarot/{card_key}.png"
 
 def rotate_image(image_path):
-"""Rotate image 180 degrees for reversed cards"""
-img = Image.open(image_path)
-rotated = img.rotate(180, expand=True)
-buffer = io.BytesIO()
-rotated.save(buffer, format='PNG')
-buffer.seek(0)
-return buffer
+    """Rotate image 180 degrees for reversed cards"""
+    img = Image.open(image_path)
+    rotated = img.rotate(180, expand=True)
+    buffer = io.BytesIO()
+    rotated.save(buffer, format='PNG')
+    buffer.seek(0)
+    return buffer
 
 def draw_card():
-"""Draw a random card with 50% chance of reversal"""
-card_key = random.choice(list(TAROT_DECK.keys()))
-is_reversed = random.choice([True, False])
-return card_key, is_reversed
+    """Draw a random card with 50% chance of reversal"""
+    card_key = random.choice(list(TAROT_DECK.keys()))
+    is_reversed = random.choice([True, False])
+    return card_key, is_reversed
 
 def search_card(keyword):
-"""Search for a card by name or keyword"""
-keyword_lower = keyword.lower()
-for card_key, card_data in TAROT_DECK.items():
-if keyword_lower in card_data["name"].lower():
-return card_key
-return None
+    """Search for a card by name or keyword"""
+    keyword_lower = keyword.lower()
+    for card_key, card_data in TAROT_DECK.items():
+        if keyword_lower in card_data["name"].lower():
+            return card_key
+    return None
 
 # ============================================================
 
@@ -454,48 +454,48 @@ return None
 # ============================================================
 
 async def send_tarot_card(ctx, card_key=None, is_reversed=None):
-"""Send a tarot card to Discord channel"""
-# If no card specified, draw random
-if card_key is None:
-card_key, is_reversed = draw_card()
+    """Send a tarot card to Discord channel"""
+    # If no card specified, draw random
+    if card_key is None:
+        card_key, is_reversed = draw_card()
+    
+    # Get card data
+    card = TAROT_DECK[card_key]
+    card_name = card["name"]
+    
+    # Get keywords based on orientation
+    if is_reversed:
+        keywords = f"(REVERSED) {card['reversed']}"
+        color = discord.Color.purple()
+    else:
+        keywords = card["upright"]
+        color = discord.Color.blue()
+    
+    # Create embed
+    embed = discord.Embed(
+        title=card_name,
+        description=keywords,
+        color=color
+    )
 
-# Get card data
-card = TAROT_DECK[card_key]
-card_name = card["name"]
-
-# Get keywords based on orientation
-if is_reversed:
-    keywords = f"(REVERSED) {card['reversed']}"
-    color = discord.Color.purple()
-else:
-    keywords = card["upright"]
-    color = discord.Color.blue()
-
-# Create embed
-embed = discord.Embed(
-    title=card_name,
-    description=keywords,
-    color=color
-)
-
-# Get image
-image_path = get_image_path(card_key)
-
-# Check if image exists
-if not os.path.exists(image_path):
-    embed.set_footer(text="⚠️ Image file not found")
-    await ctx.send(embed=embed)
-    return
-
-# Rotate if reversed
-if is_reversed:
-    image_buffer = rotate_image(image_path)
-    file = discord.File(image_buffer, filename=f"{card_key}.png")
-else:
-    file = discord.File(image_path, filename=f"{card_key}.png")
-
-# Set image in embed
-embed.set_image(url=f"attachment://{card_key}.png")
-
-# Send to Discord
-await ctx.send(file=file, embed=embed)
+    # Get image
+    image_path = get_image_path(card_key)
+    
+    # Check if image exists
+    if not os.path.exists(image_path):
+        embed.set_footer(text="⚠️ Image file not found")
+        await ctx.send(embed=embed)
+        return
+    
+    # Rotate if reversed
+    if is_reversed:
+        image_buffer = rotate_image(image_path)
+        file = discord.File(image_buffer, filename=f"{card_key}.png")
+    else:
+        file = discord.File(image_path, filename=f"{card_key}.png")
+    
+    # Set image in embed
+    embed.set_image(url=f"attachment://{card_key}.png")
+    
+    # Send to Discord
+    await ctx.send(file=file, embed=embed)
