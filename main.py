@@ -681,6 +681,36 @@ async def stats_command(ctx):
     embed.add_field(name="Servers", value=str(len(bot.guilds)), inline=True)
     await ctx.send(embed=embed)
 
+@bot.command(name="gem")
+async def gematria_command(ctx, *, text: str):
+    try:
+        # calculate english systems
+        ordinal = gematria_ordinal(text)
+        reduction = gematria_reduction(text)
+        reverse = gematria_reverse(text)
+        reverse_reduction = gematria_reverse_reduction(text)
+
+        # calculate hebrew only if input actually contains hebrew chars
+        hebrew = gematria_hebrew(text) if is_hebrew(text) else None
+
+        desc = (
+            f"**Input:** `{text}`\n\n"
+            f"**English Systems:**\n"
+            f"• Ordinal: **{ordinal}**\n"
+            f"• Reduction: **{reduction}**\n"
+            f"• Reverse Ordinal: **{reverse}**\n"
+            f"• Reverse Reduction: **{reverse_reduction}**\n"
+        )
+
+        if hebrew is not None:
+            desc += f"\n**Hebrew (Mispar Hechrechi):** **{hebrew}**"
+
+        embed = discord.Embed(title="🔢 Gematria", description=desc, color=0x8e44ad)
+        await ctx.send(embed=embed)
+
+    except Exception as e:
+        await ctx.send(f"❌ Error: `{e}`")
+        
 @bot.command(name="blessing")
 async def blessing_command(ctx):
     """Send a Blessings message to channels (Role required)"""
@@ -805,6 +835,8 @@ async def time_command(ctx, member: discord.Member = None):
     except Exception as e:
         logger.error(f"Error getting time: {e}")
         await ctx.send(f"❌ Error getting time: {e}")
+
+
 
 # ============================================================
 # DATABASE MAINTENANCE COMMANDS (Admin only)
