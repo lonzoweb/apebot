@@ -1,4 +1,4 @@
 requests
-serpapi
+pillow
 aiohttp
 discord.py
