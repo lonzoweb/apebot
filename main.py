@@ -446,7 +446,7 @@ async def moon_command(ctx):
         
         # Build embed
         embed = discord.Embed(
-            title="🌙 Moon Phase",
+            title="Moon Phase",
             color=discord.Color.blue()
         )
         
@@ -457,7 +457,7 @@ async def moon_command(ctx):
         )
         
         embed.add_field(
-            name="📅 Upcoming",
+            name="Upcoming",
             value=(
                 f"**Next New Moon:** {new_date_str} (in {days_to_new} days)\n"
                 f"Moon in: **{new_moon_sign}**\n\n"
