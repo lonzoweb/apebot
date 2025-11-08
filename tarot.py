@@ -124,7 +124,7 @@ TAROT_DECK = {
 "reversed": "Incompletion, lack of closure, short-cuts, emptiness"
 },
 
-```
+'''
 # WANDS (Fire - Creativity, Passion, Action)
 "wands-01": {
     "name": "Ace of Wands",
@@ -412,7 +412,7 @@ TAROT_DECK = {
     "upright": "Hard work, productivity, routine, reliability",
     "reversed": "Laziness, boredom, feeling stuck, workaholic"
 }
-```
+'''
 
 }
 
@@ -461,7 +461,7 @@ async def send_tarot_card(ctx, card_key=None, is_reversed=None):
 if card_key is None:
 card_key, is_reversed = draw_card()
 
-```
+'''
 # Get card data
 card = TAROT_DECK[card_key]
 card_name = card["name"]
@@ -502,4 +502,4 @@ embed.set_image(url=f"attachment://{card_key}.png")
 
 # Send to Discord
 await ctx.send(file=file, embed=embed)
-```
+'''
