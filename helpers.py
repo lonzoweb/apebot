@@ -114,7 +114,7 @@ def get_moon_phase_name(illumination):
     else:
         return "Waning Crescent"
 
-def get_zodiac_sign(longitude):
+def get_zodiac_sign(ecliptic_lon):
     """Get zodiac sign from ecliptic longitude"""
     signs = [
         ("♈ Aries", 0), ("♉ Taurus", 30), ("♊ Gemini", 60),
@@ -122,14 +122,21 @@ def get_zodiac_sign(longitude):
         ("♎ Libra", 180), ("♏ Scorpio", 210), ("♐ Sagittarius", 240),
         ("♑ Capricorn", 270), ("♒ Aquarius", 300), ("♓ Pisces", 330)
     ]
-    degrees = (longitude * 180 / ephem.pi) % 360
-    for i, (sign, start) in enumerate(signs):
-        next_start = signs[(i + 1) % 12][1]
-        if next_start == 0:
-            next_start = 360
-        if start <= degrees < next_start:
-            return sign
-    return signs[0][0]
+    # Convert radians to degrees
+    degrees = float(ecliptic_lon) * 180.0 / ephem.pi
+    degrees = degrees % 360  # Normalize to 0-360
+    
+    for i in range(len(signs)):
+        sign_name, start = signs[i]
+        if i < len(signs) - 1:
+            end = signs[i + 1][1]
+        else:
+            end = 360
+        
+        if start <= degrees < end:
+            return sign_name
+    
+    return signs[0][0]  # Default to Aries
 
 def calculate_life_path(month, day, year):
     """Calculate life path number with master number logic"""
