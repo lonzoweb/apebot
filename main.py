@@ -682,34 +682,63 @@ async def stats_command(ctx):
     await ctx.send(embed=embed)
 
 @bot.command(name="gem")
-async def gematria_command(ctx, *, text: str):
-    try:
-        # calculate english systems
-        ordinal = gematria_ordinal(text)
-        reduction = gematria_reduction(text)
-        reverse = gematria_reverse(text)
-        reverse_reduction = gematria_reverse_reduction(text)
+async def gematria_command(ctx, *, input_text: str = None):
 
-        # calculate hebrew only if input actually contains hebrew chars
-        hebrew = gematria_hebrew(text) if is_hebrew(text) else None
+    # Check if user replied to a message and didn't type text
+    if input_text is None and ctx.message.reference:
+        try:
+            replied = await ctx.channel.fetch_message(ctx.message.reference.message_id)
 
-        desc = (
-            f"**Input:** `{text}`\n\n"
-            f"**English Systems:**\n"
-            f"• Ordinal: **{ordinal}**\n"
-            f"• Reduction: **{reduction}**\n"
-            f"• Reverse Ordinal: **{reverse}**\n"
-            f"• Reverse Reduction: **{reverse_reduction}**\n"
-        )
+            # Must contain plain text only
+            if replied.content and replied.attachments == []:
+                # Reject if emojis detected
+                if any(char in replied.content for char in "🧿😀😁😂🤣😅😆😉😊😇🙂🙃😋😜😝😛🫠😎🤓🥸🤩🥳🙂🙁☹️"}):
+                    return await ctx.reply("⚠️ Replied message contains emojis. Text only.")
+                
+                input_text = replied.content.strip()
+            else:
+                return await ctx.reply("⚠️ Replied message is not plain text. Only text is allowed.")
+        except:
+            return await ctx.reply("⚠️ Unable to read replied message.")
 
-        if hebrew is not None:
-            desc += f"\n**Hebrew (Mispar Hechrechi):** **{hebrew}**"
+    # If no text provided and no reply
+    if not input_text:
+        return await ctx.reply("Usage: `!gem <text>` or reply to a message using `!gem`")
 
-        embed = discord.Embed(title="🔢 Gematria", description=desc, color=0x8e44ad)
-        await ctx.send(embed=embed)
+    # Normalize input
+    phrase = input_text.lower()
 
-    except Exception as e:
-        await ctx.send(f"❌ Error: `{e}`")
+    # ---- Gematria Calculations ----
+    english_ord = sum(ord(c) - 96 for c in phrase if c.isalpha())
+    english_rev = sum(27 - (ord(c) - 96) for c in phrase if c.isalpha())
+
+    def reduction(n):
+        while n > 9:
+            n = sum(int(d) for d in str(n))
+        return n
+
+    english_red = reduction(english_ord)
+    english_rev_red = reduction(english_rev)
+
+    # ---- Hebrew (basic transliteration mapping) ----
+    hebrew_map = {
+        'a': 1,'b': 2,'g': 3,'d': 4,'h': 5,'v': 6,'z': 7,'x': 8,'t': 9,
+        'y': 10,'k': 20,'l': 30,'m': 40,'n': 50,'s': 60,'p': 80,'q':100,'r':200,'w':300,'f':400
+    }
+
+    hebrew_value = sum(hebrew_map.get(c, 0) for c in phrase if c.isalpha())
+
+    # ---- Output ----
+    text = (
+        f"🔢 **Gematria for:** `{input_text}`\n\n"
+        f"**English Ordinal:** {english_ord}\n"
+        f"**English Reduction:** {english_red}\n"
+        f"**Reverse Ordinal:** {english_rev}\n"
+        f"**Reverse Reduction:** {english_rev_red}\n"
+        f"**Hebrew (Simple):** {hebrew_value}"
+    )
+
+    await ctx.reply(text)
         
 @bot.command(name="blessing")
 async def blessing_command(ctx):
