@@ -391,19 +391,16 @@ async def eightball_command(ctx, *, question: str = None):
     await msg.edit(content=f"**{ctx.author.display_name}:** {question}\n🎱 **{random.choice(responses)}**")
 
 @bot.command(name="tc")
-@commands.cooldown(10, 60, commands.BucketType.user)  # 10 uses per 60 seconds
+@commands.cooldown(10, 60, commands.BucketType.user)
 async def tarot_card(ctx, *, search: str = None):
     """Draw a random tarot card or search for a specific one"""
     if search:
-        # Search for specific card
         card_key = tarot.search_card(search)
         if card_key:
-            # Show card upright when searched
-            await tarot.send_tarot_card(ctx, card_key=card_key, is_reversed=False)
+            await tarot.send_tarot_card(ctx, card_key=card_key)
         else:
             await ctx.send(f"🔍 No card found matching '{search}'")
     else:
-        # Draw random card
         await tarot.send_tarot_card(ctx)
 
 @bot.command(name="moon")
