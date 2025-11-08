@@ -2,7 +2,7 @@
 Helper functions for Discord Bot
 General utility functions
 """
-
+import ephem
 from config import AUTHORIZED_ROLES
 
 # ============================================================
