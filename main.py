@@ -510,24 +510,24 @@ async def lifepathnumber_command(ctx, date: str = None):
         is_master = life_path in [11, 22, 33]
         
         embed = discord.Embed(
-            title="🔢 Life Path Number",
+            title="Life Path Number",
             color=discord.Color.purple()
         )
         
         embed.add_field(
-            name="📅 Birthday",
+            name="Birthday",
             value=formatted_date,
             inline=False
         )
         
         embed.add_field(
-            name="🔢 Life Path",
+            name="Life Path",
             value=f"**{life_path}**" + (" (Master Number)" if is_master else ""),
             inline=False
         )
         
         embed.add_field(
-            name="✨ Traits",
+            name="Traits",
             value=traits,
             inline=False
         )
