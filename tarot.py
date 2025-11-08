@@ -13,115 +13,115 @@ import os
 
 TAROT_DECK = {
 # MAJOR ARCANA (0-21)
-“00-the-fool”: {
-“name”: “The Fool”,
-“upright”: “New beginnings, innocence, spontaneity, leap of faith”,
-“reversed”: “Recklessness, naivety, poor judgment, folly”
+"00-the-fool”: {
+"name”: "The Fool”,
+"upright”: "New beginnings, innocence, spontaneity, leap of faith”,
+"reversed”: "Recklessness, naivety, poor judgment, folly”
 },
-“01-the-magus”: {
-“name”: “The Magus”,
-“upright”: “Willpower, manifestation, skill, concentration”,
-“reversed”: “Manipulation, trickery, scattered energy, illusion”
+"01-the-magus”: {
+"name”: "The Magus”,
+"upright”: "Willpower, manifestation, skill, concentration”,
+"reversed”: "Manipulation, trickery, scattered energy, illusion”
 },
-“02-the-priestess”: {
-“name”: “The Priestess”,
-“upright”: “Intuition, mystery, inner wisdom, divine feminine”,
-“reversed”: “Hidden agendas, secrets, withdrawal, silence”
+"02-the-priestess”: {
+"name”: "The Priestess”,
+"upright”: "Intuition, mystery, inner wisdom, divine feminine”,
+"reversed”: "Hidden agendas, secrets, withdrawal, silence”
 },
-“03-the-empress”: {
-“name”: “The Empress”,
-“upright”: “Abundance, fertility, nurturing, creative expression”,
-“reversed”: “Dependence, emptiness, neglect, creative block”
+"03-the-empress”: {
+"name”: "The Empress”,
+"upright”: "Abundance, fertility, nurturing, creative expression”,
+"reversed”: "Dependence, emptiness, neglect, creative block”
 },
-“04-the-emperor”: {
-“name”: “The Emperor”,
-“upright”: “Authority, structure, control, leadership”,
-“reversed”: “Tyranny, rigidity, domination, inflexibility”
+"04-the-emperor”: {
+"name”: "The Emperor”,
+"upright”: "Authority, structure, control, leadership”,
+"reversed”: "Tyranny, rigidity, domination, inflexibility”
 },
-“05-the-hierophant”: {
-“name”: “The Hierophant”,
-“upright”: “Tradition, spiritual wisdom, conformity, education”,
-“reversed”: “Rebellion, unconventionality, challenging norms, personal beliefs”
+"05-the-hierophant”: {
+"name”: "The Hierophant”,
+"upright”: "Tradition, spiritual wisdom, conformity, education”,
+"reversed”: "Rebellion, unconventionality, challenging norms, personal beliefs”
 },
-“06-the-lovers”: {
-“name”: “The Lovers”,
-“upright”: “Union, love, harmony, choices”,
-“reversed”: “Imbalance, disharmony, misalignment, poor choices”
+"06-the-lovers”: {
+"name”: "The Lovers”,
+"upright”: "Union, love, harmony, choices”,
+"reversed”: "Imbalance, disharmony, misalignment, poor choices”
 },
-“07-the-chariot”: {
-“name”: “The Chariot”,
-“upright”: “Willpower, victory, determination, control”,
-“reversed”: “Lack of direction, aggression, opposition, scattered focus”
+"07-the-chariot”: {
+"name”: "The Chariot”,
+"upright”: "Willpower, victory, determination, control”,
+"reversed”: "Lack of direction, aggression, opposition, scattered focus”
 },
-“08-adjustment”: {
-“name”: “Adjustment”,
-“upright”: “Balance, justice, truth, equilibrium”,
-“reversed”: “Imbalance, unfairness, dishonesty, karmic debt”
+"08-adjustment”: {
+"name”: "Adjustment”,
+"upright”: "Balance, justice, truth, equilibrium”,
+"reversed”: "Imbalance, unfairness, dishonesty, karmic debt”
 },
-“09-the-hermit”: {
-“name”: “The Hermit”,
-“upright”: “Soul searching, introspection, inner guidance, solitude”,
-“reversed”: “Isolation, loneliness, withdrawal, lost your way”
+"09-the-hermit”: {
+"name”: "The Hermit”,
+"upright”: "Soul searching, introspection, inner guidance, solitude”,
+"reversed”: "Isolation, loneliness, withdrawal, lost your way”
 },
-“10-fortune”: {
-“name”: “Fortune”,
-“upright”: “Change, cycles, destiny, turning point”,
-“reversed”: “Bad luck, resistance to change, breaking cycles”
+"10-fortune”: {
+"name”: "Fortune”,
+"upright”: "Change, cycles, destiny, turning point”,
+"reversed”: "Bad luck, resistance to change, breaking cycles”
 },
-“11-lust”: {
-“name”: “Lust”,
-“upright”: “Passion, courage, strength, raw power”,
-“reversed”: “Self-doubt, weakness, lack of discipline, repression”
+"11-lust”: {
+"name”: "Lust”,
+"upright”: "Passion, courage, strength, raw power”,
+"reversed”: "Self-doubt, weakness, lack of discipline, repression”
 },
-“12-the-hanged-man”: {
-“name”: “The Hanged Man”,
-“upright”: “Suspension, letting go, new perspective, sacrifice”,
-“reversed”: “Stalling, needless sacrifice, resistance, indecision”
+"12-the-hanged-man”: {
+"name”: "The Hanged Man”,
+"upright”: "Suspension, letting go, new perspective, sacrifice”,
+"reversed”: "Stalling, needless sacrifice, resistance, indecision”
 },
-“13-death”: {
-“name”: “Death”,
-“upright”: “Transformation, endings, renewal, letting go”,
-“reversed”: “Resistance to change, stagnation, fear, decay”
+"13-death”: {
+"name”: "Death”,
+"upright”: "Transformation, endings, renewal, letting go”,
+"reversed”: "Resistance to change, stagnation, fear, decay”
 },
-“14-art”: {
-“name”: “Art”,
-“upright”: “Balance, alchemy, moderation, synthesis”,
-“reversed”: “Imbalance, excess, lack of harmony, discord”
+"14-art”: {
+"name”: "Art”,
+"upright”: "Balance, alchemy, moderation, synthesis”,
+"reversed”: "Imbalance, excess, lack of harmony, discord”
 },
-“15-the-devil”: {
-“name”: “The Devil”,
-“upright”: “Bondage, materialism, temptation, illusion”,
-“reversed”: “Release, freedom, breaking chains, enlightenment”
+"15-the-devil”: {
+"name”: "The Devil”,
+"upright”: "Bondage, materialism, temptation, illusion”,
+"reversed”: "Release, freedom, breaking chains, enlightenment”
 },
-“16-the-tower”: {
-“name”: “The Tower”,
-“upright”: “Sudden change, upheaval, revelation, destruction”,
-“reversed”: “Avoiding disaster, fear of change, delaying inevitable”
+"16-the-tower”: {
+"name”: "The Tower”,
+"upright”: "Sudden change, upheaval, revelation, destruction”,
+"reversed”: "Avoiding disaster, fear of change, delaying inevitable”
 },
-“17-the-star”: {
-“name”: “The Star”,
-“upright”: “Hope, inspiration, serenity, cosmic connection”,
-“reversed”: “Despair, disconnection, lack of faith, disillusionment”
+"17-the-star”: {
+"name”: "The Star”,
+"upright”: "Hope, inspiration, serenity, cosmic connection”,
+"reversed”: "Despair, disconnection, lack of faith, disillusionment”
 },
-“18-the-moon”: {
-“name”: “The Moon”,
-“upright”: “Illusion, intuition, subconscious, mystery”,
-“reversed”: “Confusion, fear, misinterpretation, deception”
+"18-the-moon”: {
+"name”: "The Moon”,
+"upright”: "Illusion, intuition, subconscious, mystery”,
+"reversed”: "Confusion, fear, misinterpretation, deception”
 },
-“19-the-sun”: {
-“name”: “The Sun”,
-“upright”: “Joy, success, vitality, enlightenment”,
-“reversed”: “Temporary depression, false impressions, lack of success”
+"19-the-sun”: {
+"name”: "The Sun”,
+"upright”: "Joy, success, vitality, enlightenment”,
+"reversed”: "Temporary depression, false impressions, lack of success”
 },
-“20-the-aeon”: {
-“name”: “The Aeon”,
-“upright”: “Awakening, renewal, reckoning, inner calling”,
-“reversed”: “Self-doubt, refusal to change, fear of judgment”
+"20-the-aeon”: {
+"name”: "The Aeon”,
+"upright”: "Awakening, renewal, reckoning, inner calling”,
+"reversed”: "Self-doubt, refusal to change, fear of judgment”
 },
-“21-the-universe”: {
-“name”: “The Universe”,
-“upright”: “Completion, accomplishment, integration, cosmic consciousness”,
-“reversed”: “Incompletion, lack of closure, short-cuts, emptiness”
+"21-the-universe”: {
+"name”: "The Universe”,
+"upright”: "Completion, accomplishment, integration, cosmic consciousness”,
+"reversed”: "Incompletion, lack of closure, short-cuts, emptiness”
 },
 
 ```
@@ -423,11 +423,11 @@ TAROT_DECK = {
 # ============================================================
 
 def get_image_path(card_key):
-“”“Get the file path for a card image”””
+"”"Get the file path for a card image”””
 return f”images/tarot/{card_key}.png”
 
 def rotate_image(image_path):
-“”“Rotate image 180 degrees for reversed cards”””
+"”"Rotate image 180 degrees for reversed cards”””
 img = Image.open(image_path)
 rotated = img.rotate(180, expand=True)
 buffer = io.BytesIO()
@@ -436,16 +436,16 @@ buffer.seek(0)
 return buffer
 
 def draw_card():
-“”“Draw a random card with 50% chance of reversal”””
+"”"Draw a random card with 50% chance of reversal”””
 card_key = random.choice(list(TAROT_DECK.keys()))
 is_reversed = random.choice([True, False])
 return card_key, is_reversed
 
 def search_card(keyword):
-“”“Search for a card by name or keyword”””
+"”"Search for a card by name or keyword”””
 keyword_lower = keyword.lower()
 for card_key, card_data in TAROT_DECK.items():
-if keyword_lower in card_data[“name”].lower():
+if keyword_lower in card_data["name”].lower():
 return card_key
 return None
 
@@ -456,7 +456,7 @@ return None
 # ============================================================
 
 async def send_tarot_card(ctx, card_key=None, is_reversed=None):
-“”“Send a tarot card to Discord channel”””
+"”"Send a tarot card to Discord channel”””
 # If no card specified, draw random
 if card_key is None:
 card_key, is_reversed = draw_card()
