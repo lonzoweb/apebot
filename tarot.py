@@ -1,8 +1,3 @@
-"""
-Thoth Tarot Module for Discord Bot
-Contains deck data and card drawing functionality
-Based on Aleister Crowley's Thoth Tarot instructions by James Wasserman
-"""
 
 import random
 import discord
@@ -88,7 +83,7 @@ TAROT_DECK = {
     },
     "12-the-hanged-man": {
         "name": "The Hanged Man",
-        "emojis": "💧 ☠️ 🐍 ⚓ 🔺",
+        "emojis": "🌊 ☠️ 🐍 ⚓ 🔺",
         "attribution": "Water • Mem",
         "description": "Redemption through sacrifice. New perspectives. Punishment. Loss. Defeat. Failure. Suffering."
     },
@@ -118,7 +113,7 @@ TAROT_DECK = {
     },
     "17-the-star": {
         "name": "The Star",
-        "emojis": "♒ ⭐ 💧 🌊 🌀",
+        "emojis": "♒ ⭐ 🌊 🌊 🌀",
         "attribution": "Aquarius • Heh",
         "description": "Hope. Unexpected help. Clarity of vision. Spiritual insight. Influenced: Dreaminess. Disappointment."
     },
@@ -222,7 +217,7 @@ TAROT_DECK = {
     },
     "wands-queen": {
         "name": "Queen of Wands",
-        "emojis": "🔥 💧 👑 🐆 🔥",
+        "emojis": "🔥 🌊 👑 🐆 🔥",
         "attribution": "Watery part of Fire",
         "description": "A woman of adaptability, persistent energy, calm authority, powers of attraction, generous but intolerant. Obstinacy, revenge, dominance."
     },
@@ -236,7 +231,7 @@ TAROT_DECK = {
     # CUPS - Water
     "cups-01": {
         "name": "Ace of Cups",
-        "emojis": "💧 🏺 🌊 💖 🌹",
+        "emojis": "🌊 🏺 🌊 💖 🌹",
         "attribution": "Root of Water",
         "description": "Fertility. Productivity. Beauty. Pleasure and happiness."
     },
@@ -296,25 +291,25 @@ TAROT_DECK = {
     },
     "cups-princess": {
         "name": "Princess of Cups",
-        "emojis": "💧 🌍 🦢 🐢 🐬",
+        "emojis": "🌊 🌍 🦢 🐢 🐬",
         "attribution": "Earthy part of Water",
         "description": "A young woman, infinitely gracious, sweet, voluptuous, gentle, kind, romantic and dreamy. Indolent, selfish and luxurious woman."
     },
     "cups-prince": {
         "name": "Prince of Cups",
-        "emojis": "💧 💨 🦅 🐍 🌊",
+        "emojis": "🌊 💨 🦅 🐍 🌊",
         "attribution": "Airy part of Water",
         "description": "A young man of subtlety, secret violence, craft. An artist whose calm surface masks intense passion. Ruthless in his aims. Ambitious and obtuse."
     },
     "cups-queen": {
         "name": "Queen of Cups",
-        "emojis": "💧 💧 🦢 🌊 🔮",
+        "emojis": "🌊 🌊 🦢 🌊 🔮",
         "attribution": "Watery part of Water",
         "description": "An observer, dreamy, tranquil, poetic, imaginative, kind yet passive. Impressionable to other card influences."
     },
     "cups-knight": {
         "name": "Knight of Cups",
-        "emojis": "💧 🔥 🏇 🦚 🦀",
+        "emojis": "🌊 🔥 🏇 🦚 ♋️",
         "attribution": "Fiery part of Water",
         "description": "A man with commitment issues. Amiable but passive. Attracted to excitement. Unsustainable enthusiasm. Sensitive but shallow. Influenced: Sensual and idle, untruthful, prone to depression and drug abuse."
     },
@@ -394,7 +389,7 @@ TAROT_DECK = {
     },
     "swords-queen": {
         "name": "Queen of Swords",
-        "emojis": "💨 💧 👑 🗡️ 💀",
+        "emojis": "💨 🌊 👑 🗡️ 💀",
         "attribution": "Watery part of Air",
         "description": "A graceful woman, intensely perceptive, a keen observer, subtle interpreter, an intense individualist. Confident and gracious. Also: Cruel, sly, deceitful and unreliable woman. Superficially attractive."
     },
@@ -480,7 +475,7 @@ TAROT_DECK = {
     },
     "disks-queen": {
         "name": "Queen of Disks",
-        "emojis": "🌍 💧 🐐 🌹 👑",
+        "emojis": "🌍 🌊 🐐 🌹 👑",
         "attribution": "Watery part of Earth",
         "description": "An ambitious woman, yet affectionate and kind, charming, timid, practical, quiet and domesticated. Influenced: Dull. Servile. Foolish. Capricious. Moody."
     },
@@ -532,9 +527,9 @@ async def send_tarot_card(ctx, card_key=None):
     
     # Create embed
     embed = discord.Embed(
-        title=card_name,
-        description=f"{emojis}  *({attribution})*\n\n{description}",
-        color=discord.Color.from_rgb(0, 0, 128)
+        title=f"{emojis}\n{card_name}",
+        description=f"**{attribution}**\n\n{description}",
+        color=discord.Color.purple()
     )
     
     # Get image
