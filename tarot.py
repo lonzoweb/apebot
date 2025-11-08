@@ -5,8 +5,6 @@ Contains deck data and card drawing functionality
 
 import random
 import discord
-from PIL import Image
-import io
 import os
 
 # ============================================================
