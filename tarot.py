@@ -131,47 +131,47 @@ TAROT_DECK = {
     "reversed": "Delays, false starts, lack of direction, creative block"
 },
 "wands-02": {
-    "name": "2 of Wands (Dominion)",
+    "name": "Two of Wands (Dominion)",
     "upright": "Planning, decisions, bold vision, personal power",
     "reversed": "Fear of unknown, lack of planning, poor decisions"
 },
 "wands-03": {
-    "name": "3 of Wands (Virtue)",
+    "name": "Three of Wands (Virtue)",
     "upright": "Expansion, foresight, leadership, enterprise",
     "reversed": "Obstacles, delays, lack of foresight, playing it safe"
 },
 "wands-04": {
-    "name": "4 of Wands (Completion)",
+    "name": "Four of Wands (Completion)",
     "upright": "Celebration, harmony, homecoming, community",
     "reversed": "Lack of harmony, transition, instability, broken foundation"
 },
 "wands-05": {
-    "name": "5 of Wands (Strife)",
+    "name": "Five of Wands (Strife)",
     "upright": "Conflict, competition, tension, disagreement",
     "reversed": "Avoiding conflict, inner conflict, resolution, compromise"
 },
 "wands-06": {
-    "name": "6 of Wands (Victory)",
+    "name": "Six of Wands (Victory)",
     "upright": "Success, recognition, triumph, pride",
     "reversed": "Arrogance, lack of recognition, fall from grace, ego"
 },
 "wands-07": {
-    "name": "7 of Wands (Valour)",
+    "name": "Seven of Wands (Valour)",
     "upright": "Courage, perseverance, standing your ground, defense",
     "reversed": "Exhaustion, giving up, overwhelmed, defenseless"
 },
 "wands-08": {
-    "name": "8 of Wands (Swiftness)",
+    "name": "Eight of Wands (Swiftness)",
     "upright": "Speed, movement, rapid action, progress",
     "reversed": "Delays, frustration, waiting, slowness"
 },
 "wands-09": {
-    "name": "9 of Wands (Strength)",
+    "name": "Nine of Wands (Strength)",
     "upright": "Resilience, persistence, boundaries, last stand",
     "reversed": "Paranoia, stubbornness, weakness, exhaustion"
 },
 "wands-10": {
-    "name": "10 of Wands (Oppression)",
+    "name": "Ten of Wands (Oppression)",
     "upright": "Burden, responsibility, stress, hard work",
     "reversed": "Release, delegation, burnout, collapse"
 },
@@ -203,47 +203,47 @@ TAROT_DECK = {
     "reversed": "Emotional loss, blocked creativity, emptiness, repression"
 },
 "cups-02": {
-    "name": "2 of Cups (Love)",
+    "name": "Two of Cups (Love)",
     "upright": "Partnership, unity, attraction, connection",
     "reversed": "Imbalance, broken communication, tension, disharmony"
 },
 "cups-03": {
-    "name": "3 of Cups (Abundance)",
+    "name": "Three of Cups (Abundance)",
     "upright": "Celebration, friendship, community, joy",
     "reversed": "Overindulgence, gossip, isolation, triangle"
 },
 "cups-04": {
-    "name": "4 of Cups (Luxury)",
+    "name": "Four of Cups (Luxury)",
     "upright": "Contemplation, apathy, reevaluation, meditation",
     "reversed": "Awareness, acceptance, new perspective, action"
 },
 "cups-05": {
-    "name": "5 of Cups (Disappointment)",
+    "name": "Five of Cups (Disappointment)",
     "upright": "Loss, regret, disappointment, emotional pain",
     "reversed": "Acceptance, moving on, healing, recovery"
 },
 "cups-06": {
-    "name": "6 of Cups (Pleasure)",
+    "name": "Six of Cups (Pleasure)",
     "upright": "Nostalgia, innocence, childhood memories, joy",
     "reversed": "Living in past, unrealistic expectations, naivety"
 },
 "cups-07": {
-    "name": "7 of Cups (Debauch)",
+    "name": "Seven of Cups (Debauch)",
     "upright": "Illusion, choices, fantasy, temptation",
     "reversed": "Clarity, reality check, alignment, decision made"
 },
 "cups-08": {
-    "name": "8 of Cups (Indolence)",
+    "name": "Eight of Cups (Indolence)",
     "upright": "Walking away, seeking deeper meaning, abandonment",
     "reversed": "Stagnation, avoidance, fear of moving on"
 },
 "cups-09": {
-    "name": "9 of Cups (Happiness)",
+    "name": "Nine of Cups (Happiness)",
     "upright": "Contentment, satisfaction, wishes fulfilled, pleasure",
     "reversed": "Dissatisfaction, greed, superficiality, unfulfilled"
 },
 "cups-10": {
-    "name": "10 of Cups (Satiety)",
+    "name": "Ten of Cups (Satiety)",
     "upright": "Harmony, alignment, happy family, emotional fulfillment",
     "reversed": "Disconnection, misalignment, values not aligned"
 },
@@ -275,47 +275,47 @@ TAROT_DECK = {
     "reversed": "Chaos, defeat, confusion, mental fog"
 },
 "swords-02": {
-    "name": "2 of Swords (Peace)",
+    "name": "Two of Swords (Peace)",
     "upright": "Difficult choice, stalemate, balance, truce",
     "reversed": "Indecision, confusion, information overload, stalemate broken"
 },
 "swords-03": {
-    "name": "3 of Swords (Sorrow)",
+    "name": "Three of Swords (Sorrow)",
     "upright": "Heartbreak, grief, painful truth, separation",
     "reversed": "Recovery, forgiveness, moving on, healing"
 },
 "swords-04": {
-    "name": "4 of Swords (Truce)",
+    "name": "Four of Swords (Truce)",
     "upright": "Rest, recovery, contemplation, meditation",
     "reversed": "Restlessness, burnout, stagnation, exhaustion"
 },
 "swords-05": {
-    "name": "5 of Swords (Defeat)",
+    "name": "Five of Swords (Defeat)",
     "upright": "Conflict, defeat, dishonor, winning at all costs",
     "reversed": "Reconciliation, making amends, moving on"
 },
 "swords-06": {
-    "name": "6 of Swords (Science)",
+    "name": "Six of Swords (Science)",
     "upright": "Transition, moving on, mental clarity, travel",
     "reversed": "Resistance to change, unfinished business, baggage"
 },
 "swords-07": {
-    "name": "7 of Swords (Futility)",
+    "name": "Seven of Swords (Futility)",
     "upright": "Deception, strategy, betrayal, cunning",
     "reversed": "Truth revealed, conscience, rethinking approach"
 },
 "swords-08": {
-    "name": "8 of Swords (Interference)",
+    "name": "Eight of Swords (Interference)",
     "upright": "Restriction, imprisonment, victim mentality, paralysis",
     "reversed": "Release, freedom, self-acceptance, new perspective"
 },
 "swords-09": {
-    "name": "9 of Swords (Cruelty)",
+    "name": "Nine of Swords (Cruelty)",
     "upright": "Anxiety, worry, nightmares, mental anguish",
     "reversed": "Hope, recovery, releasing worry, facing fears"
 },
 "swords-10": {
-    "name": "10 of Swords (Ruin)",
+    "name": "Ten of Swords (Ruin)",
     "upright": "Painful ending, betrayal, rock bottom, mental anguish",
     "reversed": "Recovery, regeneration, resisting inevitable end, survival"
 },
@@ -347,47 +347,47 @@ TAROT_DECK = {
     "reversed": "Lost opportunity, lack of planning, greed, materialism"
 },
 "disks-02": {
-    "name": "2 of Disks (Change)",
+    "name": "Two of Disks (Change)",
     "upright": "Balance, adaptability, juggling, flexibility",
     "reversed": "Imbalance, overwhelmed, disorganization, chaos"
 },
 "disks-03": {
-    "name": "3 of Disks (Works)",
+    "name": "Three of Disks (Works)",
     "upright": "Teamwork, collaboration, skill, achievement",
     "reversed": "Lack of teamwork, poor quality, disharmony"
 },
 "disks-04": {
-    "name": "4 of Disks (Power)",
+    "name": "Four of Disks (Power)",
     "upright": "Security, control, possession, conservation",
     "reversed": "Greed, materialism, self-protection, control issues"
 },
 "disks-05": {
-    "name": "5 of Disks (Worry)",
+    "name": "Five of Disks (Worry)",
     "upright": "Financial loss, poverty, insecurity, hardship",
     "reversed": "Recovery, improvement, charity, spiritual poverty"
 },
 "disks-06": {
-    "name": "6 of Disks (Success)",
+    "name": "Six of Disks (Success)",
     "upright": "Generosity, charity, sharing wealth, prosperity",
     "reversed": "Debt, strings attached, inequality, selfishness"
 },
 "disks-07": {
-    "name": "7 of Disks (Failure)",
+    "name": "Seven of Disks (Failure)",
     "upright": "Frustration, delay, lack of results, reevaluation",
     "reversed": "Progress, perseverance, investment paying off"
 },
 "disks-08": {
-    "name": "8 of Disks (Prudence)",
+    "name": "Eight of Disks (Prudence)",
     "upright": "Apprenticeship, skill development, hard work, diligence",
     "reversed": "Lack of focus, perfectionism, no ambition"
 },
 "disks-09": {
-    "name": "9 of Disks (Gain)",
+    "name": "Nine of Disks (Gain)",
     "upright": "Abundance, luxury, self-sufficiency, financial independence",
     "reversed": "Overworking, materialism, financial setback"
 },
 "disks-10": {
-    "name": "10 of Disks (Wealth)",
+    "name": "Ten of Disks (Wealth)",
     "upright": "Legacy, inheritance, financial security, family",
     "reversed": "Financial failure, debt, family conflict, instability"
 },
@@ -434,10 +434,9 @@ def rotate_image(image_path):
     return buffer
 
 def draw_card():
-    """Draw a random card with 50% chance of reversal"""
+    """Draw a random card"""
     card_key = random.choice(list(TAROT_DECK.keys()))
-    is_reversed = random.choice([True, False])
-    return card_key, is_reversed
+    return card_key
 
 def search_card(keyword):
     """Search for a card by name or keyword"""
@@ -453,31 +452,28 @@ def search_card(keyword):
 
 # ============================================================
 
-async def send_tarot_card(ctx, card_key=None, is_reversed=None):
+async def send_tarot_card(ctx, card_key=None):
     """Send a tarot card to Discord channel"""
     # If no card specified, draw random
     if card_key is None:
-        card_key, is_reversed = draw_card()
+        card_key = draw_card()
     
     # Get card data
     card = TAROT_DECK[card_key]
     card_name = card["name"]
+    keywords = card["upright"]
     
-    # Get keywords based on orientation
-    if is_reversed:
-        keywords = f"(REVERSED) {card['reversed']}"
-        color = discord.Color.purple()
-    else:
-        keywords = card["upright"]
-        color = discord.Color.blue()
+    # Create Corax URL
+    corax_url = f"https://corax.com/tarot/cards/index.html?{card_key}"
     
     # Create embed
     embed = discord.Embed(
         title=card_name,
+        url=corax_url,
         description=keywords,
-        color=color
+        color=discord.Color.blue()
     )
-
+    
     # Get image
     image_path = get_image_path(card_key)
     
@@ -487,14 +483,7 @@ async def send_tarot_card(ctx, card_key=None, is_reversed=None):
         await ctx.send(embed=embed)
         return
     
-    # Rotate if reversed
-    if is_reversed:
-        image_buffer = rotate_image(image_path)
-        file = discord.File(image_buffer, filename=f"{card_key}.png")
-    else:
-        file = discord.File(image_path, filename=f"{card_key}.png")
-    
-    # Set image in embed
+    file = discord.File(image_path, filename=f"{card_key}.png")
     embed.set_image(url=f"attachment://{card_key}.png")
     
     # Send to Discord
