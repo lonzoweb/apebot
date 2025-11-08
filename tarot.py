@@ -1,7 +1,3 @@
-“””
-Thoth Tarot Module for Discord Bot
-Contains deck data and card drawing functionality
-“””
 
 import random
 import discord
