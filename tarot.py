@@ -1,6 +1,7 @@
 """
 Thoth Tarot Module for Discord Bot
 Contains deck data and card drawing functionality
+Based on Aleister Crowley's Thoth Tarot instructions by James Wasserman
 """
 
 import random
@@ -8,330 +9,486 @@ import discord
 import os
 
 # ============================================================
-# TAROT DECK DATA - Full Aleister Crowley Thoth LWB Descriptions
+# TAROT DECK DATA - Aleister Crowley Thoth Tarot
 # ============================================================
 
 TAROT_DECK = {
     # MAJOR ARCANA (0-21)
     "00-the-fool": {
         "name": "The Fool",
-        "description": "Idea, thought, spirituality, that which endeavors to transcend earth. Folly, eccentricity, or even mania. Redemption from material matters. Vagabond, wanderer. Poetical and dreamy nature."
+        "emojis": "💨 🌈 🃏 ⚡ 🎭",
+        "attribution": "Air • Aleph",
+        "description": "In spiritual matters, represents ideas and thoughts, which endeavor to transcend earth. In material matters, reveals folly, eccentricity, even mania. It represents a sudden, unexpected impulse."
     },
     "01-the-magus": {
         "name": "The Magus",
-        "description": "Skill, wisdom, adaptation, craft, cunning, eloquence, subtlety in material matters. Flexibility, Business transactions. Learning or intelligence in hand."
+        "emojis": "☿️ 🪄 🎪 📜 🐒",
+        "attribution": "Mercury • Beth",
+        "description": "Skill. Wisdom. Adroitness. Elasticity. Craft. Cunning. Deceit. Theft. Sometimes esoteric wisdom or power. Messages. Business transactions. Learning or intelligence interfering with the matter in hand."
     },
     "02-the-priestess": {
         "name": "The Priestess",
-        "description": "Pure, exalted and gracious influence enters the matter. Change, alternation, increase and decrease. Fluctuation whether for good or evil is definitely indicated maintained."
+        "emojis": "🌙 🏹 👸 🔮 ✨",
+        "attribution": "Moon • Gimel",
+        "description": "Pure, exalted and gracious influence enters the matter, bringing change, alternation, increase and decrease, fluctuation. Exuberance should be tempered and careful balance maintained."
     },
     "03-the-empress": {
         "name": "The Empress",
-        "description": "Love, Beauty, Happiness, Pleasure, Success, Luxury, Good fortune, Graciousness, Elegance, Gentleness. Dissipation, Debauchery, Idleness, Sensuality."
+        "emojis": "♀️ 🌹 👑 🦢 🦅",
+        "attribution": "Venus • Daleth",
+        "description": "Love. Beauty. Happiness. Pleasure. Success. Fruitfulness. Good fortune. Graciousness. Elegance. Gentleness. Influenced: Dissipation. Promiscuity. Idleness. Sensuality."
     },
     "04-the-emperor": {
         "name": "The Emperor",
-        "description": "War, Conquest, Victory, Strife, Stability, Power. Originally: Government, Energy, Ambition. Over-weening pride, Megalomania, Rashness. Stubborn strength, Toil, Endurance, Persistance. Teaching, Help from superiors. Patience, Organization, Peace, Goodness of heart. Occult force voluntarily invoked."
+        "emojis": "♈ 🐏 👑 ⚔️ 🦅",
+        "attribution": "Aries • Tzaddi",
+        "description": "War. Conquest. Victory. Strife. Power. Stability. Originality. Government. Energy. Ambition. Influenced: Arrogance. Megalomania. Rashness."
     },
     "05-the-hierophant": {
         "name": "The Hierophant",
-        "description": "Divine wisdom, Manifestation, Explanation, Teaching, Stubborn strength, Toil, Endurance, Persistence. Teaching, Help from superiors. Patience, Organization, Peace, Goodness of heart, Occult force voluntarily invoked."
+        "emojis": "♉ 🐘 ⭐ 🕊️ 📿",
+        "attribution": "Taurus • Vau",
+        "description": "Divine wisdom. Inspiration. Stubborn strength. Toil. Endurance. Persistence. Teaching. Help from superiors. Patience. Organization. Peace. Goodness of heart."
     },
     "06-the-lovers": {
         "name": "The Lovers",
-        "description": "Openness to inspiration, Intuition, Intelligence, Goodness, Kindness, Gentleness, Beauty, Love. Self-contradiction, Instability, Indecision. Union in a shallow degree with others, Superficiality."
+        "emojis": "♊ 💑 🗡️ 🥚 🦅",
+        "attribution": "Gemini • Zain",
+        "description": "Inspiration. Intuition. Intelligence. Innocence. Attraction. Beauty. Love. Influenced: Self-contradiction. Instability. Indecision. Superficiality. Infatuation."
     },
     "07-the-chariot": {
         "name": "The Chariot",
-        "description": "Triumph, Victory, Hope, Obedience, Faithfulness, Health, Success, though sometimes not enduring. Authority under authority. Violence in maintaining traditional."
+        "emojis": "♋ 🏺 🦁 🐂 🌊",
+        "attribution": "Cancer • Cheth",
+        "description": "Triumph. Victory. Hope. Obedience. Faithfulness. Health. Success, though sometimes not enduring. Influenced: Abrupt departure from traditional ideas."
     },
     "08-adjustment": {
         "name": "Adjustment",
-        "description": "Justice, Balance, Adjustment, Suspension of action pending decision. May refer to lawsuits, trials, marriages, divorces."
+        "emojis": "♎ ⚖️ 🗡️ 👑 💎",
+        "attribution": "Libra • Lamed",
+        "description": "Justice. Balance. Adjustment. Suspension of action pending decision. May refer to lawsuits, trials, marriages, contracts, etc."
     },
     "09-the-hermit": {
         "name": "The Hermit",
-        "description": "Illumination from within, Divine inspiration, Wisdom, Prudence, Circumspection, Retirement from participation in current events."
+        "emojis": "♍ 🪔 🥚 🐍 🌾",
+        "attribution": "Virgo • Yod",
+        "description": "Illumination from within. Divine inspiration. Wisdom. Circumspection. Retirement."
     },
     "10-fortune": {
         "name": "Fortune",
-        "description": "Change of fortune, generally good. Destiny, Luck. Inevitability of Fate. Control of the force. Great love affair. Resort to magic."
+        "emojis": "♃ 🎡 🦁 🐒 🐍",
+        "attribution": "Jupiter • Kaph",
+        "description": "Change of fortune, generally good. Destiny."
     },
     "11-lust": {
         "name": "Lust",
-        "description": "Courage, Strength, Energy, Action, Magnanimity. A noble woman. Power not arrested in the act of judgment. Ill-dignified: Cruelty, Lust, Wickedness."
+        "emojis": "♌ 🦁 👸 🏺 🔥",
+        "attribution": "Leo • Teth",
+        "description": "Courage. Strength. Energy. Use of magical power. Control of the life force. Great love affair."
     },
     "12-the-hanged-man": {
         "name": "The Hanged Man",
-        "description": "Redemption through sacrifice, Enforced sacrifice, Scheming, Punishment, Loss, Defeat, Failure, Death. Transformation, Change, voluntary or involuntary, perhaps sudden and unexpected. Apparent death or destruction of body and goods from a Higher perspective."
+        "emojis": "💧 ☠️ 🐍 ⚓ 🔺",
+        "attribution": "Water • Mem",
+        "description": "Redemption through sacrifice. New perspectives. Punishment. Loss. Defeat. Failure. Suffering."
     },
     "13-death": {
         "name": "Death",
-        "description": "Transformation, Change, voluntary or involuntary, perhaps sudden and unexpected. Apparent death or destruction of body and goods from a Higher perspective. Time, Creation, ultimate practicable action, Realization, Action based on accurate calculation, Economy, Management. The way of escape."
+        "emojis": "♏ 🦂 💀 🦅 🐟",
+        "attribution": "Scorpio • Nun",
+        "description": "Transformation. Change, voluntary or involuntary, perhaps sudden and unexpected. Illusory death. Release through destruction."
     },
     "14-art": {
         "name": "Art",
-        "description": "Combination of Forces, Realization, Action. Combination of forces sometimes good but sometimes disruptive. Productive of strife and disease. Truth, Shamelessness, Manifestation. Recovery from sickness, but sometimes a long and dangerous convalescence. Death."
+        "emojis": "♐ 🌈 ⚗️ 🦅 🦁",
+        "attribution": "Sagittarius • Samech",
+        "description": "Combination of forces. Realization. Action based on accurate calculation. Economy. Management. Success after elaborate maneuvers. Escape."
     },
     "15-the-devil": {
         "name": "The Devil",
-        "description": "Blind impulse, Irresistibly strong and unscrupulous ambition. Temptation. Obsession. Secret plan about to be executed. Ill-dignified: Bondage, Weakness. Malice prepense. Fate."
+        "emojis": "♑ 🐐 👁️ 🍇 🪐",
+        "attribution": "Capricorn • Ayin",
+        "description": "Blind impulse. Irresistibly strong. Unscrupulous. Ambition. Temptation. Obsession. Secret plan. Hard work. Endurance. Discontent. Materialism. Fate."
     },
     "16-the-tower": {
         "name": "The Tower",
-        "description": "Quarrel, Combat, Danger, Ruin. Destruction of accustomed ideas and disruption. Courage, Sudden death. Escape from prison and all it implies."
+        "emojis": "♂️ ⚡ 🗼 👁️ 🕊️",
+        "attribution": "Mars • Peh",
+        "description": "Quarrel. Combat. Danger. Ruin. Destruction of plans. Ambition. Courage. Sudden death. Escape from prison and all it implies."
     },
     "17-the-star": {
         "name": "The Star",
-        "description": "Hope, Unexpected help, Clarity of vision, Spiritual insight. Error of judgment, Dreaminess, Disappointment."
+        "emojis": "♒ ⭐ 💧 🌊 🌀",
+        "attribution": "Aquarius • Heh",
+        "description": "Hope. Unexpected help. Clarity of vision. Spiritual insight. Influenced: Dreaminess. Disappointment."
     },
     "18-the-moon": {
         "name": "The Moon",
-        "description": "Illusion, Deception, Bewilderment, Hysterical, Madness, Dreaminess, Falsehood, Voluntary change. The brink of an important change. This card is very sensitive to dignity. May mean poetic or artistic ability. Practical error. Truth, Shamelessness, Manifestation. Recovery from sickness, but sometimes sudden death."
+        "emojis": "♓ 🌙 🦂 🐺 🌊",
+        "attribution": "Pisces • Qoph",
+        "description": "Illusion. Deception. Bewilderment. Falsehood. Voluntary change. Influenced: Hysteria. Madness."
     },
     "19-the-sun": {
         "name": "The Sun",
-        "description": "Glory, Gain, riches, display, vanity, arrogance. Sudden break up or overturn. Truth, Shamelessness, Manifestation. Recovery from sickness, but sometimes sudden death. Arrogance, Vanity."
+        "emojis": "☀️ 👶 🦋 🌹 ✨",
+        "attribution": "Sun • Resh",
+        "description": "Glory. Gain. Riches. Triumph. Pleasure. Truth. Shamelessness. Manifestation. Recovery. Arrogance. Vanity."
     },
     "20-the-aeon": {
         "name": "The Aeon",
-        "description": "Final decision concerning the past. New current for the future. Always represents the taking of a definite step."
+        "emojis": "🔥 👶 🌟 🐍 ✨",
+        "attribution": "Fire • Shin",
+        "description": "Closure. Resolution. Definitive action."
     },
     "21-the-universe": {
         "name": "The Universe",
-        "description": "The matter itself, Synthesis, World. The end of the matter, Delay, Opposition, Inertia, Perseverance. Patience, The crystallization of the whole matter involved."
+        "emojis": "🪐 🌍 💃 🐍 ♄",
+        "attribution": "Saturn • Earth • Tau",
+        "description": "Essential questions. Synthesis. Delay. Completion. Opposition. Inertia. Perseverance. Patience. Crystallized thinking."
     },
     
     # WANDS - Fire
     "wands-01": {
         "name": "Ace of Wands",
-        "description": "Root of the Powers of Fire. Energy, Strength. Natural Force as opposed to invoked force."
+        "emojis": "🔥 🌳 ⚡ 💫 🔆",
+        "attribution": "Root of Fire",
+        "description": "Energy. Strength. Natural Force. Sexual vigor."
     },
     "wands-02": {
         "name": "Two of Wands - Dominion",
-        "description": "Fire in its most destructive aspect. Cruelty and malice. Selfishness. Lust of result. Bold, fierce, aggressive but often intolerant and lacking in persistence. Another: Boldness, Courage, Fierceness, Shamelessness. Turbulence, Generosity."
+        "emojis": "♂️ ♈ 🔥 ⚔️ 👑",
+        "attribution": "Mars in Aries • Chokmah",
+        "description": "Fire in its highest form. Force of energy. Harmony of power and justice. Influence. Boldness. Courage. Fierceness. Restlessness. Turbulence. Obstinacy."
     },
     "wands-03": {
         "name": "Three of Wands - Virtue",
-        "description": "Established strength. Success after struggle. Pride and arrogance. Realization of hope. Nobility. Conceit and self-assertion. Another: Ill-dignified: Pride and arrogance."
+        "emojis": "☀️ ♈ 🌺 👑 ✨",
+        "attribution": "Sun in Aries • Binah",
+        "description": "Established strength. Success after struggle. Pride and arrogance. Realization of hope. Conceit."
     },
     "wands-04": {
         "name": "Four of Wands - Completion",
-        "description": "Perfected work. Settlement. Completion after much labour. Rest. Subtlety. Cleverness. Conclusions from experience. Unreliability from fickleness and hurriedness of action."
+        "emojis": "♀️ ♈ 🐏 🕊️ 🏰",
+        "attribution": "Venus in Aries • Chesed",
+        "description": "Perfection. Settlement. Rest. Subtlety. Cleverness. Knowledge brings conclusions. Unreliable outcomes from overzealous action."
     },
     "wands-05": {
         "name": "Five of Wands - Strife",
-        "description": "Quarreling, Competition, Cruelty. Violence, Lust and desire. May be prodigality or generosity according to dignity."
+        "emojis": "♄ ♌ ⚔️ 🔥 💥",
+        "attribution": "Saturn in Leo • Geburah",
+        "description": "Quarreling. Fighting. Competition. Cruelty. Violence. Lust. Desire. Generosity or excess spending."
     },
     "wands-06": {
         "name": "Six of Wands - Victory",
-        "description": "Energy tried and justified by victory. Triumph, Energy in life at starting but too much force applied too rapidly. Possible victory. Obstacles and difficulties yet courage to meet them. Victory in small things."
+        "emojis": "♃ ♌ 🏆 🌟 ⚡",
+        "attribution": "Jupiter in Leo • Tiphareth",
+        "description": "Balanced energy. Love. Gain and success. Triumph after strife. Influenced: Insolence and pride."
     },
     "wands-07": {
         "name": "Seven of Wands - Valour",
-        "description": "Possible victory dependent on the energy of high velocity. Activity. Approach to goal. Letter or message. Rapidly. Boldness. Freedom. Too much force applied too quickly. Ill-dignified: Quarreling."
+        "emojis": "♂️ ♌ ⚔️ 🛡️ 🔥",
+        "attribution": "Mars in Leo • Netzach",
+        "description": "Struggles. Small victories. Courage to meet obstacles. Victory in small things. Quarreling."
     },
     "wands-08": {
         "name": "Eight of Wands - Swiftness",
-        "description": "Too much force applied too rapidly. Violent but quite transient effect. Speech, communication, conversation. Swiftness. Hasty. Boldness. Freedom. Approach to goal. Letter or message. Rapidly. Boldness. Freedom."
+        "emojis": "☿️ ♐ ⚡ 🌈 💬",
+        "attribution": "Mercury in Sagittarius • Hod",
+        "description": "Speech. Light. Electricity. Energy of high velocity. Activity. Approaching goals. Letter. Message. Boldness. Freedom. Too much force applied too suddenly."
     },
     "wands-09": {
         "name": "Nine of Wands - Strength",
-        "description": "Power, Health, Success after opposition and strife, Tremendous force, Recovery from sickness, Victory after apprehension and fear."
+        "emojis": "🌙 ♐ 🏹 💪 ☀️",
+        "attribution": "Moon in Sagittarius • Yesod",
+        "description": "Power. Health. Success after conflict. Tremendous force. Recovery. Victory follows fear. Change brings stability."
     },
     "wands-10": {
         "name": "Ten of Wands - Oppression",
-        "description": "Force detached from spiritual sources. Cruel and overbearing strength. Malice. Revenge. Injustice. Obstinacy. Ill-dignified: Generosity if particularly well-dignified."
+        "emojis": "♄ ♐ ⚔️ 🔥 💔",
+        "attribution": "Saturn in Sagittarius • Malkuth",
+        "description": "Force detached from spiritual sources. Fire in its most destructive aspect. Cruelty and malice. Selfishness. Lying. Repression. Slander. Ill will. Influenced: Self-sacrifice and generosity."
     },
     "wands-princess": {
         "name": "Princess of Wands",
-        "description": "Represents the earthy part of fire. A young woman, strong and beautiful, enthusiastic. Ill-dignified: Superficial, Theatrical, Cruel, Unstable, Domineering."
+        "emojis": "🔥 🌍 ☀️ 💃 ⚡",
+        "attribution": "Earthy part of Fire",
+        "description": "An energetic young woman, individualistic, brilliant and daring, expressive in love or anger, enthusiastic. Superficial, theatrical, shallow, cruel, unreliable, faithless."
     },
     "wands-prince": {
         "name": "Prince of Wands",
-        "description": "Represents the airy part of fire. A young man, swift and strong, impulsive, violent, just, noble and generous with a sense of ideas. Ill-dignified: Cruel, Intolerant, Prejudiced, who may be a coward."
+        "emojis": "🔥 💨 🦅 🐉 ⚡",
+        "attribution": "Airy part of Fire",
+        "description": "A young man, swift and strong, impulsive, violent, just, noble and generous with a sense of humor. Proud, intolerant, cruel, cowardly, and prejudiced."
     },
     "wands-queen": {
         "name": "Queen of Wands",
-        "description": "Represents the watery part of fire. A woman of adaptability, persistent energy, calm authority, with great power to attract. Ill-dignified: A woman who is stupid, obstinate, revengeful, tyrannical, domineering and interfering."
+        "emojis": "🔥 💧 👑 🐆 🔥",
+        "attribution": "Watery part of Fire",
+        "description": "A woman of adaptability, persistent energy, calm authority, powers of attraction, generous but intolerant. Obstinacy, revenge, dominance."
     },
     "wands-knight": {
         "name": "Knight of Wands",
-        "description": "Represents the fiery part of life. A man with the qualities of activity, generosity, impetuosity, pride and swiftness, with strength but sometimes changeable."
+        "emojis": "🔥 🔥 🏇 ⚡ 👑",
+        "attribution": "Fiery part of Fire",
+        "description": "A man of activity, generosity, pride and swiftness. Cruelty, bigotry, petulance."
     },
     
     # CUPS - Water
     "cups-01": {
         "name": "Ace of Cups",
-        "description": "Root of the Powers of Water. Fertility, Productiveness, Beauty, Pleasure and happiness."
+        "emojis": "💧 🏺 🌊 💖 🌹",
+        "attribution": "Root of Water",
+        "description": "Fertility. Productivity. Beauty. Pleasure and happiness."
     },
     "cups-02": {
         "name": "Two of Cups - Love",
-        "description": "Harmony of male and female interpreted in the widest sense. Harmony between various factors on any question. Love, Friendship, Pleasure. Warm friendship, Mirth. Folly, Dissipation, Waste, Silly actions."
+        "emojis": "♀️ ♋ 💑 🐬 🌺",
+        "attribution": "Venus in Cancer • Chokmah",
+        "description": "Harmony of male and female sensibilities. Radiant joy. Ecstasy. Pleasure. Warm friendship. Intimacy. Carelessness. Dissipation. Waste."
     },
     "cups-03": {
         "name": "Three of Cups - Abundance",
-        "description": "Spiritual basis of fertility. Plenty. Hospitality. Pleasure. Sensuality. Passive success. Love, Kindness. Abundance. Plenty. Passive success. The good things of life in a transient and therefore cannot be relied on."
+        "emojis": "☿️ ♋ 🍇 🌺 🎉",
+        "attribution": "Mercury in Cancer • Binah",
+        "description": "Spiritual fertility. Plenty. Hospitality. Pleasure. Sensuality. Passive success. Love. Kindness. Bounty. Transient pleasure."
     },
     "cups-04": {
         "name": "Four of Cups - Luxury",
-        "description": "Weakness. Abandonment to desire. Pleasure. Possibly approaching their end. Impatience. The seeds of decay in pleasure."
+        "emojis": "🌙 ♋ 🏺 🌊 💔",
+        "attribution": "Moon in Cancer • Chesed",
+        "description": "Weakness. Abandonment to desire. Pleasure mixed with anxiety. Injustice. The seeds of decay in the fruits of pleasure."
     },
     "cups-05": {
         "name": "Five of Cups - Disappointment",
-        "description": "End of pleasure. Disturbance when least expected. Misfortune. Disappointment in love. Unkindness from friends. Loss of friendship. Treachery. Ill will. Sadness. Vain regret."
+        "emojis": "♂️ ♏ 💔 🌧️ 😢",
+        "attribution": "Mars in Scorpio • Geburah",
+        "description": "Unexpected disturbance. Misfortune. Heartache. Unkindness from friends. Betrayal. Resentment. Sadness. Regret."
     },
     "cups-06": {
         "name": "Six of Cups - Pleasure",
-        "description": "Well-being. Harmony of natural forces without effort or strain. Ease. Satisfaction. Happiness. Success. Fulfillment of sexual will. Beginning of steady increase (but beginning only). Complacency. Vanity. Thanklessness. Another: Intoxication. Guilt. Lying. Deceit. Promises unfulfilled. Lust. Formation. Dissipation in love and friendship. Vanity."
+        "emojis": "☀️ ♏ 🌺 💖 ✨",
+        "attribution": "Sun in Scorpio • Tiphareth",
+        "description": "Well-being. Effortless harmony. Ease. Satisfaction. Happiness. Success. Fulfillment of sexual will. Beginnings of improvements. Presumptuous. Vain. Thankless."
     },
     "cups-07": {
         "name": "Seven of Cups - Debauch",
-        "description": "Delusion. Illusory success. Drug addiction. Intoxication. Guilt. Lying. Deceit. Promises unfulfilled. Lust. Formation. Dissipation in love and friendship. Vanity."
+        "emojis": "♀️ ♏ 🍷 💀 😵",
+        "attribution": "Venus in Scorpio • Netzach",
+        "description": "Illusory success. Drug addiction. Intoxication. Guilt. Lying. Deceit. Promises unfulfilled. Lust. Dissipation of love and friendship."
     },
     "cups-08": {
         "name": "Eight of Cups - Indolence",
-        "description": "Abandoned success. Decline of interest in anything. Temporary success but without further result. Instability. Misery and repining. Journeying from place to place. May mean leaving material success for something higher."
+        "emojis": "♄ ♓ 🌊 💤 🥀",
+        "attribution": "Saturn in Pisces • Hod",
+        "description": "Abandoned success. Declining interest. Temporary success. Instability. Misery. Transience which may lead away from material success."
     },
     "cups-09": {
         "name": "Nine of Cups - Happiness",
-        "description": "Complete success. Pleasure and happiness, wishes fulfilled. Self-satisfaction. Sensuality. Perfect or almost perfect happiness. Almost perfect but perhaps temporary. Well-dignified: Danger of vanity, self-praise, complacent smugness."
+        "emojis": "♃ ♓ 🎉 💖 ✨",
+        "attribution": "Jupiter in Pisces • Yesod",
+        "description": "Complete success. Pleasure. Physical well-being. Vanity, conceit and overindulgence."
     },
     "cups-10": {
         "name": "Ten of Cups - Satiety",
-        "description": "Pursuit of pleasure crowned with perfect success but incomplete. Matters arranged and settled as wished. Complete success. Pleasure, dissipation, debauchery. Lasting success. Inspired action from above. Permanent peaceful happiness."
+        "emojis": "♂️ ♓ 🏺 🌊 🌹",
+        "attribution": "Mars in Pisces • Malkuth",
+        "description": "Pursuit of pleasure. Desired outcome. Success. Peacemaking. Generosity. Dissipation. Overindulgence. Pity. Waste. Stagnation."
     },
     "cups-princess": {
         "name": "Princess of Cups",
-        "description": "Represents the earthy part of water. A young woman, innocent, gracious, at sweetness, voluptuousness, gentle, kind and tender. A dreamy, at times indolent person. Ill-dignified: Selfish and luxurious woman."
+        "emojis": "💧 🌍 🦢 🐢 🐬",
+        "attribution": "Earthy part of Water",
+        "description": "A young woman, infinitely gracious, sweet, voluptuous, gentle, kind, romantic and dreamy. Indolent, selfish and luxurious woman."
     },
     "cups-prince": {
         "name": "Prince of Cups",
-        "description": "Represents the airy part of water. A young man whose characteristics are subtle, secret and artistic, whose calm surface masks intense passion, caring intensely for power and wisdom and ruthless in his own aims. Ill-dignified: Intensely evil, merciless, grasping man."
+        "emojis": "💧 💨 🦅 🐍 🌊",
+        "attribution": "Airy part of Water",
+        "description": "A young man of subtlety, secret violence, craft. An artist whose calm surface masks intense passion. Ruthless in his aims. Ambitious and obtuse."
     },
     "cups-queen": {
         "name": "Queen of Cups",
-        "description": "Represents the watery part of water. A woman who may be beloved for the sweetness of her nature, loving, beautiful, not always constant or reliable or liable to break her words. She is much affected by surrounding influences, therefore more dependent on others for good or ill than most people. She is poetic and dreamy. Ill-dignified: Indolent, selfish and luxurious woman."
+        "emojis": "💧 💧 🦢 🌊 🔮",
+        "attribution": "Watery part of Water",
+        "description": "An observer, dreamy, tranquil, poetic, imaginative, kind yet passive. Impressionable to other card influences."
     },
     "cups-knight": {
         "name": "Knight of Cups",
-        "description": "Represents the fiery part of water. A man whose nature is a compound of noble moral qualities, graceful and somewhat ethereal, but with lack of conscience or sense of responsibility. Ill-dignified: Subtlety, artifice, intensity, fierce and overbearing nature."
+        "emojis": "💧 🔥 🏇 🦚 🦀",
+        "attribution": "Fiery part of Water",
+        "description": "A man with commitment issues. Amiable but passive. Attracted to excitement. Unsustainable enthusiasm. Sensitive but shallow. Influenced: Sensual and idle, untruthful, prone to depression and drug abuse."
     },
     
     # SWORDS - Air
     "swords-01": {
         "name": "Ace of Swords",
-        "description": "Root of the Powers of Air. Invoked force as contrasted with natural force (compare Ace of Wands). Represents great power for good or evil but invoked. Conquest, Whirling force, Activity. Strength through trouble. As affirmation of justice upholding Divine authority, may become sword of wrath, punishment and affliction."
+        "emojis": "💨 🗡️ 👑 ⚡ ⚖️",
+        "attribution": "Root of Air",
+        "description": "Invoked force. Power for good or evil. Conquest. Activity. Strength through trouble. Just punishment."
     },
     "swords-02": {
         "name": "Two of Swords - Peace",
-        "description": "Contradictory characteristics in the same nature, Sacrifice and trouble giving birth to strength, Quarrel made up and peace restored, yet tension remaining. Pleasure after pain. Truth and untruth. Indecision. Actions sometimes selfish, sometimes unselfish."
+        "emojis": "🌙 ♎ 🗡️ 🌹 ⚖️",
+        "attribution": "Moon in Libra • Chokmah",
+        "description": "Dual nature. Sacrifice and trouble giving birth to strength. Conflict leading to peace. Pleasure after pain. Truth and untruth. Indecision. Ambivalence."
     },
     "swords-03": {
         "name": "Three of Swords - Sorrow",
-        "description": "Melancholy. Unhappiness. Tears. Disruption. Sowing of discord and strife. Delay. Absence. Separation. Mirth in forbidden pleasures. Deceit. Well-dignified: Singing, Faithfulness in promises. Honesty in money transactions."
+        "emojis": "♄ ♎ 💔 😢 🗡️",
+        "attribution": "Saturn in Libra • Binah",
+        "description": "Melancholy. Unhappiness. Tears. Disruption. Discord. Delay. Absence. Separation. Deceit. Faith. Honesty."
     },
     "swords-04": {
         "name": "Four of Swords - Truce",
-        "description": "Rest from strife. Relief. Peace after war. Relaxation of anxiety. Refuge from mental chaos. Recovery from sickness, Change for the better after struggle. Authority in the intellectual field. Stability. Establishment of dogma."
+        "emojis": "♃ ♎ 🗡️ 🌹 ✝️",
+        "attribution": "Jupiter in Libra • Chesed",
+        "description": "Rest from sorrow. Peace after war. Relief from anxiety. Recovery from sickness, Change after struggle. Intellectual authority. Convention."
     },
     "swords-05": {
         "name": "Five of Swords - Defeat",
-        "description": "Loss, Contest, Defeat, Strife. Weakness, Slander, Failure. Lying. Malice and spite. Cruelty. Calumny. Cowardice. Ill-dignified: Perverseness. Tact. Stiffness. Pettiness. Lies. Separator of friends. A busybody, cruel yet cowardly, evil speaking."
+        "emojis": "♀️ ♒ 💔 🗡️ 😞",
+        "attribution": "Venus in Aquarius • Geburah",
+        "description": "Loss. Malice. Spite. Weakness. Slander. Failure. Anxiety, Poverty. Dishonor. Trouble. Grief. Lies. Gossip. Interference."
     },
     "swords-06": {
         "name": "Six of Swords - Science",
-        "description": "Earned success. Intelligence in material things. Logical Labor. Work. Success after anxiety. Passage from difficulty. Selfishness by way of intellect. Ill-dignified: Selfishness in labour. Conceit."
+        "emojis": "☿️ ♒ 🗡️ 🌹 ✝️",
+        "attribution": "Mercury in Aquarius • Tiphareth",
+        "description": "Directed intelligence. Labor. Work. Success after challenge. Passage from difficulty. Journey by water. Influenced: Self-centeredness. Intellectual conceit."
     },
     "swords-07": {
         "name": "Seven of Swords - Futility",
-        "description": "Unstable effort. Vacillation. Vain striving. Journey by land. Unprofitable speculation. Disappointment. Journeying perhaps with a dishonest companion. Yielding when victory is within the grasp. Inclination too powerful for resistance but not necessarily a sign of wickedness. Crime or dishonor not necessarily implied. Journey by land. Untrustworthy person."
+        "emojis": "🌙 ♒ 🗡️ 🌙 😔",
+        "attribution": "Moon in Aquarius • Netzach",
+        "description": "Unstable effort. Vacillation. Striving in vain. Incomplete success due to exhaustion. Journey by land. Untrustworthy person."
     },
     "swords-08": {
         "name": "Eight of Swords - Interference",
-        "description": "Wants courage to rely on details quarrel. Narrowness. Pettiness. Overruled by intelligence. Shilly. Pettiness of persistence. Shilly-shallying, lack of persistence. Unforeseen bad luck. Restriction. Great force applied to small matters and so wasted. Too much force expended in detail against something too strong."
+        "emojis": "♃ ♊ 🗡️ ⚔️ 🔗",
+        "attribution": "Jupiter in Gemini • Hod",
+        "description": "Misdirected energy. Neglect of important matters. Lack of persistence. Unforeseen bad luck. Restriction. Great care in some areas, disorder in others."
     },
     "swords-09": {
         "name": "Nine of Swords - Cruelty",
-        "description": "Agony of mind. Despair. Hopelessness. Suffering. Burden. Obsession. Illness. Loss. Misery. Burden. Oppression. Unrelieved fatigue. Death-like condition. Lying. Slander. Dishonesty. Faithlessness. Patience. Unselfishness."
+        "emojis": "♂️ ♊ 🗡️ 😭 💀",
+        "attribution": "Mars in Gemini • Yesod",
+        "description": "Mental anguish. Despair. Hopelessness. Worry. Suffering. Loss. Illness. Malice. Burden. Oppression. Lying. Shame. Influenced: Obedience. Faithfulness. Patience. Unselfishness."
     },
     "swords-10": {
         "name": "Ten of Swords - Ruin",
-        "description": "Reason divorced from reality. Death. Failure. Disruption. The latter chiefly if such a mode of Dissolution is natural. Clever, eloquent and insolent person, immoral and tale-bearer. Spiritually, may herald the end of delusion."
+        "emojis": "☀️ ♊ 🗡️ 💀 ☠️",
+        "attribution": "Sun in Gemini • Malkuth",
+        "description": "Faulty reasoning. Death. Failure. Disruption. Clever. Eloquent but impertinent person. Spiritually, may herald the end of delusion."
     },
     "swords-princess": {
         "name": "Princess of Swords",
-        "description": "Represents the earthy part of air. A young woman, stern and revengeful, with destructive logic, firm and aggressive, with great practical wisdom and subtlety, dexterous in material and practical affairs."
+        "emojis": "💨 🌍 🗡️ ⚔️ 👸",
+        "attribution": "Earthy part of Air",
+        "description": "A young woman, stern and revengeful, with destructive logic, firm and aggressive, skilled in practical affairs. Influenced: Cunning, frivolous, and manipulative."
     },
     "swords-prince": {
         "name": "Prince of Swords",
-        "description": "Represents the airy part of air. A young man, swift and clever, fierce, delicate and courageous but often unreliable."
+        "emojis": "💨 💨 🗡️ 🧚 ⚡",
+        "attribution": "Airy part of Air",
+        "description": "A young intellectual man, full of ideas and designs, domineering, intensely clever but unstable. Elusive. Impressionable. Influenced: Harsh, malicious, plotting, unreliable, fanatic."
     },
     "swords-queen": {
         "name": "Queen of Swords",
-        "description": "Represents the watery part of air. A graceful woman, intensely perceptive, a keen observer, subtle interpreter, intense individualism, calm exterior, accurate at recording and sensing, gracious and just. Ill-dignified: Cruel, sly, deceitful and unreliable, she may be domineering and very faithless."
+        "emojis": "💨 💧 👑 🗡️ 💀",
+        "attribution": "Watery part of Air",
+        "description": "A graceful woman, intensely perceptive, a keen observer, subtle interpreter, an intense individualist. Confident and gracious. Also: Cruel, sly, deceitful and unreliable woman. Superficially attractive."
     },
     "swords-knight": {
         "name": "Knight of Swords",
-        "description": "Represents the fiery part of air. A skillful and clever, fierce, delicate and courageous but often unreliable. A man with many good qualities, but hardly lovable and more to be respected than liked. Ill-dignified: A man remarkable in the same skillful and clever, fierce, delicate and courageous but often unreliable."
+        "emojis": "💨 🔥 🏇 🗡️ 🌪️",
+        "attribution": "Fiery part of Air",
+        "description": "An active man, skillful and clever. Fierce and courageous, but often unreflective. A man incapable of decision, deceitful and over-bearing."
     },
     
     # DISKS - Earth
     "disks-01": {
         "name": "Ace of Disks",
-        "description": "Root of the Powers of Earth. Material gain. Power. Labor. Wealth. Contentment. Materiality in all senses. For Crowley, this card is affirmation of the identity of Sun and earth, spirit and matter."
+        "emojis": "🌍 💎 🪙 🌱 ✨",
+        "attribution": "Root of Earth",
+        "description": "Material gain. Power. Labor. Wealth. Contentment. Materialism."
     },
     "disks-02": {
         "name": "Two of Disks - Change",
-        "description": "Harmony of change. Alternation of gain and loss, weakness and strength, elation and melancholy. Varying occupation. Wandering. Visit to friends. Pleasant change. Industrious, clever, kind and trustworthy person."
+        "emojis": "♃ ♑ ☯️ 🐍 🔄",
+        "attribution": "Jupiter in Capricorn • Chokmah",
+        "description": "Harmony. Alternating gain and loss, weakness and strength, elation and melancholy. Varying occupation. Wandering. Visit to friends. Pleasant change. Industrious, yet unreliable."
     },
     "disks-03": {
         "name": "Three of Disks - Works",
-        "description": "Paid employment. Commercial transaction. Constructive building up. Increase of material things. Commencement of matters to be established later. Business, Paid employment. Commercial transaction. Constructive building up. Ill-dignified: Narrow, prejudiced, greedy person seeking impossibilities."
+        "emojis": "♂️ ♑ 🔺 ⚙️ 🏗️",
+        "attribution": "Mars in Capricorn • Binah",
+        "description": "Business. Commercial transaction. Constructive. Increase of material things. Growth. Commencement of projects. Influenced: Selfish, narrow, unrealistic, greedy."
     },
     "disks-04": {
         "name": "Four of Disks - Power",
-        "description": "Earthly power. Law and order. Gain of money and influence. Earthly power but nothing beyond. Success. Rank. Dominion. Skill in directing practical forces. Prejudice. Covetousness."
+        "emojis": "☀️ ♑ 🏰 👑 🛡️",
+        "attribution": "Sun in Capricorn • Chesed",
+        "description": "Law and order. Gain of money and influence. Success. Rank. Dominion. Physical skill. Influenced: Prejudice. Envy. Suspicion. Lack of originality."
     },
     "disks-05": {
         "name": "Five of Disks - Worry",
-        "description": "Intense strain with continued inaction. Loss of money. Profession or business in danger. Monetary anxiety. Poverty. Well-dignified: Labor. Toil. Loss of profession. Loss of money. Trouble about material things."
+        "emojis": "☿️ ♉ 💰 😰 ⭐",
+        "attribution": "Mercury in Taurus • Geburah",
+        "description": "Intense strain. Inactivity. Financial loss. Professional setbacks. Monetary anxiety. Poverty. Influenced: Labor. Real estate. Business acumen."
     },
     "disks-06": {
         "name": "Six of Disks - Success",
-        "description": "Success and gain in material things. Power. Influence. Nobility. Philanthropy. Somewhat dreamy and transitory situation. Insolence. Concern with wealth. Prodigality."
+        "emojis": "🌙 ♉ 💰 ⚖️ ✨",
+        "attribution": "Moon in Taurus • Tiphareth",
+        "description": "Material gain. Power. Influence. Philanthropy. Transitory situation. Influenced: Insolence. Conceit with wealth. Excessive spending."
     },
     "disks-07": {
         "name": "Seven of Disks - Failure",
-        "description": "Labor abandoned. Sloth. Unprofitable speculations. Little gain for much labor. Promises unfulfilled. Disappointment. Little gain from much labor. Well-dignified: Delay but growth. Honorable work undertaken for the love of work with no hope of reward."
+        "emojis": "♄ ♉ 🌾 😞 💔",
+        "attribution": "Saturn in Taurus • Netzach",
+        "description": "Unfinished work. Unprofitable speculation. Unmet goals. Hopes deceived. Disappointment. Little gain from much effort. Influenced: Delayed growth. Honorable undertakings."
     },
     "disks-08": {
         "name": "Eight of Disks - Prudence",
-        "description": "Intelligence applied to material affairs. Agriculture. Building. Skill. Cunning. Industriousness. Ill-dignified: Penny wise and pound foolish attitudes. Avariciousness and hoarding. Meanness. Over-carefulness in small things at the expense of the great."
+        "emojis": "☀️ ♍ 🌳 ⚙️ 💰",
+        "attribution": "Sun in Virgo • Hod",
+        "description": "Intelligence in material affairs. Agriculture. Building. Skill. Cunning. Industriousness. Influenced: 'Penny wise and pound foolish.' Avarice. Meanness. Failure to see the big picture."
     },
     "disks-09": {
         "name": "Nine of Disks - Gain",
-        "description": "Much increase of goods or of money in material affairs. Inheritance. Great increase of wealth. Complete confidence of material affairs. Theft and knavery. Disappearance or dissipation of goods. Substance. Gain. Treasures and riches. Good things of this world. Complacency. Consciousness. Thrift. Wisdom. Certainty."
+        "emojis": "♀️ ♍ 💎 🌟 🏆",
+        "attribution": "Venus in Virgo • Yesod",
+        "description": "Good fortune. Inheritance. Improved wealth. Influenced: Envy, loss, waste."
     },
     "disks-10": {
         "name": "Ten of Disks - Wealth",
-        "description": "Material prosperity and riches. Completion of material fortune, but nothing beyond. Completion of material gain, mean partial loss, dullness of mind with acuity and profit in money transactions. Meanness. Sordid selfishness."
+        "emojis": "☿️ ♍ 💰 🪙 🏛️",
+        "attribution": "Mercury in Virgo • Malkuth",
+        "description": "Prosperity. Creativity. Old age. Influenced: Laziness. Indifference. Dullness of mind."
     },
     "disks-princess": {
         "name": "Princess of Disks",
-        "description": "Represents the earthy part of earth. A young woman, beautiful and strong, generous and kind, charming and magnetic in all directions, affectionate and kind, charming, magnetic in all directions, affectionate and kind. Serious and thoughtful. Ill-dignified: Servile. Foolish. Capricious. Prone to debauch and moodiness."
+        "emojis": "🌍 🌍 🐏 💎 🌾",
+        "attribution": "Earthy part of Earth",
+        "description": "A young woman, beautiful and strong, pregnant with life. She is generous, kind, diligent, and benevolent. Influenced: Wasteful and at war with her essential dignity."
     },
     "disks-prince": {
         "name": "Prince of Disks",
-        "description": "Represents the airy part of earth. A young man at his best when in authority, manager, steadfast worker, competent, perhaps considered dull, somewhat lacking in emotion or sentiment of spiritual types, slow to anger but fearsome if aroused."
+        "emojis": "🌍 💨 🐂 🌾 ⚙️",
+        "attribution": "Airy part of Earth",
+        "description": "An energetic young man. A capable manager and steadfast worker, competent, perhaps dull, somewhat skeptical of spirituality, slow to anger but implacable if aroused."
     },
     "disks-queen": {
         "name": "Queen of Disks",
-        "description": "Represents the watery part of earth. A woman of great heart and intelligence, thoughtful and kindly yet capable of much fascination. She is quiet and strong, as if befriending a secret wonder, which she will not reveal. She is generous and gracious, benevolent, preserving. Ill-dignified: Wasteful and prodigal woman at war with the elements or else unduly possessive."
+        "emojis": "🌍 💧 🐐 🌹 👑",
+        "attribution": "Watery part of Earth",
+        "description": "An ambitious woman, yet affectionate and kind, charming, timid, practical, quiet and domesticated. Influenced: Dull. Servile. Foolish. Capricious. Moody."
     },
     "disks-knight": {
         "name": "Knight of Disks",
-        "description": "Represents the fiery part of earth. A farmer, patient, laborious, reliable in material things, perhaps somewhat dull and heavy, or too Ill-dignified: Avaricious, grasping, dull, jealous and animal man."
+        "emojis": "🌍 🔥 🏇 🐴 🌾",
+        "attribution": "Fiery part of Earth",
+        "description": "A farmer, patient, laborious and clever. Somewhat dull and preoccupied with material things. Influenced: Avaricious, surly, petty, jealous."
     }
 }
 
@@ -369,13 +526,15 @@ async def send_tarot_card(ctx, card_key=None):
     # Get card data
     card = TAROT_DECK[card_key]
     card_name = card["name"]
+    emojis = card["emojis"]
+    attribution = card["attribution"]
     description = card["description"]
     
     # Create embed
     embed = discord.Embed(
-        title=card_name,
-        description=description,
-        color=discord.Color.blue()
+        title=f"{emojis}\n{card_name}",
+        description=f"**{attribution}**\n\n{description}",
+        color=discord.Color.purple()
     )
     
     # Get image
