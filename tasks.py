@@ -6,6 +6,7 @@ Background tasks that run on intervals
 import discord
 import random
 import logging
+import activity
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from discord.ext import tasks
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Global variable to store daily quote
 daily_quote_of_the_day = None
-
+    
 # ============================================================
 # DAILY QUOTE TASK
 # ============================================================
@@ -67,6 +68,12 @@ def setup_tasks(bot):
                 logger.info("✅ Sent 6PM quote")
         except Exception as e:
             logger.error(f"Error in daily_quote task: {e}")
+
+    # activity cleanup
+
+    async def cleanup_activity_task():
+    """Clean up activity data older than 30 days (run daily)"""
+    activity.cleanup_old_activity()
 
     @daily_quote.before_loop
     async def before_daily_quote():
