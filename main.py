@@ -733,76 +733,74 @@ async def blessing_command(ctx):
         await ch.send(embed=embed)
     await ctx.send("✅ Blessings sent to channels.")
 
-@bot.command(name=“hierarchy”)
+@bot.command(name="hierarchy")
 @commands.cooldown(5, 60, commands.BucketType.user)
 async def hierarchy_command(ctx, *, args: str = None):
-“”“Fallen angel and demon hierarchy system”””
+    """Fallen angel and demon hierarchy system"""
 
-```
-# No arguments - show full chart (AUTHORIZED ONLY)
-if args is None:
-    if not (ctx.author.guild_permissions.administrator or 
-            any(role.name in AUTHORIZED_ROLES for role in ctx.author.roles)):
-        return await ctx.send("🚫 Peasant Detected - Full hierarchy chart is restricted to authorized roles.")
-    
-    await hierarchy.send_hierarchy_chart(ctx)
-    return
-
-# Parse arguments
-args_lower = args.lower().strip()
-
-# Check for 'list' command (AUTHORIZED ONLY)
-if args_lower.startswith('list'):
-    if not (ctx.author.guild_permissions.administrator or 
-            any(role.name in AUTHORIZED_ROLES for role in ctx.author.roles)):
-        return await ctx.send("🚫 Peasant Detected - Hierarchy list is restricted to authorized roles.")
-    
-    # Extract page number if provided
-    parts = args.split()
-    page = 1
-    if len(parts) > 1 and parts[1].isdigit():
-        page = int(parts[1])
-    
-    await hierarchy.send_entity_list(ctx, page)
-    return
-
-# Check for 'random' command (EVERYONE)
-if args_lower == 'random':
-    entity_key = hierarchy.get_random_entity()
-    await hierarchy.send_entity_details(ctx, entity_key)
-    return
-
-# Check for 'search' command (EVERYONE)
-if args_lower.startswith('search '):
-    keyword = args[7:].strip()  # Remove 'search ' prefix
-    if not keyword:
-        return await ctx.send("❌ Please provide a search keyword. Usage: `.hierarchy search [keyword]`")
-    
-    results = hierarchy.search_hierarchy(keyword)
-    await hierarchy.send_search_results(ctx, results)
-    return
-
-# Otherwise, treat as entity name lookup (EVERYONE)
-entity_key = args_lower.replace(' ', '_').replace('-', '_')
-
-# Try to find the entity
-if entity_key in hierarchy.HIERARCHY_DB:
-    await hierarchy.send_entity_details(ctx, entity_key)
-else:
-    # Try fuzzy search by name
-    results = hierarchy.search_hierarchy(args)
-    if results:
-        # If exact match found, show it
-        for key, entity in results:
-            if entity['name'].lower() == args_lower:
-                await hierarchy.send_entity_details(ctx, key)
-                return
+    # No arguments - show full chart (AUTHORIZED ONLY)
+    if args is None:
+        if not (ctx.author.guild_permissions.administrator or 
+                any(role.name in AUTHORIZED_ROLES for role in ctx.author.roles)):
+            return await ctx.send("🚫 Peasant Detected - Full hierarchy chart is restricted to authorized roles.")
         
-        # Otherwise show search results
+        await hierarchy.send_hierarchy_chart(ctx)
+        return
+
+    # Parse arguments
+    args_lower = args.lower().strip()
+
+    # Check for 'list' command (AUTHORIZED ONLY)
+    if args_lower.startswith("list"):
+        if not (ctx.author.guild_permissions.administrator or 
+                any(role.name in AUTHORIZED_ROLES for role in ctx.author.roles)):
+            return await ctx.send("🚫 Peasant Detected - Hierarchy list is restricted to authorized roles.")
+        
+        # Extract page number if provided
+        parts = args.split()
+        page = 1
+        if len(parts) > 1 and parts[1].isdigit():
+            page = int(parts[1])
+        
+        await hierarchy.send_entity_list(ctx, page)
+        return
+
+    # Check for 'random' command (EVERYONE)
+    if args_lower == "random":
+        entity_key = hierarchy.get_random_entity()
+        await hierarchy.send_entity_details(ctx, entity_key)
+        return
+
+    # Check for 'search' command (EVERYONE)
+    if args_lower.startswith("search "):
+        keyword = args[7:].strip()  # Remove 'search ' prefix
+        if not keyword:
+            return await ctx.send("❌ Please provide a search keyword. Usage: `.hierarchy search [keyword]`")
+        
+        results = hierarchy.search_hierarchy(keyword)
         await hierarchy.send_search_results(ctx, results)
+        return
+
+    # Otherwise, treat as entity name lookup (EVERYONE)
+    entity_key = args_lower.replace(" ", "_").replace("-", "_")
+
+    # Try to find the entity
+    if entity_key in hierarchy.HIERARCHY_DB:
+        await hierarchy.send_entity_details(ctx, entity_key)
     else:
-        await ctx.send(f"❌ No entity found matching '{args}'. Try `.hierarchy search {args}` or `.hierarchy random`")
-```
+        # Try fuzzy search by name
+        results = hierarchy.search_hierarchy(args)
+        if results:
+            # If exact match found, show it
+            for key, entity in results:
+                if entity["name"].lower() == args_lower:
+                    await hierarchy.send_entity_details(ctx, key)
+                    return
+            
+            # Otherwise show search results
+            await hierarchy.send_search_results(ctx, results)
+        else:
+            await ctx.send(f"❌ No entity found matching '{args}'. Try `.hierarchy search {args}` or `.hierarchy random`")
 
 # ---- cmds  # '''    
 '''
