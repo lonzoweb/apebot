@@ -85,7 +85,7 @@ TAROT_DECK = {
         "name": "The Hanged Man",
         "emojis": "🌊 ☠️ 🐍 ⚓ 🔺",
         "attribution": "Water • Mem",
-        "description": "Redemption through sacrifice. New perspectives. Punishment. Loss. Defeat. Failure. Suffering."
+        "description": "Redemption through sacrifice. New perspectives. Shadow: Punishment. Loss. Defeat. Failure. Suffering."
     },
     "13-death": {
         "name": "Death",
@@ -97,7 +97,7 @@ TAROT_DECK = {
         "name": "Art",
         "emojis": "♐ 🌈 ⚗️ 🦅 🦁",
         "attribution": "Sagittarius • Samech",
-        "description": "Combination of forces. Realization. Action based on accurate calculation. Economy. Management. Success after elaborate maneuvers. Escape."
+        "description": "Combination of forces. Realization. Action based on accurate calculation. Economy. Management. Success after elaborate maneuvers. The way of Escape."
     },
     "15-the-devil": {
         "name": "The Devil",
@@ -121,13 +121,13 @@ TAROT_DECK = {
         "name": "The Moon",
         "emojis": "♓ 🌙 🦂 🐺 🌊",
         "attribution": "Pisces • Qoph",
-        "description": "Illusion. Deception. Bewilderment. Falsehood. Voluntary change. Influenced: Hysteria. Madness."
+        "description": "Illusion. Deception. Bewilderment. Falsehood. Voluntary change. Shadow: Hysteria. Madness."
     },
     "19-the-sun": {
         "name": "The Sun",
         "emojis": "☀️ 👶 🦋 🌹 ✨",
         "attribution": "Sun • Resh",
-        "description": "Glory. Gain. Riches. Triumph. Pleasure. Truth. Shamelessness. Manifestation. Recovery. Arrogance. Vanity."
+        "description": "Glory. Gain. Riches. Triumph. Pleasure. Truth. Shamelessness. Manifestation. Recovery. Shadow: Arrogance. Vanity."
     },
     "20-the-aeon": {
         "name": "The Aeon",
@@ -147,25 +147,25 @@ TAROT_DECK = {
         "name": "Ace of Wands",
         "emojis": "🔥 🌳 ⚡ 💫 🔆",
         "attribution": "Root of Fire",
-        "description": "Energy. Strength. Natural Force. Sexual vigor."
+        "description": "Energy. Strength. Natural Force. Sexual vigor. Natural force as opposed to invoked force."
     },
     "wands-02": {
         "name": "Two of Wands - Dominion",
         "emojis": "♂️ ♈ 🔥 ⚔️ 👑",
         "attribution": "Mars in Aries • Chokmah",
-        "description": "Fire in its highest form. Force of energy. Harmony of power and justice. Influence. Boldness. Courage. Fierceness. Restlessness. Turbulence. Obstinacy."
+        "description": "Fire in its highest form. Force of energy. Harmony of power and justice. Influence. Boldness. Courage. Fierceness. Shadow: Restlessness. Turbulence. Obstinacy."
     },
     "wands-03": {
         "name": "Three of Wands - Virtue",
         "emojis": "☀️ ♈ 🌺 👑 ✨",
         "attribution": "Sun in Aries • Binah",
-        "description": "Established strength. Success after struggle. Pride and arrogance. Realization of hope. Conceit."
+        "description": "Established strength. Success after struggle. Pride and arrogance. Realization of hope. Shadow: Conceit."
     },
     "wands-04": {
         "name": "Four of Wands - Completion",
         "emojis": "♀️ ♈ 🐏 🕊️ 🏰",
         "attribution": "Venus in Aries • Chesed",
-        "description": "Perfection. Settlement. Rest. Subtlety. Cleverness. Knowledge brings conclusions. Unreliable outcomes from overzealous action."
+        "description": "Perfection. Settlement. Rest. Subtlety. Cleverness. Knowledge brings conclusions. Shadow: Unreliable outcomes from overzealous action."
     },
     "wands-05": {
         "name": "Five of Wands - Strife",
@@ -177,19 +177,19 @@ TAROT_DECK = {
         "name": "Six of Wands - Victory",
         "emojis": "♃ ♌ 🏆 🌟 ⚡",
         "attribution": "Jupiter in Leo • Tiphareth",
-        "description": "Balanced energy. Love. Gain and success. Triumph after strife. Influenced: Insolence and pride."
+        "description": "Balanced energy. Love. Gain and success. Triumph after strife. Shadow: Insolence and pride."
     },
     "wands-07": {
         "name": "Seven of Wands - Valour",
         "emojis": "♂️ ♌ ⚔️ 🛡️ 🔥",
         "attribution": "Mars in Leo • Netzach",
-        "description": "Struggles. Small victories. Courage to meet obstacles. Victory in small things. Quarreling."
+        "description": "Struggles. Small victories. Courage to meet obstacles. Victory in small things. Shadow: Quarreling."
     },
     "wands-08": {
         "name": "Eight of Wands - Swiftness",
         "emojis": "☿️ ♐ ⚡ 🌈 💬",
         "attribution": "Mercury in Sagittarius • Hod",
-        "description": "Speech. Light. Electricity. Energy of high velocity. Activity. Approaching goals. Letter. Message. Boldness. Freedom. Too much force applied too suddenly."
+        "description": "Speech. Light. Electricity. Energy of high velocity. Activity. Approaching goals. Letter. Message. Boldness. Freedom. Shadow: Too much force applied too suddenly."
     },
     "wands-09": {
         "name": "Nine of Wands - Strength",
@@ -201,31 +201,31 @@ TAROT_DECK = {
         "name": "Ten of Wands - Oppression",
         "emojis": "♄ ♐ ⚔️ 🔥 💔",
         "attribution": "Saturn in Sagittarius • Malkuth",
-        "description": "Force detached from spiritual sources. Fire in its most destructive aspect. Cruelty and malice. Selfishness. Lying. Repression. Slander. Ill will. Influenced: Self-sacrifice and generosity."
+        "description": "Force detached from spiritual sources. Fire in its most destructive aspect. Cruelty and malice. Selfishness. Lying. Repression. Slander. Ill will. Shadow: Self-sacrifice and generosity."
     },
     "wands-princess": {
         "name": "Princess of Wands",
         "emojis": "🔥 🌍 ☀️ 💃 ⚡",
         "attribution": "Earthy part of Fire",
-        "description": "An energetic young woman, individualistic, brilliant and daring, expressive in love or anger, enthusiastic. Superficial, theatrical, shallow, cruel, unreliable, faithless."
+        "description": "An energetic young woman, individualistic, brilliant and daring, expressive in love or anger, enthusiastic. Shadow: Superficial, theatrical, shallow, cruel, unreliable, faithless."
     },
     "wands-prince": {
         "name": "Prince of Wands",
         "emojis": "🔥 💨 🦅 🐉 ⚡",
         "attribution": "Airy part of Fire",
-        "description": "A young man, swift and strong, impulsive, violent, just, noble and generous with a sense of humor. Proud, intolerant, cruel, cowardly, and prejudiced."
+        "description": "A young man, swift and strong, impulsive, violent, just, noble and generous with a sense of humor. Shadow: Proud, intolerant, cruel, cowardly, and prejudiced."
     },
     "wands-queen": {
         "name": "Queen of Wands",
         "emojis": "🔥 🌊 👑 🐆 🔥",
         "attribution": "Watery part of Fire",
-        "description": "A woman of adaptability, persistent energy, calm authority, powers of attraction, generous but intolerant. Obstinacy, revenge, dominance."
+        "description": "A woman of adaptability, persistent energy, calm authority, powers of attraction, generous but intolerant. Shadow: Obstinacy, revenge, dominance."
     },
     "wands-knight": {
         "name": "Knight of Wands",
         "emojis": "🔥 🔥 🏇 ⚡ 👑",
         "attribution": "Fiery part of Fire",
-        "description": "A man of activity, generosity, pride and swiftness. Cruelty, bigotry, petulance."
+        "description": "A man of activity, generosity, pride and swiftness. Shadow: Cruelty, bigotry, petulance."
     },
     
     # CUPS - Water
@@ -239,13 +239,13 @@ TAROT_DECK = {
         "name": "Two of Cups - Love",
         "emojis": "♀️ ♋ 💑 🐬 🌺",
         "attribution": "Venus in Cancer • Chokmah",
-        "description": "Harmony of male and female sensibilities. Radiant joy. Ecstasy. Pleasure. Warm friendship. Intimacy. Carelessness. Dissipation. Waste."
+        "description": "Harmony of male and female sensibilities. Radiant joy. Ecstasy. Pleasure. Warm friendship. Intimacy. Shadow: Carelessness. Dissipation. Waste."
     },
     "cups-03": {
         "name": "Three of Cups - Abundance",
         "emojis": "☿️ ♋ 🍇 🌺 🎉",
         "attribution": "Mercury in Cancer • Binah",
-        "description": "Spiritual fertility. Plenty. Hospitality. Pleasure. Sensuality. Passive success. Love. Kindness. Bounty. Transient pleasure."
+        "description": "Spiritual basis of fertility. Plenty. Hospitality. Pleasure. Sensuality. Passive success. Love. Kindness. Bounty. Transient pleasure."
     },
     "cups-04": {
         "name": "Four of Cups - Luxury",
@@ -263,7 +263,7 @@ TAROT_DECK = {
         "name": "Six of Cups - Pleasure",
         "emojis": "☀️ ♏ 🌺 💖 ✨",
         "attribution": "Sun in Scorpio • Tiphareth",
-        "description": "Well-being. Effortless harmony. Ease. Satisfaction. Happiness. Success. Fulfillment of sexual will. Beginnings of improvements. Presumptuous. Vain. Thankless."
+        "description": "Well-being. Effortless harmony. Ease. Satisfaction. Happiness. Success. Fulfillment of sexual will. Beginnings of improvements. Shadow: Presumptuous. Vain. Thankless."
     },
     "cups-07": {
         "name": "Seven of Cups - Debauch",
@@ -281,25 +281,25 @@ TAROT_DECK = {
         "name": "Nine of Cups - Happiness",
         "emojis": "♃ ♓ 🎉 💖 ✨",
         "attribution": "Jupiter in Pisces • Yesod",
-        "description": "Complete success. Pleasure. Physical well-being. Vanity, conceit and overindulgence."
+        "description": "Complete success. Pleasure. Physical well-being. Shadow: Vanity, conceit and overindulgence."
     },
     "cups-10": {
         "name": "Ten of Cups - Satiety",
         "emojis": "♂️ ♓ 🏺 🌊 🌹",
         "attribution": "Mars in Pisces • Malkuth",
-        "description": "Pursuit of pleasure. Desired outcome. Success. Peacemaking. Generosity. Dissipation. Overindulgence. Pity. Waste. Stagnation."
+        "description": "Pursuit of pleasure. Desired outcome. Success. Peacemaking. Generosity. Shadow: Dissipation. Overindulgence. Pity. Waste. Stagnation."
     },
     "cups-princess": {
         "name": "Princess of Cups",
         "emojis": "🌊 🌍 🦢 🐢 🐬",
         "attribution": "Earthy part of Water",
-        "description": "A young woman, infinitely gracious, sweet, voluptuous, gentle, kind, romantic and dreamy. Indolent, selfish and luxurious woman."
+        "description": "A young woman, infinitely gracious, sweet, voluptuous, gentle, kind, romantic and dreamy. Shadow: Indolent, selfish and luxurious woman."
     },
     "cups-prince": {
         "name": "Prince of Cups",
         "emojis": "🌊 💨 🦅 🐍 🌊",
         "attribution": "Airy part of Water",
-        "description": "A young man of subtlety, secret violence, craft. An artist whose calm surface masks intense passion. Ruthless in his aims. Ambitious and obtuse."
+        "description": "A young man of subtlety, secret violence, craft. An artist whose calm surface masks intense passion. Shadow: Ruthless in his aims. Ambitious and obtuse."
     },
     "cups-queen": {
         "name": "Queen of Cups",
@@ -391,13 +391,13 @@ TAROT_DECK = {
         "name": "Queen of Swords",
         "emojis": "💨 🌊 👑 🗡️ 💀",
         "attribution": "Watery part of Air",
-        "description": "A graceful woman, intensely perceptive, a keen observer, subtle interpreter, an intense individualist. Confident and gracious. Also: Cruel, sly, deceitful and unreliable woman. Superficially attractive."
+        "description": "A graceful woman, intensely perceptive, a keen observer, subtle interpreter, an intense individualist. Confident and gracious. Shadow: Cruel, sly, deceitful and unreliable woman. Superficially attractive."
     },
     "swords-knight": {
         "name": "Knight of Swords",
         "emojis": "💨 🔥 🏇 🗡️ 🌪️",
         "attribution": "Fiery part of Air",
-        "description": "An active man, skillful and clever. Fierce and courageous, but often unreflective. A man incapable of decision, deceitful and over-bearing."
+        "description": "An active man, skillful and clever. Fierce and courageous, but often unreflective. Shadow: Incapable of decision, deceitful and over-bearing."
     },
     
     # DISKS - Earth
