@@ -1,4 +1,3 @@
-Content is user-generated and unverified.
 """
 Fallen Angel and Demon Hierarchy Module
 Comprehensive database across multiple traditions
