@@ -28,7 +28,7 @@ HIERARCHY_DB = {
 "description": "The most powerful fallen angel, cast from Heaven for pride and rebellion. Name means ‘Light-Bearer’ in Latin. Supreme commander of Hell’s armies across most traditions."
 },
 
-```
+
 # THE SEVEN PRINCES (Deadly Sins)
 "mammon": {
     "name": "Mammon",
@@ -1038,7 +1038,7 @@ HIERARCHY_DB = {
     "symbols": "Corruption",
     "description": "One of four demon queens with Lilith. Name means 'Woman of Whoredom.' Rules demons of sacred prostitution and temple corruption. Mates with fallen angels."
 }
-```
+ 
 
 }
 
@@ -1057,7 +1057,7 @@ def search_hierarchy(keyword):
 keyword_lower = keyword.lower()
 results = []
 
-```
+ 
 for key, entity in HIERARCHY_DB.items():
     # Search in name, alt names, domain, and description
     if (keyword_lower in entity["name"].lower() or
@@ -1067,7 +1067,7 @@ for key, entity in HIERARCHY_DB.items():
         results.append((key, entity))
 
 return results
-```
+ 
 
 def get_entity_list(page=1, per_page=20):
 """Get paginated list of all entities"""
@@ -1075,7 +1075,7 @@ sorted_keys = sorted(HIERARCHY_DB.keys(), key=lambda k: HIERARCHY_DB[k]["name"])
 total = len(sorted_keys)
 total_pages = (total + per_page - 1) // per_page
 
-```
+ 
 start_idx = (page - 1) * per_page
 end_idx = start_idx + per_page
 
@@ -1083,7 +1083,7 @@ page_keys = sorted_keys[start_idx:end_idx]
 page_entities = [(k, HIERARCHY_DB[k]) for k in page_keys]
 
 return page_entities, page, total_pages, total
-```
+ 
 
 def get_full_hierarchy_chart():
 """Generate ASCII hierarchy chart"""
@@ -1184,7 +1184,7 @@ if entity_key not in HIERARCHY_DB:
 await ctx.send(f"❌ Entity ‘{entity_key}’ not found.")
 return
 
-```
+ 
 entity = HIERARCHY_DB[entity_key]
 
 # Create embed
@@ -1220,7 +1220,7 @@ if entity.get('symbols'):
 embed.set_footer(text="Use .hierarchy search [keyword] to find related entities")
 
 await ctx.send(embed=embed)
-```
+ 
 
 async def send_search_results(ctx, results):
 """Send search results"""
@@ -1228,7 +1228,7 @@ if not results:
 await ctx.send("❌ No entities found matching your search.")
 return
 
-```
+ 
 # Limit to 10 results
 results = results[:10]
 
@@ -1246,13 +1246,13 @@ embed = discord.Embed(
 embed.set_footer(text="Use .hierarchy [name] for detailed info")
 
 await ctx.send(embed=embed)
-```
+ 
 
 async def send_entity_list(ctx, page=1):
 """Send paginated list of all entities"""
 entities, current_page, total_pages, total = get_entity_list(page)
 
-```
+ 
 if not entities:
     await ctx.send("❌ Invalid page number.")
     return
@@ -1271,23 +1271,23 @@ embed = discord.Embed(
 embed.set_footer(text=f"Page {current_page}/{total_pages} • {total} total entities • .hierarchy list [page]")
 
 await ctx.send(embed=embed)
-```
+ 
 
 async def send_hierarchy_chart(ctx):
 """Send full hierarchy chart"""
 chart = get_full_hierarchy_chart()
 
-```
+ 
 # Split into multiple messages if needed
 chunks = [chart[i:i+1900] for i in range(0, len(chart), 1900)]
 
 for i, chunk in enumerate(chunks):
     embed = discord.Embed(
         title=f"📊 Fallen Angel Hierarchy" + (f" (Part {i+1}/{len(chunks)})" if len(chunks) > 1 else ""),
-        description=f"```\n{chunk}\n```",
+        description=f" \n{chunk}\n ",
         color=discord.Color.from_rgb(139, 0, 0)
     )
     if i == len(chunks) - 1:  # Last chunk
         embed.set_footer(text="Use .hierarchy [name] for detailed info • .hierarchy list for full alphabetical list")
     await ctx.send(embed=embed)
-```
+ 
