@@ -14,6 +14,7 @@ import tarot
 import logging
 import ephem
 import hierarchy
+import activity
 from datetime import timedelta
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -56,11 +57,24 @@ async def on_ready():
     """Bot startup event"""
     init_db()
     init_gif_table()
+    activity.init_activity_db()
     logger.info(f"✅ Logged in as {bot.user}")
     tasks.setup_tasks(bot)
+    
 
 @bot.event
 async def on_message(message):
+    # Don't track bot messages
+    if message.author.bot:
+        await bot.process_commands(message)
+        return
+    
+    # Log activity
+    activity.log_message_activity(
+        timestamp=message.created_at,
+        user_id=str(message.author.id),
+        username=message.author.display_name
+    )
     """Track GIFs from messages"""
     # Ignore bot messages
     if message.author.bot:
@@ -76,6 +90,23 @@ async def on_message(message):
     
     # Process commands
     await bot.process_commands(message)
+
+@bot.event
+async def on_message(message):
+    # Don't track bot messages
+    if message.author.bot:
+        await bot.process_commands(message)
+        return
+    
+    # Log activity
+    activity.log_message_activity(
+        timestamp=message.created_at,
+        user_id=str(message.author.id),
+        username=message.author.display_name
+    )
+    # Process commands as normal
+    await bot.process_commands(message)
+
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -801,6 +832,65 @@ async def hierarchy_command(ctx, *, args: str = None):
             await hierarchy.send_search_results(ctx, results)
         else:
             await ctx.send(f"❌ No entity found matching '{args}'. Try `.hierarchy search {args}` or `.hierarchy random`")
+
+# ============================================================
+# ACTIVITY COMMAND
+# ============================================================
+
+@bot.command(name="activity")
+async def activity_command(ctx, *, args: str = None):
+    """View server activity statistics (Admin only)"""
+    
+    # Admin only check
+    if not ctx.author.guild_permissions.administrator:
+        return await ctx.send("🚫 Peasant Detected - Activity tracker is for administrators only.")
+    
+    # No arguments - show help
+    if args is None:
+        help_text = """
+📊 **Activity Tracker Commands**
+
+**View Specific Day:**
+`.activity today` - Today's hourly activity
+`.activity yesterday` - Yesterday's activity
+`.activity monday` - Most recent Monday
+`.activity 11/4` - Specific date (MM/DD)
+
+**View Overview:**
+`.activity week` - Last 7 days overview
+`.activity month` - Last 30 days overview
+
+**Examples:**
+`.activity friday` - Last Friday's hourly breakdown
+`.activity 11/21` - Nov 21st hourly breakdown
+`.activity week` - Daily totals for last 7 days
+"""
+        embed = discord.Embed(
+            description=help_text,
+            color=discord.Color.blue()
+        )
+        await ctx.send(embed=embed)
+        return
+    
+    args_lower = args.lower().strip()
+    
+    # Check for overview commands
+    if args_lower == 'month':
+        await activity.send_month_overview(ctx)
+        return
+    
+    if args_lower == 'week':
+        await activity.send_week_overview(ctx)
+        return
+    
+    # Try to parse as date
+    date_str = activity.parse_date_input(args)
+    
+    if date_str:
+        await activity.send_day_activity(ctx, date_str)
+    else:
+        await ctx.send(f"❌ Could not parse date '{args}'. Try: `today`, `monday`, `11/4`, or `.activity` for help.")
+
 
 # ---- cmds  # '''    
 '''
