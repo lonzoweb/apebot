@@ -31,13 +31,13 @@ TAROT_DECK = {
         "name": "The Empress",
         "emojis": "♀️ 🌹 👑 🦢 🦅",
         "attribution": "Venus • Daleth",
-        "description": "Love. Beauty. Happiness. Pleasure. Success. Fruitfulness. Good fortune. Graciousness. Elegance. Gentleness. Influenced: Dissipation. Promiscuity. Idleness. Sensuality."
+        "description": "Love. Beauty. Happiness. Pleasure. Success. Fruitfulness. Good fortune. Graciousness. Elegance. Gentleness. Shadow: Dissipation. Promiscuity. Idleness. Sensuality."
     },
     "04-the-emperor": {
         "name": "The Emperor",
         "emojis": "♈ 🐏 👑 ⚔️ 🦅",
         "attribution": "Aries • Tzaddi",
-        "description": "War. Conquest. Victory. Strife. Power. Stability. Originality. Government. Energy. Ambition. Influenced: Arrogance. Megalomania. Rashness."
+        "description": "War. Conquest. Victory. Strife. Power. Stability. Originality. Government. Energy. Ambition. Shadow: Arrogance. Megalomania. Rashness."
     },
     "05-the-hierophant": {
         "name": "The Hierophant",
@@ -49,13 +49,13 @@ TAROT_DECK = {
         "name": "The Lovers",
         "emojis": "♊ 💑 🗡️ 🥚 🦅",
         "attribution": "Gemini • Zain",
-        "description": "Inspiration. Intuition. Intelligence. Innocence. Attraction. Beauty. Love. Influenced: Self-contradiction. Instability. Indecision. Superficiality. Infatuation."
+        "description": "Inspiration. Intuition. Intelligence. Innocence. Attraction. Beauty. Love. Shadow: Self-contradiction. Instability. Indecision. Superficiality. Infatuation."
     },
     "07-the-chariot": {
         "name": "The Chariot",
         "emojis": "♋ 🏺 🦁 🐂 🌊",
         "attribution": "Cancer • Cheth",
-        "description": "Triumph. Victory. Hope. Obedience. Faithfulness. Health. Success, though sometimes not enduring. Influenced: Abrupt departure from traditional ideas."
+        "description": "Triumph. Victory. Hope. Obedience. Faithfulness. Health. Success, though sometimes not enduring. Shadow: Abrupt departure from traditional ideas."
     },
     "08-adjustment": {
         "name": "Adjustment",
@@ -115,7 +115,7 @@ TAROT_DECK = {
         "name": "The Star",
         "emojis": "♒ ⭐ 🌊 🌊 🌀",
         "attribution": "Aquarius • Heh",
-        "description": "Hope. Unexpected help. Clarity of vision. Spiritual insight. Influenced: Dreaminess. Disappointment."
+        "description": "Hope. Unexpected help. Clarity of vision. Spiritual insight. Shadow: Dreaminess. Disappointment."
     },
     "18-the-moon": {
         "name": "The Moon",
@@ -311,7 +311,7 @@ TAROT_DECK = {
         "name": "Knight of Cups",
         "emojis": "🌊 🔥 🏇 🦚 ♋️",
         "attribution": "Fiery part of Water",
-        "description": "A man with commitment issues. Amiable but passive. Attracted to excitement. Unsustainable enthusiasm. Sensitive but shallow. Influenced: Sensual and idle, untruthful, prone to depression and drug abuse."
+        "description": "A man with commitment issues. Amiable but passive. Attracted to excitement. Unsustainable enthusiasm. Sensitive but shallow. Shadow: Sensual and idle, untruthful, prone to depression and drug abuse."
     },
     
     # SWORDS - Air
@@ -349,7 +349,7 @@ TAROT_DECK = {
         "name": "Six of Swords - Science",
         "emojis": "☿️ ♒ 🗡️ 🌹 ✝️",
         "attribution": "Mercury in Aquarius • Tiphareth",
-        "description": "Directed intelligence. Labor. Work. Success after challenge. Passage from difficulty. Journey by water. Influenced: Self-centeredness. Intellectual conceit."
+        "description": "Directed intelligence. Labor. Work. Success after challenge. Passage from difficulty. Journey by water. Shadow: Self-centeredness. Intellectual conceit."
     },
     "swords-07": {
         "name": "Seven of Swords - Futility",
@@ -367,7 +367,7 @@ TAROT_DECK = {
         "name": "Nine of Swords - Cruelty",
         "emojis": "♂️ ♊ 🗡️ 😭 💀",
         "attribution": "Mars in Gemini • Yesod",
-        "description": "Mental anguish. Despair. Hopelessness. Worry. Suffering. Loss. Illness. Malice. Burden. Oppression. Lying. Shame. Influenced: Obedience. Faithfulness. Patience. Unselfishness."
+        "description": "Mental anguish. Despair. Hopelessness. Worry. Suffering. Loss. Illness. Malice. Burden. Oppression. Lying. Shame. Shadow: Obedience. Faithfulness. Patience. Unselfishness."
     },
     "swords-10": {
         "name": "Ten of Swords - Ruin",
@@ -379,13 +379,13 @@ TAROT_DECK = {
         "name": "Princess of Swords",
         "emojis": "💨 🌍 🗡️ ⚔️ 👸",
         "attribution": "Earthy part of Air",
-        "description": "A young woman, stern and revengeful, with destructive logic, firm and aggressive, skilled in practical affairs. Influenced: Cunning, frivolous, and manipulative."
+        "description": "A young woman, stern and revengeful, with destructive logic, firm and aggressive, skilled in practical affairs. Shadow: Cunning, frivolous, and manipulative."
     },
     "swords-prince": {
         "name": "Prince of Swords",
         "emojis": "💨 💨 🗡️ 🧚 ⚡",
         "attribution": "Airy part of Air",
-        "description": "A young intellectual man, full of ideas and designs, domineering, intensely clever but unstable. Elusive. Impressionable. Influenced: Harsh, malicious, plotting, unreliable, fanatic."
+        "description": "A young intellectual man, full of ideas and designs, domineering, intensely clever but unstable. Elusive. Impressionable. Shadow: Harsh, malicious, plotting, unreliable, fanatic."
     },
     "swords-queen": {
         "name": "Queen of Swords",
@@ -417,55 +417,55 @@ TAROT_DECK = {
         "name": "Three of Disks - Works",
         "emojis": "♂️ ♑ 🔺 ⚙️ 🏗️",
         "attribution": "Mars in Capricorn • Binah",
-        "description": "Business. Commercial transaction. Constructive. Increase of material things. Growth. Commencement of projects. Influenced: Selfish, narrow, unrealistic, greedy."
+        "description": "Business. Commercial transaction. Constructive. Increase of material things. Growth. Commencement of projects. Shadow: Selfish, narrow, unrealistic, greedy."
     },
     "disks-04": {
         "name": "Four of Disks - Power",
         "emojis": "☀️ ♑ 🏰 👑 🛡️",
         "attribution": "Sun in Capricorn • Chesed",
-        "description": "Law and order. Gain of money and influence. Success. Rank. Dominion. Physical skill. Influenced: Prejudice. Envy. Suspicion. Lack of originality."
+        "description": "Law and order. Gain of money and influence. Success. Rank. Dominion. Physical skill. Shadow: Prejudice. Envy. Suspicion. Lack of originality."
     },
     "disks-05": {
         "name": "Five of Disks - Worry",
         "emojis": "☿️ ♉ 💰 😰 ⭐",
         "attribution": "Mercury in Taurus • Geburah",
-        "description": "Intense strain. Inactivity. Financial loss. Professional setbacks. Monetary anxiety. Poverty. Influenced: Labor. Real estate. Business acumen."
+        "description": "Intense strain. Inactivity. Financial loss. Professional setbacks. Monetary anxiety. Poverty. Shadow: Labor. Real estate. Business acumen."
     },
     "disks-06": {
         "name": "Six of Disks - Success",
         "emojis": "🌙 ♉ 💰 ⚖️ ✨",
         "attribution": "Moon in Taurus • Tiphareth",
-        "description": "Material gain. Power. Influence. Philanthropy. Transitory situation. Influenced: Insolence. Conceit with wealth. Excessive spending."
+        "description": "Material gain. Power. Influence. Philanthropy. Transitory situation. Shadow: Insolence. Conceit with wealth. Excessive spending."
     },
     "disks-07": {
         "name": "Seven of Disks - Failure",
         "emojis": "♄ ♉ 🌾 😞 💔",
         "attribution": "Saturn in Taurus • Netzach",
-        "description": "Unfinished work. Unprofitable speculation. Unmet goals. Hopes deceived. Disappointment. Little gain from much effort. Influenced: Delayed growth. Honorable undertakings."
+        "description": "Unfinished work. Unprofitable speculation. Unmet goals. Hopes deceived. Disappointment. Little gain from much effort. Shadow: Delayed growth. Honorable undertakings."
     },
     "disks-08": {
         "name": "Eight of Disks - Prudence",
         "emojis": "☀️ ♍ 🌳 ⚙️ 💰",
         "attribution": "Sun in Virgo • Hod",
-        "description": "Intelligence in material affairs. Agriculture. Building. Skill. Cunning. Industriousness. Influenced: 'Penny wise and pound foolish.' Avarice. Meanness. Failure to see the big picture."
+        "description": "Intelligence in material affairs. Agriculture. Building. Skill. Cunning. Industriousness. Shadow: 'Penny wise and pound foolish.' Avarice. Meanness. Failure to see the big picture."
     },
     "disks-09": {
         "name": "Nine of Disks - Gain",
         "emojis": "♀️ ♍ 💎 🌟 🏆",
         "attribution": "Venus in Virgo • Yesod",
-        "description": "Good fortune. Inheritance. Improved wealth. Influenced: Envy, loss, waste."
+        "description": "Good fortune. Inheritance. Improved wealth. Shadow: Envy, loss, waste."
     },
     "disks-10": {
         "name": "Ten of Disks - Wealth",
         "emojis": "☿️ ♍ 💰 🪙 🏛️",
         "attribution": "Mercury in Virgo • Malkuth",
-        "description": "Prosperity. Creativity. Old age. Influenced: Laziness. Indifference. Dullness of mind."
+        "description": "Prosperity. Creativity. Old age. Shadow: Laziness. Indifference. Dullness of mind."
     },
     "disks-princess": {
         "name": "Princess of Disks",
         "emojis": "🌍 🌍 🐏 💎 🌾",
         "attribution": "Earthy part of Earth",
-        "description": "A young woman, beautiful and strong, pregnant with life. She is generous, kind, diligent, and benevolent. Influenced: Wasteful and at war with her essential dignity."
+        "description": "A young woman, beautiful and strong, pregnant with life. She is generous, kind, diligent, and benevolent. Shadow: Wasteful and at war with her essential dignity."
     },
     "disks-prince": {
         "name": "Prince of Disks",
@@ -477,13 +477,13 @@ TAROT_DECK = {
         "name": "Queen of Disks",
         "emojis": "🌍 🌊 🐐 🌹 👑",
         "attribution": "Watery part of Earth",
-        "description": "An ambitious woman, yet affectionate and kind, charming, timid, practical, quiet and domesticated. Influenced: Dull. Servile. Foolish. Capricious. Moody."
+        "description": "An ambitious woman, yet affectionate and kind, charming, timid, practical, quiet and domesticated. Shadow: Dull. Servile. Foolish. Capricious. Moody."
     },
     "disks-knight": {
         "name": "Knight of Disks",
         "emojis": "🌍 🔥 🏇 🐴 🌾",
         "attribution": "Fiery part of Earth",
-        "description": "A farmer, patient, laborious and clever. Somewhat dull and preoccupied with material things. Influenced: Avaricious, surly, petty, jealous."
+        "description": "A farmer, patient, laborious and clever. Somewhat dull and preoccupied with material things. Shadow: Avaricious, surly, petty, jealous."
     }
 }
 
