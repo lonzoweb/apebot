@@ -1,7 +1,7 @@
-“””
+"""
 Fallen Angel and Demon Hierarchy Module
 Comprehensive database across multiple traditions
-“””
+"""
 
 import random
 import discord
@@ -15,17 +15,17 @@ from config import AUTHORIZED_ROLES
 
 HIERARCHY_DB = {
 # SUPREME RULER
-“lucifer”: {
-“name”: “Lucifer”,
-“alt_names”: [“Satan”, “The Adversary”, “Light-Bearer”, “Morning Star”],
-“rank”: “Supreme Ruler”,
-“domain”: “Pride, Rebellion, Enlightenment”,
-“legions”: “Countless”,
-“tradition”: “Christian, Jewish, Islamic, Occult”,
-“superior”: “None”,
-“subordinates”: “All fallen angels and demons”,
-“symbols”: “Morning star, serpent, dragon, inverted pentagram”,
-“description”: “The most powerful fallen angel, cast from Heaven for pride and rebellion. Name means ‘Light-Bearer’ in Latin. Supreme commander of Hell’s armies across most traditions.”
+"lucifer": {
+"name": "Lucifer",
+"alt_names": ["Satan", "The Adversary", "Light-Bearer", "Morning Star"],
+"rank": "Supreme Ruler",
+"domain": "Pride, Rebellion, Enlightenment",
+"legions": "Countless",
+"tradition": "Christian, Jewish, Islamic, Occult",
+"superior": "None",
+"subordinates": "All fallen angels and demons",
+"symbols": "Morning star, serpent, dragon, inverted pentagram",
+"description": "The most powerful fallen angel, cast from Heaven for pride and rebellion. Name means ‘Light-Bearer’ in Latin. Supreme commander of Hell’s armies across most traditions."
 },
 
 ```
@@ -1049,11 +1049,11 @@ HIERARCHY_DB = {
 # ============================================================
 
 def get_random_entity():
-“”“Get a random entity from the hierarchy”””
+"""Get a random entity from the hierarchy"""
 return random.choice(list(HIERARCHY_DB.keys()))
 
 def search_hierarchy(keyword):
-“”“Search hierarchy by keyword in name, domain, or description”””
+"""Search hierarchy by keyword in name, domain, or description"""
 keyword_lower = keyword.lower()
 results = []
 
@@ -1070,8 +1070,8 @@ return results
 ```
 
 def get_entity_list(page=1, per_page=20):
-“”“Get paginated list of all entities”””
-sorted_keys = sorted(HIERARCHY_DB.keys(), key=lambda k: HIERARCHY_DB[k][“name”])
+"""Get paginated list of all entities"""
+sorted_keys = sorted(HIERARCHY_DB.keys(), key=lambda k: HIERARCHY_DB[k]["name"])
 total = len(sorted_keys)
 total_pages = (total + per_page - 1) // per_page
 
@@ -1086,8 +1086,8 @@ return page_entities, page, total_pages, total
 ```
 
 def get_full_hierarchy_chart():
-“”“Generate ASCII hierarchy chart”””
-chart = “””
+"""Generate ASCII hierarchy chart"""
+chart = """
 ═══════════════════════════════════════════
 HIERARCHY OF THE FALLEN
 ═══════════════════════════════════════════
@@ -1169,7 +1169,7 @@ Knights: Furcas
 Use .hierarchy [name] for detailed info
 Use .hierarchy random for random entity
 Use .hierarchy search [keyword] to find entities
-“””
+"""
 return chart
 
 # ============================================================
@@ -1179,9 +1179,9 @@ return chart
 # ============================================================
 
 async def send_entity_details(ctx, entity_key):
-“”“Send detailed information about a specific entity”””
+"""Send detailed information about a specific entity"""
 if entity_key not in HIERARCHY_DB:
-await ctx.send(f”❌ Entity ‘{entity_key}’ not found.”)
+await ctx.send(f"❌ Entity ‘{entity_key}’ not found.")
 return
 
 ```
@@ -1223,9 +1223,9 @@ await ctx.send(embed=embed)
 ```
 
 async def send_search_results(ctx, results):
-“”“Send search results”””
+"""Send search results"""
 if not results:
-await ctx.send(“❌ No entities found matching your search.”)
+await ctx.send("❌ No entities found matching your search.")
 return
 
 ```
@@ -1249,7 +1249,7 @@ await ctx.send(embed=embed)
 ```
 
 async def send_entity_list(ctx, page=1):
-“”“Send paginated list of all entities”””
+"""Send paginated list of all entities"""
 entities, current_page, total_pages, total = get_entity_list(page)
 
 ```
@@ -1274,7 +1274,7 @@ await ctx.send(embed=embed)
 ```
 
 async def send_hierarchy_chart(ctx):
-“”“Send full hierarchy chart”””
+"""Send full hierarchy chart"""
 chart = get_full_hierarchy_chart()
 
 ```
