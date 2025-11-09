@@ -72,8 +72,8 @@ def setup_tasks(bot):
     # activity cleanup
 
     async def cleanup_activity_task():
-    """Clean up activity data older than 30 days (run daily)"""
-    activity.cleanup_old_activity()
+        """Clean up activity data older than 30 days (run daily)"""
+        activity.cleanup_old_activity()
 
     @daily_quote.before_loop
     async def before_daily_quote():
