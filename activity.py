@@ -18,6 +18,29 @@ from zoneinfo import ZoneInfo
 # ============================================================
 
 
+def convert_hourly_to_timezone(hourly_data, date_str, timezone_name):
+    """Convert hourly activity dict from UTC to user's timezone"""
+    if not timezone_name or timezone_name == "None":
+        return hourly_data  # No conversion
+
+    try:
+        tz = ZoneInfo(timezone_name)
+    except Exception:
+        return hourly_data
+
+    converted = {hour: 0 for hour in range(24)}
+
+    # Create UTC datetime objects for the given date
+    for hour, count in hourly_data.items():
+        utc_dt = datetime.strptime(f"{date_str} {hour}", "%Y-%m-%d %H")
+        utc_dt = utc_dt.replace(tzinfo=ZoneInfo("UTC"))
+
+        local_dt = utc_dt.astimezone(tz)
+        converted[local_dt.hour] += count
+
+    return converted
+
+
 def init_activity_db():
     """Initialize activity tracking tables"""
     with get_db() as conn:
@@ -346,14 +369,25 @@ def format_week_overview(daily_data, ctx):
 
 async def send_day_activity(ctx, date_str):
     """Send activity report for a specific day"""
+    # Get hourly data from DB
     hourly_data = get_day_activity(date_str)
+
+    # Get user's timezone
+    timezone_name, _ = get_user_timezone(ctx.author.id)
+
+    # Convert hourly data to user's timezone
+    hourly_data = convert_hourly_to_timezone(hourly_data, date_str, timezone_name)
+
+    # Get top users
     top_users = get_day_top_users(date_str, limit=5)
 
+    # Format output
     output = format_day_activity(date_str, hourly_data, top_users, ctx)
 
     # Split into chunks if too long
     chunks = [output[i : i + 1900] for i in range(0, len(output), 1900)]
 
+    # Send as embeds
     for chunk in chunks:
         embed = discord.Embed(description=chunk, color=discord.Color.blue())
         await ctx.send(embed=embed)
@@ -361,12 +395,33 @@ async def send_day_activity(ctx, date_str):
 
 async def send_month_overview(ctx):
     """Send monthly overview"""
-    daily_data = get_month_overview(ctx)
+    # Get user's timezone
+    timezone_name, _ = get_user_timezone(ctx.author.id)
+    timezone = (
+        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    )
+    now = datetime.now(timezone) if timezone else datetime.now()
+    start_date = now - timedelta(days=30)
+
+    # Pull raw daily totals
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute(
+            """
+            SELECT date, SUM(message_count) as total
+            FROM activity_hourly
+            WHERE date >= ?
+            GROUP BY date
+            ORDER BY date
+            """,
+            (start_date.strftime("%Y-%m-%d"),),
+        )
+        daily_data = c.fetchall()
+
     output = format_month_overview(daily_data, ctx)
 
     # Split into chunks if needed
     chunks = [output[i : i + 1900] for i in range(0, len(output), 1900)]
-
     for chunk in chunks:
         embed = discord.Embed(description=chunk, color=discord.Color.blue())
         await ctx.send(embed=embed)
@@ -374,11 +429,38 @@ async def send_month_overview(ctx):
 
 async def send_week_overview(ctx):
     """Send weekly overview"""
-    daily_data = get_week_overview(ctx)
+    # Get user's timezone
+    timezone_name, _ = get_user_timezone(ctx.author.id)
+    timezone = (
+        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    )
+    now = datetime.now(timezone) if timezone else datetime.now()
+    start_date = now - timedelta(days=7)
+
+    # Pull raw daily totals
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute(
+            """
+            SELECT date, SUM(message_count) as total
+            FROM activity_hourly
+            WHERE date >= ?
+            GROUP BY date
+            ORDER BY date
+            """,
+            (start_date.strftime("%Y-%m-%d"),),
+        )
+        daily_data = c.fetchall()
+
+    # Adjust each day's hourly data for timezone if you want hourly breakdown
+    # Otherwise, daily totals are fine
     output = format_week_overview(daily_data, ctx)
 
-    embed = discord.Embed(description=output, color=discord.Color.blue())
-    await ctx.send(embed=embed)
+    # Split into chunks if needed
+    chunks = [output[i : i + 1900] for i in range(0, len(output), 1900)]
+    for chunk in chunks:
+        embed = discord.Embed(description=chunk, color=discord.Color.blue())
+        await ctx.send(embed=embed)
 
 
 # ============================================================
