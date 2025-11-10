@@ -4,6 +4,9 @@ Tracks message activity over rolling 30-day period
 """
 
 import discord
+import logging
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta
 from collections import defaultdict
 from database import get_db
@@ -134,11 +137,12 @@ def get_day_top_users(date_str, limit=5):
         return c.fetchall()
 
 
-
 def get_month_overview(ctx):
     """Get daily totals for last 30 days"""
     timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    timezone = (
+        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    )
     now = datetime.now(timezone) if timezone else datetime.now()
     start_date = now - timedelta(days=30)
     with get_db() as conn:
@@ -160,7 +164,9 @@ def get_month_overview(ctx):
 def get_week_overview(ctx):
     """Get daily totals for last 7 days"""
     timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    timezone = (
+        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    )
     now = datetime.now(timezone) if timezone else datetime.now()
     start_date = now - timedelta(days=7)
 
@@ -198,8 +204,10 @@ def format_day_activity(date_str, hourly_data, top_users, ctx):
     """Format daily activity as text"""
     # Get user's timezone
     timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
-    
+    timezone = (
+        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    )
+
     # Parse date
     date_obj = datetime.strptime(date_str, "%Y-%m-%d")
     if timezone:
@@ -234,9 +242,7 @@ def format_day_activity(date_str, hourly_data, top_users, ctx):
 
         time_str = f"{hour_12}:00 {am_pm}"
         peak_marker = " 🔥" if hour == peak_hour and count > 0 else ""
-        lines.append(
-            f"`{time_str}` {bar} {count:>4} msgs{peak_marker}"
-        )
+        lines.append(f"`{time_str}` {bar} {count:>4} msgs{peak_marker}")
 
     lines.append("─" * 40)  # ← Move this OUTSIDE the loop
     lines.append(f"**Total:** {total_messages:,} messages")
@@ -265,7 +271,13 @@ def format_month_overview(daily_data, ctx):
     """Format monthly overview"""
     # Get user's timezone
     timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    timezone = (
+        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    )
+
+    # Get today's date in user's timezone
+    now = datetime.now(timezone) if timezone else datetime.now()
+    today_str = now.strftime("%Y-%m-%d")  # ← ADD THIS
 
     if not daily_data:
         return "📊 **Activity - Last 30 Days**\n\nNo activity data available."
@@ -283,13 +295,10 @@ def format_month_overview(daily_data, ctx):
         date_obj = datetime.strptime(date_str, "%Y-%m-%d")
         if timezone:
             date_obj = date_obj.replace(tzinfo=timezone)
-        logger.info(f"Date object timezone: {date_obj.tzinfo}")
         display_date = date_obj.strftime("%b %d")
         bar = create_bar(count, max_count, 10)
 
-        today_marker = (
-            " (Today)" if date_str == datetime.now().strftime("%Y-%m-%d") else ""
-        )
+        today_marker = " (Today)" if date_str == today_str else ""  # ← FIX THIS
         lines.append(f"`{display_date}` {bar} {count:>4} msgs{today_marker}")
 
     lines.append("─" * 40)
@@ -308,7 +317,13 @@ def format_week_overview(daily_data, ctx):
     """Format weekly overview"""
     # Get user's timezone
     timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    timezone = (
+        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    )
+
+    # Get today's date in user's timezone
+    now = datetime.now(timezone) if timezone else datetime.now()
+    today_str = now.strftime("%Y-%m-%d")  # ← ADD THIS
 
     if not daily_data:
         return "📊 **Activity - Last 7 Days**\n\nNo activity data available."
@@ -325,13 +340,10 @@ def format_week_overview(daily_data, ctx):
         date_obj = datetime.strptime(date_str, "%Y-%m-%d")
         if timezone:
             date_obj = date_obj.replace(tzinfo=timezone)
-        logger.info(f"Date object timezone: {date_obj.tzinfo}")
         day_name = date_obj.strftime("%a, %b %d")
         bar = create_bar(count, max_count, 10)
 
-        today_marker = (
-            " (Today)" if date_str == datetime.now().strftime("%Y-%m-%d") else ""
-        )
+        today_marker = " (Today)" if date_str == today_str else ""  # ← FIX THIS
         lines.append(f"`{day_name}` {bar} {count:>4} msgs{today_marker}")
 
     lines.append("─" * 40)
@@ -393,9 +405,16 @@ async def send_week_overview(ctx):
 # ============================================================
 
 
-def parse_date_input(date_input):
+def parse_date_input(date_input, user_id=None):
     """Parse various date formats to YYYY-MM-DD"""
-    today = datetime.now()
+    # Get user's timezone if provided
+    timezone = None
+    if user_id:
+        timezone_name, _ = get_user_timezone(user_id)
+        if timezone_name and timezone_name != "None":
+            timezone = ZoneInfo(timezone_name)
+
+    today = datetime.now(timezone) if timezone else datetime.now()
 
     # Handle day names (monday, tuesday, etc.)
     day_names = {

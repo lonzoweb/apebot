@@ -934,13 +934,13 @@ async def activity_command(ctx, *, args: str = None):
         if args_lower == "month":
             await activity.send_month_overview(ctx)
             return
-    
+
         if args_lower == "week":
             await activity.send_week_overview(ctx)
             return
 
         # Try to parse as date
-        date_str = activity.parse_date_input(args)
+        date_str = activity.parse_date_input(args, ctx.author.id)
 
         if date_str:
             await activity.send_day_activity(ctx, date_str)
