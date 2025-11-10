@@ -93,11 +93,13 @@ async def on_message(message):
     timezone_name, _ = get_user_timezone(your_user_id)
     logger.info(f"Timezone name: {timezone_name}")
 
+    # Determine timezone of *message sender*
+    timezone_name, _ = get_user_timezone(message.author.id)
+
     activity.log_message_activity(
         timestamp=message.created_at,
         user_id=str(message.author.id),
         username=message.author.display_name,
-        user_timezone=timezone_name,
     )
 
     # Track GIFs from messages

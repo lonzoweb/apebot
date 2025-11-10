@@ -48,34 +48,26 @@ def init_activity_db():
 
 
 def log_message_activity(timestamp, user_id, username, user_timezone=None):
-    """Log a message in the activity tracker"""
-    # Convert to user's timezone if available
-    if user_timezone:
-        try:
-            local_time = timestamp.astimezone(ZoneInfo(user_timezone))
-        except:
-            local_time = timestamp
-    else:
-        local_time = timestamp
+    """Log message activity (always store in UTC)"""
+    # Convert all timestamps to UTC first
+    utc_time = timestamp.astimezone(ZoneInfo("UTC"))
 
-    date_str = local_time.strftime("%Y-%m-%d")
-    hour = local_time.hour
+    date_str = utc_time.strftime("%Y-%m-%d")
+    hour = utc_time.hour
 
     with get_db() as conn:
         c = conn.cursor()
 
-        # Update hourly count
         c.execute(
             """
             INSERT INTO activity_hourly (date, hour, message_count)
             VALUES (?, ?, 1)
-            ON CONFLICT(date, hour) 
+            ON CONFLICT(date, hour)
             DO UPDATE SET message_count = message_count + 1
-        """,
+            """,
             (date_str, hour),
         )
 
-        # Update user count
         c.execute(
             """
             INSERT INTO activity_users (date, user_id, username, message_count)
@@ -83,7 +75,7 @@ def log_message_activity(timestamp, user_id, username, user_timezone=None):
             ON CONFLICT(date, user_id)
             DO UPDATE SET message_count = message_count + 1,
                          username = ?
-        """,
+            """,
             (date_str, user_id, username, username),
         )
 
