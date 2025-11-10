@@ -226,15 +226,25 @@ def create_bar(value, max_value, width=10):
 
 def format_day_activity(date_str, hourly_data, top_users, ctx):
     """Format daily activity as text"""
-    # The hours in hourly_data are already in user's timezone
-    # No need to shift them again
-    day_obj = datetime.strptime(date_str, "%Y-%m-%d")
+    # Get user's timezone
     timezone_name, _ = get_user_timezone(ctx.author.id)
     tz = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
-    if tz:
-        day_obj = day_obj.replace(tzinfo=tz)
 
-    day_name = day_obj.strftime("%A, %B %d")
+    # Convert hourly_data keys from UTC to local
+    if tz:
+        converted_hourly = {h: 0 for h in range(24)}
+        for hour, count in hourly_data.items():
+            utc_dt = datetime.strptime(f"{date_str} {hour}", "%Y-%m-%d %H").replace(
+                tzinfo=ZoneInfo("UTC")
+            )
+            local_hour = utc_dt.astimezone(tz).hour
+            converted_hourly[local_hour] += count
+        hourly_data = converted_hourly
+
+    # Now the rest stays the same
+    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+    day_name = date_obj.strftime("%A, %B %d")
+
     total_messages = sum(hourly_data.values())
     max_hour_count = max(hourly_data.values()) if hourly_data else 0
     peak_hour = (
@@ -246,27 +256,34 @@ def format_day_activity(date_str, hourly_data, top_users, ctx):
     for hour in range(24):
         count = hourly_data[hour]
         bar = create_bar(count, max_hour_count, 10)
-        hour_12 = hour % 12 or 12
+
+        hour_12 = hour % 12
+        if hour_12 == 0:
+            hour_12 = 12
         am_pm = "AM" if hour < 12 else "PM"
-        time_str = f"{hour_12:02d}:00 {am_pm}"
+
         peak_marker = " 🔥" if hour == peak_hour and count > 0 else ""
-        lines.append(f"`{time_str}` {bar} {count:>4} msgs{peak_marker}")
+        lines.append(f"`{hour_12:02d}:00 {am_pm}` {bar} {count:>4} msgs{peak_marker}")
 
     lines.append("─" * 40)
     lines.append(f"**Total:** {total_messages:,} messages")
 
     if total_messages > 0:
-        peak_12 = peak_hour % 12 or 12
+        peak_12 = peak_hour % 12
+        if peak_12 == 0:
+            peak_12 = 12
         peak_am_pm = "AM" if peak_hour < 12 else "PM"
         lines.append(
             f"**Peak Hour:** {peak_12}:00 {peak_am_pm} ({hourly_data[peak_hour]} msgs)"
         )
 
+    # Top users
     if top_users:
-        lines.append("\n👥 **Top Users:**")
+        lines.append("")
+        lines.append("👥 Top Users:")
         for i, (username, count) in enumerate(top_users, 1):
-            pct = (count / total_messages * 100) if total_messages else 0
-            lines.append(f"{i}. {username} - {count} msgs ({pct:.1f}%)")
+            percentage = (count / total_messages * 100) if total_messages > 0 else 0
+            lines.append(f"{i}. {username} - {count} msgs ({percentage:.1f}%)")
 
     return "\n".join(lines)
 
