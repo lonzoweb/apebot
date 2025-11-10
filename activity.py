@@ -283,6 +283,7 @@ def format_month_overview(daily_data, ctx):
         date_obj = datetime.strptime(date_str, "%Y-%m-%d")
         if timezone:
             date_obj = date_obj.replace(tzinfo=timezone)
+        logger.info(f"Date object timezone: {date_obj.tzinfo}")
         display_date = date_obj.strftime("%b %d")
         bar = create_bar(count, max_count, 10)
 
@@ -324,6 +325,7 @@ def format_week_overview(daily_data, ctx):
         date_obj = datetime.strptime(date_str, "%Y-%m-%d")
         if timezone:
             date_obj = date_obj.replace(tzinfo=timezone)
+        logger.info(f"Date object timezone: {date_obj.tzinfo}")
         day_name = date_obj.strftime("%a, %b %d")
         bar = create_bar(count, max_count, 10)
 
