@@ -59,7 +59,7 @@ async def globally_block_channels(ctx):
     if ctx.author.guild_permissions.administrator:
         return True
 
-    # Public channels + private mod channel``
+    # Public channels + private mod channel
     ALLOWED_CHANNELS = [
         CHANNEL_ID,  # Public channel 1
         TEST_CHANNEL_ID,  # Public channel 2
