@@ -231,8 +231,8 @@ def format_day_activity(date_str, hourly_data, top_users, ctx):
             if hour_12 == 0:
                 hour_12 = 12
             am_pm = "AM" if hour < 12 else "PM"
-            
-        time_str = f"{hour_12:2d}:00 {am_pm}"
+
+        time_str = f"{hour_12}:00 {am_pm}"
         peak_marker = " 🔥" if hour == peak_hour and count > 0 else ""
         lines.append(
             f"`{time_str}` {bar} {count:>4} msgs{peak_marker}"
