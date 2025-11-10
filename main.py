@@ -81,16 +81,15 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    """Handle all message events - activity tracking and GIF tracking"""
     if message.author.bot:
         await bot.process_commands(message)
         return
 
-    # Get user's timezone from database
+    # Get user's timezone from DB
     timezone_name, _ = get_user_timezone(message.author.id)
 
     activity.log_message_activity(
-        timestamp=message.created_at,
+        timestamp=message.created_at,  # Discord gives UTC
         user_id=str(message.author.id),
         username=message.author.display_name,
         user_timezone=timezone_name,

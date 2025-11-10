@@ -71,42 +71,41 @@ def init_activity_db():
 
 
 def log_message_activity(timestamp, user_id, username, user_timezone=None):
-    """Log a message in the activity tracker in the user's local timezone"""
-    # Convert timestamp to user's timezone
+    """Log a message in the activity tracker in the user's timezone."""
+    # Convert to user's timezone if available
     if user_timezone:
         try:
-            local_time = timestamp.astimezone(ZoneInfo(user_timezone))
-        except Exception:
-            local_time = timestamp
-    else:
-        local_time = timestamp
+            tz = ZoneInfo(user_timezone)
+            timestamp = timestamp.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
+        except Exception as e:
+            logger.warning(f"Failed to convert timezone for user {user_id}: {e}")
 
-    # Use local date and hour for storage
-    date_str = local_time.strftime("%Y-%m-%d")
-    hour = local_time.hour
+    # Get date and hour in local time
+    date_str = timestamp.strftime("%Y-%m-%d")
+    hour = timestamp.hour
 
     with get_db() as conn:
         c = conn.cursor()
 
-        # Update hourly count
+        # Hourly count
         c.execute(
             """
             INSERT INTO activity_hourly (date, hour, message_count)
             VALUES (?, ?, 1)
-            ON CONFLICT(date, hour) 
+            ON CONFLICT(date, hour)
             DO UPDATE SET message_count = message_count + 1
         """,
             (date_str, hour),
         )
 
-        # Update user count
+        # User count
         c.execute(
             """
             INSERT INTO activity_users (date, user_id, username, message_count)
             VALUES (?, ?, ?, 1)
             ON CONFLICT(date, user_id)
             DO UPDATE SET message_count = message_count + 1,
-                         username = ?
+                          username = ?
         """,
             (date_str, user_id, username, username),
         )
@@ -229,60 +228,37 @@ from datetime import datetime, timedelta
 
 
 def format_day_activity(date_str, hourly_data, top_users, ctx):
-    """Format daily activity as text with proper user timezone."""
-    # Get user's timezone
-    timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = (
-        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
-    )
-
-    # Convert hourly_data keys (UTC) to user's local hours
-    local_hourly = {hour: 0 for hour in range(24)}
-    for utc_hour, count in hourly_data.items():
-        if timezone:
-            # Create a datetime in UTC and shift to local timezone
-            dt_utc = datetime.strptime(date_str, "%Y-%m-%d").replace(
-                hour=utc_hour, tzinfo=ZoneInfo("UTC")
-            )
-            dt_local = dt_utc.astimezone(timezone)
-            local_hour = dt_local.hour
-        else:
-            local_hour = utc_hour
-        local_hourly[local_hour] += count
-
-    total_messages = sum(local_hourly.values())
-    max_hour_count = max(local_hourly.values()) if local_hourly else 0
-    peak_hour = (
-        max(local_hourly.items(), key=lambda x: x[1])[0] if total_messages > 0 else 0
-    )
-
-    # Build output
+    """Format daily activity as text"""
     date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-    if timezone:
-        date_obj = date_obj.replace(tzinfo=timezone)
     day_name = date_obj.strftime("%A, %B %d")
 
+    total_messages = sum(hourly_data.values())
+    max_hour_count = max(hourly_data.values()) if hourly_data else 0
+    peak_hour = max(hourly_data.items(), key=lambda x: x[1])[0] if total_messages else 0
+
     lines = [f"📊 **Activity for {day_name}**", "─" * 40]
+
     for hour in range(24):
-        count = local_hourly[hour]
+        count = hourly_data[hour]
         bar = create_bar(count, max_hour_count, 10)
         hour_12 = hour % 12 or 12
         am_pm = "AM" if hour < 12 else "PM"
-        peak_marker = " 🔥" if hour == peak_hour and count > 0 else ""
+        peak_marker = " 🔥" if hour == peak_hour and count else ""
         lines.append(f"`{hour_12:02d}:00 {am_pm}` {bar} {count:>4} msgs{peak_marker}")
 
     lines.append("─" * 40)
     lines.append(f"**Total:** {total_messages:,} messages")
-
-    if total_messages > 0:
+    if total_messages:
         peak_12 = peak_hour % 12 or 12
         peak_am_pm = "AM" if peak_hour < 12 else "PM"
         lines.append(
-            f"**Peak Hour:** {peak_12}:00 {peak_am_pm} ({local_hourly[peak_hour]} msgs)"
+            f"**Peak Hour:** {peak_12}:00 {peak_am_pm} ({hourly_data[peak_hour]} msgs)"
         )
 
+    # Top users
     if top_users:
-        lines.append("\n👥 **Top Users:**")
+        lines.append("")
+        lines.append("👥 **Top Users:**")
         for i, (username, count) in enumerate(top_users, 1):
             percentage = (count / total_messages * 100) if total_messages else 0
             lines.append(f"{i}. {username} - {count} msgs ({percentage:.1f}%)")
