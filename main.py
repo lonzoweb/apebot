@@ -89,10 +89,9 @@ async def on_message(message):
 
     # Log activity with your timezone
     your_user_id = 154814148054745088
+    logger.info(f"Your user ID: {your_user_id}")
     timezone_name, _ = get_user_timezone(your_user_id)
-
-    # DEBUG: Print this to console
-    print(f"DEBUG: timezone_name = {timezone_name}")  # ← ADD THIS
+    logger.info(f"Timezone name: {timezone_name}")
 
     activity.log_message_activity(
         timestamp=message.created_at,

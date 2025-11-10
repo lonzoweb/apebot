@@ -118,9 +118,11 @@ def get_user_timezone(user_id):
             c.execute("SELECT timezone, city FROM user_timezones WHERE user_id = ?", (str(user_id),))
             row = c.fetchone()
             if row:
+                logger.info(f"Timezone from database: {row[0]}, City: {row[1]}")
                 return row[0], row[1]
     except Exception as e:
         logger.error(f"Error getting user timezone: {e}")
+    logger.info("No timezone found for user")
     return None, None
 
 def set_user_timezone(user_id, timezone_str, city):
