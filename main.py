@@ -1025,10 +1025,57 @@ async def db_check(ctx):
     """Check database status (Admin only)"""
     if not ctx.author.guild_permissions.administrator:
         return await ctx.send("🚫 Peasant Detected")
+    
     exists = os.path.exists(DB_FILE)
     size = os.path.getsize(DB_FILE) if exists else 0
-    await ctx.send(f"🗄️ DB file: {DB_FILE}\nExists: {exists}\nSize: {size} bytes")
+    
+    # Check all tables
+    try:
+        with get_db() as conn:
+            c = conn.cursor()
+            
+            # Count quotes
+            c.execute("SELECT COUNT(*) FROM quotes")
+            quote_count = c.fetchone()[0]
+            
+            # Count activity records
+            c.execute("SELECT COUNT(*) FROM activity_hourly")
+            activity_count = c.fetchone()[0]
+            
+            # Count timezone records
+            c.execute("SELECT COUNT(*) FROM user_timezones")
+            tz_count = c.fetchone()[0]
+            
+            await ctx.send(
+                f"🗄️ **Database Status**\n"
+                f"File: `{DB_FILE}`\n"
+                f"Size: {size:,} bytes\n"
+                f"Quotes: {quote_count}\n"
+                f"Activity Records: {activity_count}\n"
+                f"Timezones: {tz_count}"
+            )
+    except Exception as e:
+        await ctx.send(f"❌ Database error: {e}")
 
+@bot.command(name="dbintegrity")
+async def db_integrity(ctx):
+    """Check database integrity (Admin only)"""
+    if not ctx.author.guild_permissions.administrator:
+        return await ctx.send("🚫 Peasant Detected")
+    
+    try:
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute("PRAGMA integrity_check")
+            result = c.fetchone()[0]
+            
+            if result == "ok":
+                await ctx.send("✅ Database integrity check passed!")
+            else:
+                await ctx.send(f"⚠️ Database integrity issues: {result}")
+    except Exception as e:
+        await ctx.send(f"❌ Error checking integrity: {e}")
+        
 @bot.command(name="showquotes")
 async def show_quotes(ctx):
     """Show sample quotes (Admin only)"""
