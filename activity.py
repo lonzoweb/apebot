@@ -225,31 +225,43 @@ def create_bar(value, max_value, width=10):
 
 
 def format_day_activity(date_str, hourly_data, top_users, ctx):
-    """Format daily activity as text"""
-    # Get user's timezone (not needed for hour conversion here)
+    """Format daily activity as text in user's timezone"""
+    # Get user's timezone
     timezone_name, _ = get_user_timezone(ctx.author.id)
-    tz = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
-
-    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-    day_name = date_obj.strftime("%A, %B %d")
-
-    total_messages = sum(hourly_data.values())
-    max_hour_count = max(hourly_data.values()) if hourly_data else 0
-    peak_hour = (
-        max(hourly_data.items(), key=lambda x: x[1])[0] if total_messages > 0 else 0
+    timezone = (
+        ZoneInfo(timezone_name)
+        if timezone_name and timezone_name != "None"
+        else ZoneInfo("UTC")
     )
 
+    # Create 24-hour dict shifted to user timezone
+    shifted_hours = {h: 0 for h in range(24)}
+    for utc_hour, count in hourly_data.items():
+        # Convert UTC hour to user local hour
+        utc_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(
+            hour=utc_hour, tzinfo=ZoneInfo("UTC")
+        )
+        local_dt = utc_dt.astimezone(timezone)
+        shifted_hours[local_dt.hour] += count
+
+    # Stats
+    total_messages = sum(shifted_hours.values())
+    max_hour_count = max(shifted_hours.values()) if total_messages else 0
+    peak_hour = (
+        max(shifted_hours.items(), key=lambda x: x[1])[0] if total_messages else 0
+    )
+
+    # Format header
+    date_obj = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone)
+    day_name = date_obj.strftime("%A, %B %d")
     lines = [f"📊 **Activity for {day_name}**", "─" * 40]
 
+    # Hourly chart
     for hour in range(24):
-        count = hourly_data[hour]
+        count = shifted_hours[hour]
         bar = create_bar(count, max_hour_count, 10)
-
-        hour_12 = hour % 12
-        if hour_12 == 0:
-            hour_12 = 12
+        hour_12 = hour % 12 or 12
         am_pm = "AM" if hour < 12 else "PM"
-
         peak_marker = " 🔥" if hour == peak_hour and count > 0 else ""
         lines.append(f"`{hour_12:02d}:00 {am_pm}` {bar} {count:>4} msgs{peak_marker}")
 
@@ -257,102 +269,50 @@ def format_day_activity(date_str, hourly_data, top_users, ctx):
     lines.append(f"**Total:** {total_messages:,} messages")
 
     if total_messages > 0:
-        peak_12 = peak_hour % 12
-        if peak_12 == 0:
-            peak_12 = 12
+        peak_12 = peak_hour % 12 or 12
         peak_am_pm = "AM" if peak_hour < 12 else "PM"
         lines.append(
-            f"**Peak Hour:** {peak_12}:00 {peak_am_pm} ({hourly_data[peak_hour]} msgs)"
+            f"**Peak Hour:** {peak_12}:00 {peak_am_pm} ({shifted_hours[peak_hour]} msgs)"
         )
 
     # Top users
     if top_users:
         lines.append("")
-        lines.append("👥 Top Users:")
+        lines.append("👥 **Top Users:**")
         for i, (username, count) in enumerate(top_users, 1):
-            percentage = (count / total_messages * 100) if total_messages > 0 else 0
+            percentage = (count / total_messages * 100) if total_messages else 0
             lines.append(f"{i}. {username} - {count} msgs ({percentage:.1f}%)")
 
     return "\n".join(lines)
 
 
-def format_month_overview(daily_data, ctx):
-    """Format monthly overview"""
-    # Get user's timezone
-    timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = (
-        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
-    )
-
-    # Get today's date in user's timezone
-    now = datetime.now(timezone) if timezone else datetime.now()
-    today_str = now.strftime("%Y-%m-%d")  # ← ADD THIS
-
-    if not daily_data:
-        return "📊 **Activity - Last 30 Days**\n\nNo activity data available."
-
-    # Calculate stats
-    total_messages = sum(count for _, count in daily_data)
-    avg_per_day = total_messages / len(daily_data) if daily_data else 0
-    max_day = max(daily_data, key=lambda x: x[1]) if daily_data else (None, 0)
-    max_count = max_day[1] if max_day else 0
-
-    lines = ["📊 **Activity - Last 30 Days**", "─" * 40]
-
-    # Daily breakdown (show last 30 days)
-    for date_str, count in daily_data:
-        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-        if timezone:
-            date_obj = date_obj.replace(tzinfo=timezone)
-        display_date = date_obj.strftime("%b %d")
-        bar = create_bar(count, max_count, 10)
-
-        today_marker = " (Today)" if date_str == today_str else ""  # ← FIX THIS
-        lines.append(f"`{display_date}` {bar} {count:>4} msgs{today_marker}")
-
-    lines.append("─" * 40)
-    lines.append(f"**Total:** {total_messages:,} messages")
-    lines.append(f"**Avg/Day:** {avg_per_day:.0f} msgs")
-
-    if max_day[0]:
-        max_date_obj = datetime.strptime(max_day[0], "%Y-%m-%d")
-        max_date_display = max_date_obj.strftime("%b %d")
-        lines.append(f"**Most Active:** {max_date_display} ({max_day[1]:,} msgs)")
-
-    return "\n".join(lines)
-
-
 def format_week_overview(daily_data, ctx):
-    """Format weekly overview"""
-    # Get user's timezone
+    """Format weekly overview in user's timezone"""
     timezone_name, _ = get_user_timezone(ctx.author.id)
     timezone = (
-        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+        ZoneInfo(timezone_name)
+        if timezone_name and timezone_name != "None"
+        else ZoneInfo("UTC")
     )
 
-    # Get today's date in user's timezone
-    now = datetime.now(timezone) if timezone else datetime.now()
-    today_str = now.strftime("%Y-%m-%d")  # ← ADD THIS
+    now = datetime.now(timezone)
+    today_str = now.strftime("%Y-%m-%d")
 
     if not daily_data:
         return "📊 **Activity - Last 7 Days**\n\nNo activity data available."
 
-    # Calculate stats
     total_messages = sum(count for _, count in daily_data)
-    avg_per_day = total_messages / len(daily_data) if daily_data else 0
+    avg_per_day = total_messages / len(daily_data)
     max_day = max(daily_data, key=lambda x: x[1]) if daily_data else (None, 0)
     max_count = max_day[1] if max_day else 0
 
     lines = ["📊 **Activity - Last 7 Days**", "─" * 40]
 
     for date_str, count in daily_data:
-        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-        if timezone:
-            date_obj = date_obj.replace(tzinfo=timezone)
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone)
         day_name = date_obj.strftime("%a, %b %d")
         bar = create_bar(count, max_count, 10)
-
-        today_marker = " (Today)" if date_str == today_str else ""  # ← FIX THIS
+        today_marker = " (Today)" if date_str == today_str else ""
         lines.append(f"`{day_name}` {bar} {count:>4} msgs{today_marker}")
 
     lines.append("─" * 40)
@@ -360,8 +320,53 @@ def format_week_overview(daily_data, ctx):
     lines.append(f"**Avg/Day:** {avg_per_day:.0f} msgs")
 
     if max_day[0]:
-        max_date_obj = datetime.strptime(max_day[0], "%Y-%m-%d")
+        max_date_obj = datetime.strptime(max_day[0], "%Y-%m-%d").replace(
+            tzinfo=timezone
+        )
         max_date_display = max_date_obj.strftime("%a, %b %d")
+        lines.append(f"**Most Active:** {max_date_display} ({max_day[1]:,} msgs)")
+
+    return "\n".join(lines)
+
+
+def format_month_overview(daily_data, ctx):
+    """Format monthly overview in user's timezone"""
+    timezone_name, _ = get_user_timezone(ctx.author.id)
+    timezone = (
+        ZoneInfo(timezone_name)
+        if timezone_name and timezone_name != "None"
+        else ZoneInfo("UTC")
+    )
+
+    now = datetime.now(timezone)
+    today_str = now.strftime("%Y-%m-%d")
+
+    if not daily_data:
+        return "📊 **Activity - Last 30 Days**\n\nNo activity data available."
+
+    total_messages = sum(count for _, count in daily_data)
+    avg_per_day = total_messages / len(daily_data)
+    max_day = max(daily_data, key=lambda x: x[1]) if daily_data else (None, 0)
+    max_count = max_day[1] if max_day else 0
+
+    lines = ["📊 **Activity - Last 30 Days**", "─" * 40]
+
+    for date_str, count in daily_data:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone)
+        display_date = date_obj.strftime("%b %d")
+        bar = create_bar(count, max_count, 10)
+        today_marker = " (Today)" if date_str == today_str else ""
+        lines.append(f"`{display_date}` {bar} {count:>4} msgs{today_marker}")
+
+    lines.append("─" * 40)
+    lines.append(f"**Total:** {total_messages:,} messages")
+    lines.append(f"**Avg/Day:** {avg_per_day:.0f} msgs")
+
+    if max_day[0]:
+        max_date_obj = datetime.strptime(max_day[0], "%Y-%m-%d").replace(
+            tzinfo=timezone
+        )
+        max_date_display = max_date_obj.strftime("%b %d")
         lines.append(f"**Most Active:** {max_date_display} ({max_day[1]:,} msgs)")
 
     return "\n".join(lines)
