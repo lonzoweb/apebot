@@ -200,6 +200,19 @@ def format_day_activity(date_str, hourly_data, top_users, ctx):
         ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
     )
 
+    # Convert hourly_data keys to user timezone
+    if timezone:
+        converted_hourly_data = {h: 0 for h in range(24)}
+        for utc_hour, count in hourly_data.items():
+            # Create a UTC datetime for that hour on this date
+            dt_utc = datetime.strptime(date_str, "%Y-%m-%d").replace(
+                hour=utc_hour, tzinfo=ZoneInfo("UTC")
+            )
+            # Convert to user timezone
+            dt_local = dt_utc.astimezone(timezone)
+            converted_hourly_data[dt_local.hour] += count
+        hourly_data = converted_hourly_data
+
     # Parse date
     date_obj = datetime.strptime(date_str, "%Y-%m-%d")
     if timezone:
