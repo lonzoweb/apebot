@@ -7,6 +7,8 @@ import discord
 from datetime import datetime, timedelta
 from collections import defaultdict
 from database import get_db
+from database import get_user_timezone
+from zoneinfo import ZoneInfo
 
 # ============================================================
 # DATABASE FUNCTIONS
@@ -36,10 +38,19 @@ def init_activity_db():
             )
         """)
 
-def log_message_activity(timestamp, user_id, username):
+def log_message_activity(timestamp, user_id, username, user_timezone=None):
     """Log a message in the activity tracker"""
-    date_str = timestamp.strftime('%Y-%m-%d')
-    hour = timestamp.hour
+    # Convert to user's timezone if available
+    if user_timezone:
+        try:
+            local_time = timestamp.astimezone(ZoneInfo(user_timezone))
+        except:
+            local_time = timestamp
+    else:
+        local_time = timestamp
+    
+    date_str = local_time.strftime('%Y-%m-%d')
+    hour = local_time.hour
     
     with get_db() as conn:
         c = conn.cursor()
@@ -166,15 +177,22 @@ def format_day_activity(date_str, hourly_data, top_users):
     for hour in range(24):
         count = hourly_data[hour]
         bar = create_bar(count, max_hour_count, 10)
-        time_str = f"{hour:02d}:00"
-        peak_marker = " 🔥" if hour == peak_hour and count > 0 else ""
-        lines.append(f"`{time_str}` {bar} {count:>4} msgs{peak_marker}")
+        # Convert to 12-hour format
+        hour_12 = hour % 12
+        if hour_12 == 0:
+            hour_12 = 12
+        am_pm = "AM" if hour < 12 else "PM"
+        time_str = f"{hour_12:2d}:00 {am_pm}"
     
     lines.append("─" * 40)
     lines.append(f"**Total:** {total_messages:,} messages")
     
     if total_messages > 0:
-        lines.append(f"**Peak Hour:** {peak_hour:02d}:00 ({hourly_data[peak_hour]} msgs)")
+        peak_12 = peak_hour % 12
+        if peak_12 == 0:
+            peak_12 = 12
+        peak_am_pm = "AM" if peak_hour < 12 else "PM"
+        lines.append(f"**Peak Hour:** {peak_12}:00 {peak_am_pm} ({hourly_data[peak_hour]} msgs)")
     
     # Top users
     if top_users:
