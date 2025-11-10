@@ -134,10 +134,13 @@ def get_day_top_users(date_str, limit=5):
         return c.fetchall()
 
 
-def get_month_overview():
-    """Get daily totals for last 30 days"""
-    start_date = datetime.now() - timedelta(days=30)
 
+def get_month_overview(ctx):
+    """Get daily totals for last 30 days"""
+    timezone_name, _ = get_user_timezone(ctx.author.id)
+    timezone = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    now = datetime.now(timezone) if timezone else datetime.now()
+    start_date = now - timedelta(days=30)
     with get_db() as conn:
         c = conn.cursor()
         c.execute(
@@ -154,9 +157,12 @@ def get_month_overview():
         return c.fetchall()
 
 
-def get_week_overview():
+def get_week_overview(ctx):
     """Get daily totals for last 7 days"""
-    start_date = datetime.now() - timedelta(days=7)
+    timezone_name, _ = get_user_timezone(ctx.author.id)
+    timezone = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    now = datetime.now(timezone) if timezone else datetime.now()
+    start_date = now - timedelta(days=7)
 
     with get_db() as conn:
         c = conn.cursor()
@@ -193,7 +199,7 @@ def format_day_activity(date_str, hourly_data, top_users, ctx):
     # Get user's timezone
     timezone_name, _ = get_user_timezone(ctx.author.id)
     timezone = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
-
+    
     # Parse date
     date_obj = datetime.strptime(date_str, "%Y-%m-%d")
     if timezone:
@@ -255,8 +261,12 @@ def format_day_activity(date_str, hourly_data, top_users, ctx):
     return "\n".join(lines)
 
 
-def format_month_overview(daily_data):
+def format_month_overview(daily_data, ctx):
     """Format monthly overview"""
+    # Get user's timezone
+    timezone_name, _ = get_user_timezone(ctx.author.id)
+    timezone = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+
     if not daily_data:
         return "📊 **Activity - Last 30 Days**\n\nNo activity data available."
 
@@ -293,8 +303,12 @@ def format_month_overview(daily_data):
     return "\n".join(lines)
 
 
-def format_week_overview(daily_data):
+def format_week_overview(daily_data, ctx):
     """Format weekly overview"""
+    # Get user's timezone
+    timezone_name, _ = get_user_timezone(ctx.author.id)
+    timezone = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+
     if not daily_data:
         return "📊 **Activity - Last 7 Days**\n\nNo activity data available."
 
@@ -352,8 +366,8 @@ async def send_day_activity(ctx, date_str):
 
 async def send_month_overview(ctx):
     """Send monthly overview"""
-    daily_data = get_month_overview()
-    output = format_month_overview(daily_data)
+    daily_data = get_month_overview(ctx)
+    output = format_month_overview(daily_data, ctx)
 
     # Split into chunks if needed
     chunks = [output[i : i + 1900] for i in range(0, len(output), 1900)]
@@ -365,8 +379,8 @@ async def send_month_overview(ctx):
 
 async def send_week_overview(ctx):
     """Send weekly overview"""
-    daily_data = get_week_overview()
-    output = format_week_overview(daily_data)
+    daily_data = get_week_overview(ctx)
+    output = format_week_overview(daily_data, ctx)
 
     embed = discord.Embed(description=output, color=discord.Color.blue())
     await ctx.send(embed=embed)
