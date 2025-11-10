@@ -48,26 +48,35 @@ def init_activity_db():
 
 
 def log_message_activity(timestamp, user_id, username, user_timezone=None):
-    """Log message activity (always store in UTC)"""
-    # Convert all timestamps to UTC first
-    utc_time = timestamp.astimezone(ZoneInfo("UTC"))
+    """Log a message in the activity tracker in the user's local timezone"""
+    # Convert timestamp to user's timezone
+    if user_timezone:
+        try:
+            local_time = timestamp.astimezone(ZoneInfo(user_timezone))
+        except Exception:
+            local_time = timestamp
+    else:
+        local_time = timestamp
 
-    date_str = utc_time.strftime("%Y-%m-%d")
-    hour = utc_time.hour
+    # Use local date and hour for storage
+    date_str = local_time.strftime("%Y-%m-%d")
+    hour = local_time.hour
 
     with get_db() as conn:
         c = conn.cursor()
 
+        # Update hourly count
         c.execute(
             """
             INSERT INTO activity_hourly (date, hour, message_count)
             VALUES (?, ?, 1)
-            ON CONFLICT(date, hour)
+            ON CONFLICT(date, hour) 
             DO UPDATE SET message_count = message_count + 1
-            """,
+        """,
             (date_str, hour),
         )
 
+        # Update user count
         c.execute(
             """
             INSERT INTO activity_users (date, user_id, username, message_count)
@@ -75,7 +84,7 @@ def log_message_activity(timestamp, user_id, username, user_timezone=None):
             ON CONFLICT(date, user_id)
             DO UPDATE SET message_count = message_count + 1,
                          username = ?
-            """,
+        """,
             (date_str, user_id, username, username),
         )
 
@@ -194,52 +203,28 @@ def create_bar(value, max_value, width=10):
 
 def format_day_activity(date_str, hourly_data, top_users, ctx):
     """Format daily activity as text"""
-    # Get user's timezone
+    # The hours in hourly_data are already in user's timezone
+    # No need to shift them again
+    day_obj = datetime.strptime(date_str, "%Y-%m-%d")
     timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = (
-        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
-    )
+    tz = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    if tz:
+        day_obj = day_obj.replace(tzinfo=tz)
 
-    # Convert hourly_data keys to user timezone
-    if timezone:
-        converted_hourly_data = {h: 0 for h in range(24)}
-        for utc_hour, count in hourly_data.items():
-            # Create a UTC datetime for that hour on this date
-            dt_utc = datetime.strptime(date_str, "%Y-%m-%d").replace(
-                hour=utc_hour, tzinfo=ZoneInfo("UTC")
-            )
-            # Convert to user timezone
-            dt_local = dt_utc.astimezone(timezone)
-            converted_hourly_data[dt_local.hour] += count
-        hourly_data = converted_hourly_data
-
-    # Parse date
-    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-    if timezone:
-        date_obj = date_obj.replace(tzinfo=timezone)
-    day_name = date_obj.strftime("%A, %B %d")
-
-    # Calculate stats
+    day_name = day_obj.strftime("%A, %B %d")
     total_messages = sum(hourly_data.values())
     max_hour_count = max(hourly_data.values()) if hourly_data else 0
     peak_hour = (
         max(hourly_data.items(), key=lambda x: x[1])[0] if total_messages > 0 else 0
     )
 
-    # Build output
     lines = [f"📊 **Activity for {day_name}**", "─" * 40]
 
-    # Hourly breakdown - DISPLAY hours are already in user's timezone from logging
     for hour in range(24):
         count = hourly_data[hour]
         bar = create_bar(count, max_hour_count, 10)
-
-        # Convert 24-hour to 12-hour format
-        hour_12 = hour % 12
-        if hour_12 == 0:
-            hour_12 = 12
+        hour_12 = hour % 12 or 12
         am_pm = "AM" if hour < 12 else "PM"
-
         time_str = f"{hour_12:02d}:00 {am_pm}"
         peak_marker = " 🔥" if hour == peak_hour and count > 0 else ""
         lines.append(f"`{time_str}` {bar} {count:>4} msgs{peak_marker}")
@@ -248,21 +233,17 @@ def format_day_activity(date_str, hourly_data, top_users, ctx):
     lines.append(f"**Total:** {total_messages:,} messages")
 
     if total_messages > 0:
-        peak_12 = peak_hour % 12
-        if peak_12 == 0:
-            peak_12 = 12
+        peak_12 = peak_hour % 12 or 12
         peak_am_pm = "AM" if peak_hour < 12 else "PM"
         lines.append(
             f"**Peak Hour:** {peak_12}:00 {peak_am_pm} ({hourly_data[peak_hour]} msgs)"
         )
 
-    # Top users
     if top_users:
-        lines.append("")
-        lines.append("👥 **Top Users:**")
+        lines.append("\n👥 **Top Users:**")
         for i, (username, count) in enumerate(top_users, 1):
-            percentage = (count / total_messages * 100) if total_messages > 0 else 0
-            lines.append(f"{i}. {username} - {count} msgs ({percentage:.1f}%)")
+            pct = (count / total_messages * 100) if total_messages else 0
+            lines.append(f"{i}. {username} - {count} msgs ({pct:.1f}%)")
 
     return "\n".join(lines)
 
@@ -403,6 +384,57 @@ async def send_week_overview(ctx):
 # ============================================================
 # HELPER FUNCTIONS
 # ============================================================
+
+
+def get_user_local_date(user_id, date_input=None):
+    """Return the date string (YYYY-MM-DD) in the user's timezone"""
+    timezone_name, _ = get_user_timezone(user_id)
+    tz = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
+    now = datetime.now(tz) if tz else datetime.now()
+
+    if not date_input or date_input.lower() in ["today", "now"]:
+        local_date = now
+    elif date_input.lower() in ["yesterday", "yday"]:
+        local_date = now - timedelta(days=1)
+    else:
+        # Check for day names
+        day_names = {
+            "monday": 0,
+            "mon": 0,
+            "tuesday": 1,
+            "tue": 1,
+            "tues": 1,
+            "wednesday": 2,
+            "wed": 2,
+            "thursday": 3,
+            "thu": 3,
+            "thur": 3,
+            "thurs": 3,
+            "friday": 4,
+            "fri": 4,
+            "saturday": 5,
+            "sat": 5,
+            "sunday": 6,
+            "sun": 6,
+        }
+        lower = date_input.lower().strip()
+        if lower in day_names:
+            target_weekday = day_names[lower]
+            current_weekday = now.weekday()
+            days_back = (current_weekday - target_weekday) % 7
+            local_date = now - timedelta(days=days_back)
+        else:
+            # MM/DD or YYYY-MM-DD
+            try:
+                if "/" in date_input:
+                    m, d = map(int, date_input.split("/"))
+                    local_date = datetime(now.year, m, d)
+                else:
+                    local_date = datetime.strptime(date_input, "%Y-%m-%d")
+            except Exception:
+                local_date = now
+
+    return local_date.strftime("%Y-%m-%d")
 
 
 def parse_date_input(date_input, user_id=None):

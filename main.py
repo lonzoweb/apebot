@@ -82,27 +82,21 @@ async def on_ready():
 @bot.event
 async def on_message(message):
     """Handle all message events - activity tracking and GIF tracking"""
-    # Don't track bot messages
     if message.author.bot:
         await bot.process_commands(message)
         return
 
-    # Log activity with your timezone
-    your_user_id = 154814148054745088
-    logger.info(f"Your user ID: {your_user_id}")
-    timezone_name, _ = get_user_timezone(your_user_id)
-    logger.info(f"Timezone name: {timezone_name}")
-
-    # Determine timezone of *message sender*
+    # Get user's timezone from database
     timezone_name, _ = get_user_timezone(message.author.id)
 
     activity.log_message_activity(
         timestamp=message.created_at,
         user_id=str(message.author.id),
         username=message.author.display_name,
+        user_timezone=timezone_name,
     )
 
-    # Track GIFs from messages
+    # GIF tracking
     gif_url = extract_gif_url(message)
     if gif_url:
         try:
@@ -110,7 +104,6 @@ async def on_message(message):
         except Exception as e:
             logger.error(f"Error tracking GIF: {e}")
 
-    # Process commands (must be at the end!)
     await bot.process_commands(message)
 
 
