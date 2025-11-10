@@ -226,22 +226,10 @@ def create_bar(value, max_value, width=10):
 
 def format_day_activity(date_str, hourly_data, top_users, ctx):
     """Format daily activity as text"""
-    # Get user's timezone
+    # Get user's timezone (not needed for hour conversion here)
     timezone_name, _ = get_user_timezone(ctx.author.id)
     tz = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
 
-    # Convert hourly_data keys from UTC to local
-    if tz:
-        converted_hourly = {h: 0 for h in range(24)}
-        for hour, count in hourly_data.items():
-            utc_dt = datetime.strptime(f"{date_str} {hour}", "%Y-%m-%d %H").replace(
-                tzinfo=ZoneInfo("UTC")
-            )
-            local_hour = utc_dt.astimezone(tz).hour
-            converted_hourly[local_hour] += count
-        hourly_data = converted_hourly
-
-    # Now the rest stays the same
     date_obj = datetime.strptime(date_str, "%Y-%m-%d")
     day_name = date_obj.strftime("%A, %B %d")
 
