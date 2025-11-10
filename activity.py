@@ -195,7 +195,9 @@ def format_day_activity(date_str, hourly_data, top_users):
     timezone = ZoneInfo(timezone_name) if timezone_name else None
 
     # Parse date
-    date_obj = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone)
+    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+    if timezone:
+        date_obj = date_obj.replace(tzinfo=timezone)
     day_name = date_obj.strftime("%A, %B %d")
 
     # Calculate stats
@@ -214,7 +216,8 @@ def format_day_activity(date_str, hourly_data, top_users):
         bar = create_bar(count, max_hour_count, 10)
         # Convert to 12-hour format in user's timezone
         if timezone:
-            dt_hour = datetime(date_obj.year, date_obj.month, date_obj.day, hour, tzinfo=timezone)
+            dt_hour = datetime(date_obj.year, date_obj.month, date_obj.day, hour)
+            dt_hour = timezone.localize(dt_hour)
             hour_12 = dt_hour.strftime("%I")
             am_pm = dt_hour.strftime("%p")
         else:

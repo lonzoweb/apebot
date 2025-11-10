@@ -897,16 +897,16 @@ async def hierarchy_command(ctx, *, args: str = None):
 @bot.command(name="activity")
 async def activity_command(ctx, *, args: str = None):
     """View server activity statistics (Admin only)"""
+    try:
+        # Admin only check
+        if not ctx.author.guild_permissions.administrator:
+            return await ctx.send(
+                "🚫 Peasant Detected - Activity tracker is for administrators only."
+            )
 
-    # Admin only check
-    if not ctx.author.guild_permissions.administrator:
-        return await ctx.send(
-            "🚫 Peasant Detected - Activity tracker is for administrators only."
-        )
-
-    # No arguments - show help
-    if args is None:
-        help_text = """
+        # No arguments - show help
+        if args is None:
+            help_text = """
 📊 **Activity Tracker Commands**
 
 **View Specific Day:**
@@ -924,30 +924,33 @@ async def activity_command(ctx, *, args: str = None):
 `.activity 11/21` - Nov 21st hourly breakdown
 `.activity week` - Daily totals for last 7 days
 """
-        embed = discord.Embed(description=help_text, color=discord.Color.blue())
-        await ctx.send(embed=embed)
-        return
+            embed = discord.Embed(description=help_text, color=discord.Color.blue())
+            await ctx.send(embed=embed)
+            return
 
-    args_lower = args.lower().strip()
+        args_lower = args.lower().strip()
 
-    # Check for overview commands
-    if args_lower == "month":
-        await activity.send_month_overview(ctx)
-        return
+        # Check for overview commands
+        if args_lower == "month":
+            await activity.send_month_overview(ctx)
+            return
 
-    if args_lower == "week":
-        await activity.send_week_overview(ctx)
-        return
+        if args_lower == "week":
+            await activity.send_week_overview(ctx)
+            return
 
-    # Try to parse as date
-    date_str = activity.parse_date_input(args)
+        # Try to parse as date
+        date_str = activity.parse_date_input(args)
 
-    if date_str:
-        await activity.send_day_activity(ctx, date_str)
-    else:
-        await ctx.send(
-            f"❌ Could not parse date '{args}'. Try: `today`, `monday`, `11/4`, or `.activity` for help."
-        )
+        if date_str:
+            await activity.send_day_activity(ctx, date_str)
+        else:
+            await ctx.send(
+                f"❌ Could not parse date '{args}'. Try: `today`, `monday`, `11/4`, or `.activity` for help."
+            )
+    except Exception as e:
+        logger.error(f"Error in activity command: {e}", exc_info=True)
+        await ctx.send(f"❌ An error occurred: {type(e).__name__}")
 
 
 # ---- cmds  # '''
