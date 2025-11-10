@@ -72,9 +72,16 @@ def load_quotes_from_db():
 
 def add_quote_to_db(quote):
     """Add a new quote to database"""
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute("INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (quote,))
+    try:
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute("INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (quote,))
+            # Check if it was actually inserted
+            if c.rowcount == 0:
+                logger.warning(f"Quote already exists (skipped): {quote[:50]}...")
+    except Exception as e:
+        logger.error(f"Error adding quote: {e}")
+        raise
 
 def update_quote_in_db(old_quote, new_quote):
     """Update an existing quote"""
