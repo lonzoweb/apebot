@@ -52,6 +52,22 @@ bot_start_time = datetime.now()
 # BOT EVENTS
 # ============================================================
 
+@bot.check
+async def globally_block_channels(ctx):
+    """Block all commands except in allowed channels"""
+    # Admins can use commands anywhere
+    if ctx.author.guild_permissions.administrator:
+        return True
+    
+    # Public channels + private mod channel
+    ALLOWED_CHANNELS = [
+        CHANNEL_ID,           # Public channel 1
+        TEST_CHANNEL_ID,      # Public channel 2
+        MOD_CHANNEL_ID        # Private mod channel
+    ]
+    
+    return ctx.channel.id in ALLOWED_CHANNELS
+    
 @bot.event
 async def on_ready():
     """Bot startup event"""
