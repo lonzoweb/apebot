@@ -471,7 +471,7 @@ TAROT_DECK = {
         "name": "Prince of Disks",
         "emojis": "🌍 💨 🐂 🌾 ⚙️",
         "attribution": "Airy part of Earth",
-        "description": "An energetic young man. A capable manager and steadfast worker, competent, perhaps dull, somewhat skeptical of spirituality, slow to anger but implacable if aroused."
+        "description": "Energetic. A capable manager and steadfast worker, competent, perhaps dull, somewhat skeptical of spirituality, slow to anger but implacable if aroused."
     },
     "disks-queen": {
         "name": "Queen of Disks",
