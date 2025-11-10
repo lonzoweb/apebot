@@ -207,7 +207,7 @@ TAROT_DECK = {
         "name": "Princess of Wands",
         "emojis": "🔥 🌍 ☀️ 💃 ⚡",
         "attribution": "Earthy part of Fire",
-        "description": "An energetic young woman, individualistic, brilliant and daring, expressive in love or anger, enthusiastic. Shadow: Superficial, theatrical, shallow, cruel, unreliable, faithless."
+        "description": "Energetic, individualistic, brilliant and daring, expressive in love or anger, enthusiastic. Shadow: Superficial, theatrical, shallow, cruel, unreliable, faithless."
     },
     "wands-prince": {
         "name": "Prince of Wands",
@@ -219,13 +219,13 @@ TAROT_DECK = {
         "name": "Queen of Wands",
         "emojis": "🔥 🌊 👑 🐆 🔥",
         "attribution": "Watery part of Fire",
-        "description": "A woman of adaptability, persistent energy, calm authority, powers of attraction, generous but intolerant. Shadow: Obstinacy, revenge, dominance."
+        "description": "Adaptability, persistent energy, calm authority, powers of attraction, generous but intolerant. Shadow: Obstinacy, revenge, dominance."
     },
     "wands-knight": {
         "name": "Knight of Wands",
         "emojis": "🔥 🔥 🏇 ⚡ 👑",
         "attribution": "Fiery part of Fire",
-        "description": "A man of activity, generosity, pride and swiftness. Shadow: Cruelty, bigotry, petulance."
+        "description": "Activity, generosity, pride and swiftness. Shadow: Cruelty, bigotry, petulance."
     },
     
     # CUPS - Water
@@ -293,13 +293,13 @@ TAROT_DECK = {
         "name": "Princess of Cups",
         "emojis": "🌊 🌍 🦢 🐢 🐬",
         "attribution": "Earthy part of Water",
-        "description": "A young woman, infinitely gracious, sweet, voluptuous, gentle, kind, romantic and dreamy. Shadow: Indolent, selfish and luxurious woman."
+        "description": "Gracious, sweet, voluptuous, gentle, kind, romantic and dreamy. Shadow: Indolent, selfish and luxurious."
     },
     "cups-prince": {
         "name": "Prince of Cups",
         "emojis": "🌊 💨 🦅 🐍 🌊",
         "attribution": "Airy part of Water",
-        "description": "A young man of subtlety, secret violence, craft. An artist whose calm surface masks intense passion. Shadow: Ruthless in his aims. Ambitious and obtuse."
+        "description": "Subtlety, secret violence, craft. An artist whose calm surface masks intense passion. Shadow: Ruthless in his aims. Ambitious and obtuse."
     },
     "cups-queen": {
         "name": "Queen of Cups",
@@ -311,7 +311,7 @@ TAROT_DECK = {
         "name": "Knight of Cups",
         "emojis": "🌊 🔥 🏇 🦚 ♋️",
         "attribution": "Fiery part of Water",
-        "description": "A man with commitment issues. Amiable but passive. Attracted to excitement. Unsustainable enthusiasm. Sensitive but shallow. Shadow: Sensual and idle, untruthful, prone to depression and drug abuse."
+        "description": "Commitment issues. Amiable but passive. Attracted to excitement. Unsustainable enthusiasm. Sensitive but shallow. Shadow: Sensual and idle, untruthful, prone to depression and drug abuse."
     },
     
     # SWORDS - Air
@@ -379,7 +379,7 @@ TAROT_DECK = {
         "name": "Princess of Swords",
         "emojis": "💨 🌍 🗡️ ⚔️ 👸",
         "attribution": "Earthy part of Air",
-        "description": "A young woman, stern and revengeful, with destructive logic, firm and aggressive, skilled in practical affairs. Shadow: Cunning, frivolous, and manipulative."
+        "description": "Stern and revengeful, with destructive logic, firm and aggressive, skilled in practical affairs. Shadow: Cunning, frivolous, and manipulative."
     },
     "swords-prince": {
         "name": "Prince of Swords",
@@ -391,7 +391,7 @@ TAROT_DECK = {
         "name": "Queen of Swords",
         "emojis": "💨 🌊 👑 🗡️ 💀",
         "attribution": "Watery part of Air",
-        "description": "A graceful woman, intensely perceptive, a keen observer, subtle interpreter, an intense individualist. Confident and gracious. Shadow: Cruel, sly, deceitful and unreliable woman. Superficially attractive."
+        "description": "Graceful, intensely perceptive, a keen observer, subtle interpreter, an intense individualist. Confident and gracious. Shadow: Cruel, sly, deceitful and unreliable. Superficially attractive."
     },
     "swords-knight": {
         "name": "Knight of Swords",
@@ -465,7 +465,7 @@ TAROT_DECK = {
         "name": "Princess of Disks",
         "emojis": "🌍 🌍 🐏 💎 🌾",
         "attribution": "Earthy part of Earth",
-        "description": "A young woman, beautiful and strong, pregnant with life. She is generous, kind, diligent, and benevolent. Shadow: Wasteful and at war with her essential dignity."
+        "description": "Beautiful and strong, pregnant with life. Generous, kind, diligent, and benevolent. Shadow: Wasteful and at war with their dignity."
     },
     "disks-prince": {
         "name": "Prince of Disks",
@@ -477,7 +477,7 @@ TAROT_DECK = {
         "name": "Queen of Disks",
         "emojis": "🌍 🌊 🐐 🌹 👑",
         "attribution": "Watery part of Earth",
-        "description": "An ambitious woman, yet affectionate and kind, charming, timid, practical, quiet and domesticated. Shadow: Dull. Servile. Foolish. Capricious. Moody."
+        "description": "Ambitious, yet affectionate and kind, charming, timid, practical, quiet and domesticated. Shadow: Dull. Servile. Foolish. Capricious. Moody."
     },
     "disks-knight": {
         "name": "Knight of Disks",
