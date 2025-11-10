@@ -28,6 +28,9 @@ CHANNEL_ID = int(channel_id_str)
 
 test_channel_id_str = os.getenv("TEST_CHANNEL_ID")
 TEST_CHANNEL_ID = int(test_channel_id_str) if test_channel_id_str else None
+# Add MOD_CHANNEL_ID
+mod_channel_id_str = os.getenv("MOD_CHANNEL_ID")
+MOD_CHANNEL_ID = int(mod_channel_id_str) if mod_channel_id_str else None
 
 # ============================================================
 # ROLE CONFIGURATIONS
