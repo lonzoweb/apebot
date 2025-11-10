@@ -932,11 +932,11 @@ async def activity_command(ctx, *, args: str = None):
 
         # Check for overview commands
         if args_lower == "month":
-            await activity.send_month_overview(ctx, ctx)
+            await activity.send_month_overview(ctx)
             return
     
         if args_lower == "week":
-            await activity.send_week_overview(ctx, ctx)
+            await activity.send_week_overview(ctx)
             return
 
         # Try to parse as date
