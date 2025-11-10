@@ -217,7 +217,7 @@ def format_day_activity(date_str, hourly_data, top_users, ctx):
         # Convert to 12-hour format in user's timezone
         if timezone:
             dt_hour = datetime(date_obj.year, date_obj.month, date_obj.day, hour)
-            dt_hour = timezone.localize(dt_hour)
+            dt_hour = dt_hour.replace(tzinfo=timezone)
             hour_12 = dt_hour.strftime("%I")
             am_pm = dt_hour.strftime("%p")
         else:
@@ -271,6 +271,8 @@ def format_month_overview(daily_data):
     # Daily breakdown (show last 30 days)
     for date_str, count in daily_data:
         date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        if timezone:
+            date_obj = date_obj.replace(tzinfo=timezone)
         display_date = date_obj.strftime("%b %d")
         bar = create_bar(count, max_count, 10)
 
@@ -306,6 +308,8 @@ def format_week_overview(daily_data):
 
     for date_str, count in daily_data:
         date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        if timezone:
+            date_obj = date_obj.replace(tzinfo=timezone)
         day_name = date_obj.strftime("%a, %b %d")
         bar = create_bar(count, max_count, 10)
 
