@@ -224,27 +224,22 @@ def format_day_activity(date_str, hourly_data, top_users, ctx):
     # Build output
     lines = [f"📊 **Activity for {day_name}**", "─" * 40]
 
-    # Hourly breakdown
+    # Hourly breakdown - DISPLAY hours are already in user's timezone from logging
     for hour in range(24):
         count = hourly_data[hour]
         bar = create_bar(count, max_hour_count, 10)
-        # Convert to 12-hour format in user's timezone
-        if timezone:
-            dt_hour = datetime(date_obj.year, date_obj.month, date_obj.day, hour)
-            dt_hour = dt_hour.replace(tzinfo=timezone)
-            hour_12 = dt_hour.strftime("%I")
-            am_pm = dt_hour.strftime("%p")
-        else:
-            hour_12 = hour % 12
-            if hour_12 == 0:
-                hour_12 = 12
-            am_pm = "AM" if hour < 12 else "PM"
 
-        time_str = f"{hour_12}:00 {am_pm}"
+        # Convert 24-hour to 12-hour format
+        hour_12 = hour % 12
+        if hour_12 == 0:
+            hour_12 = 12
+        am_pm = "AM" if hour < 12 else "PM"
+
+        time_str = f"{hour_12:02d}:00 {am_pm}"
         peak_marker = " 🔥" if hour == peak_hour and count > 0 else ""
         lines.append(f"`{time_str}` {bar} {count:>4} msgs{peak_marker}")
 
-    lines.append("─" * 40)  # ← Move this OUTSIDE the loop
+    lines.append("─" * 40)
     lines.append(f"**Total:** {total_messages:,} messages")
 
     if total_messages > 0:
