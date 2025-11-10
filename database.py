@@ -17,10 +17,15 @@ logger = logging.getLogger(__name__)
 @contextmanager
 def get_db():
     """Context manager for safe database connections"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)  # Add timeout
+    conn.execute("PRAGMA journal_mode=WAL")  # Enable WAL mode for better concurrency
     try:
         yield conn
         conn.commit()
+    except sqlite3.IntegrityError as e:
+        # Don't rollback on duplicate key errors
+        logger.warning(f"Database integrity error (expected for duplicates): {e}")
+        conn.commit()  # Commit what we can
     except Exception as e:
         conn.rollback()
         logger.error(f"Database error: {e}")
