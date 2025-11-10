@@ -188,11 +188,11 @@ def create_bar(value, max_value, width=10):
     return "▓" * filled + "░" * (width - filled)
 
 
-def format_day_activity(date_str, hourly_data, top_users):
+def format_day_activity(date_str, hourly_data, top_users, ctx):
     """Format daily activity as text"""
     # Get user's timezone
     timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = ZoneInfo(timezone_name) if timezone_name else None
+    timezone = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
 
     # Parse date
     date_obj = datetime.strptime(date_str, "%Y-%m-%d")
@@ -225,6 +225,7 @@ def format_day_activity(date_str, hourly_data, top_users):
             if hour_12 == 0:
                 hour_12 = 12
             am_pm = "AM" if hour < 12 else "PM"
+            
         time_str = f"{hour_12:2d}:00 {am_pm}"
         peak_marker = " 🔥" if hour == peak_hour and count > 0 else ""
         lines.append(
@@ -335,7 +336,7 @@ async def send_day_activity(ctx, date_str):
     hourly_data = get_day_activity(date_str)
     top_users = get_day_top_users(date_str, limit=5)
 
-    output = format_day_activity(date_str, hourly_data, top_users)
+    output = format_day_activity(date_str, hourly_data, top_users, ctx)
 
     # Split into chunks if too long
     chunks = [output[i : i + 1900] for i in range(0, len(output), 1900)]
