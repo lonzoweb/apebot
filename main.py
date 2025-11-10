@@ -69,11 +69,15 @@ async def on_message(message):
         await bot.process_commands(message)
         return
     
-    # Log activity
+    # Log activity with your timezone
+    your_user_id = 154814148054745088  # Replace with your actual Discord user ID as integer
+    timezone_name, _ = get_user_timezone(your_user_id)
+
     activity.log_message_activity(
         timestamp=message.created_at,
         user_id=str(message.author.id),
-        username=message.author.display_name
+        username=message.author.display_name,
+        user_timezone=timezone_name
     )
     """Track GIFs from messages"""
     # Ignore bot messages
