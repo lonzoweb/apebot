@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 # DATABASE CONTEXT MANAGER
 # ============================================================
 
+
 @contextmanager
 def get_db():
     """Context manager for safe database connections"""
@@ -33,31 +34,39 @@ def get_db():
     finally:
         conn.close()
 
+
 # ============================================================
 # DATABASE INITIALIZATION
 # ============================================================
+
 
 def init_db():
     """Initialize database tables"""
     with get_db() as conn:
         c = conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             CREATE TABLE IF NOT EXISTS quotes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 quote TEXT UNIQUE
             )
-        """)
-        c.execute("""
+        """
+        )
+        c.execute(
+            """
             CREATE TABLE IF NOT EXISTS user_timezones (
                 user_id TEXT PRIMARY KEY,
                 timezone TEXT,
                 city TEXT
             )
-        """)
+        """
+        )
+
 
 # ============================================================
 # QUOTE FUNCTIONS
 # ============================================================
+
 
 def load_quotes_from_db():
     """Load all quotes from database"""
@@ -69,6 +78,7 @@ def load_quotes_from_db():
     except Exception as e:
         logger.error(f"Error loading quotes: {e}")
         return []
+
 
 def add_quote_to_db(quote):
     """Add a new quote to database"""
@@ -83,22 +93,27 @@ def add_quote_to_db(quote):
         logger.error(f"Error adding quote: {e}")
         raise
 
+
 def update_quote_in_db(old_quote, new_quote):
     """Update an existing quote"""
     with get_db() as conn:
         c = conn.cursor()
         c.execute("UPDATE quotes SET quote = ? WHERE quote = ?", (new_quote, old_quote))
 
+
 def search_quotes_by_keyword(keyword):
     """Search for quotes containing keyword"""
     try:
         with get_db() as conn:
             c = conn.cursor()
-            c.execute("SELECT id, quote FROM quotes WHERE quote LIKE ?", (f"%{keyword}%",))
+            c.execute(
+                "SELECT id, quote FROM quotes WHERE quote LIKE ?", (f"%{keyword}%",)
+            )
             return c.fetchall()
     except Exception as e:
         logger.error(f"Error searching quotes: {e}")
         return []
+
 
 def delete_quote_by_id(quote_id):
     """Delete a quote by ID"""
@@ -106,91 +121,115 @@ def delete_quote_by_id(quote_id):
         c = conn.cursor()
         c.execute("DELETE FROM quotes WHERE id = ?", (quote_id,))
 
+
 # ============================================================
 # TIMEZONE FUNCTIONS
 # ============================================================
+
 
 def get_user_timezone(user_id):
     """Get user's timezone settings"""
     try:
         with get_db() as conn:
             c = conn.cursor()
-            c.execute("SELECT timezone, city FROM user_timezones WHERE user_id = ?", (str(user_id),))
+            c.execute(
+                "SELECT timezone, city FROM user_timezones WHERE user_id = ?",
+                (str(user_id),),
+            )
             row = c.fetchone()
             if row:
-                logger.info(f"Timezone from database: {row[0]}, City: {row[1]}")
                 return row[0], row[1]
     except Exception as e:
         logger.error(f"Error getting user timezone: {e}")
-    logger.info("No timezone found for user")
     return None, None
+
 
 def set_user_timezone(user_id, timezone_str, city):
     """Set user's timezone"""
     with get_db() as conn:
         c = conn.cursor()
-        c.execute("INSERT OR REPLACE INTO user_timezones (user_id, timezone, city) VALUES (?, ?, ?)",
-                  (str(user_id), timezone_str, city))
+        c.execute(
+            "INSERT OR REPLACE INTO user_timezones (user_id, timezone, city) VALUES (?, ?, ?)",
+            (str(user_id), timezone_str, city),
+        )
+
 
 # ============================================================
 # GIF TRACKER FUNCTIONS
 # ============================================================
 
+
 def init_gif_table():
     """Initialize GIF tracker table"""
     with get_db() as conn:
         c = conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             CREATE TABLE IF NOT EXISTS gif_tracker (
                 gif_url TEXT PRIMARY KEY,
                 count INTEGER DEFAULT 1,
                 last_sent_by TEXT,
                 last_sent_at TIMESTAMP
             )
-        """)
+        """
+        )
+
 
 def increment_gif_count(gif_url, user_id):
     """Increment GIF count or add new entry"""
     with get_db() as conn:
         c = conn.cursor()
         # Delete GIFs older than two weeks
-        c.execute("DELETE FROM gif_tracker WHERE last_sent_at < datetime('now', '-14 days')")
-        c.execute("""
+        c.execute(
+            "DELETE FROM gif_tracker WHERE last_sent_at < datetime('now', '-14 days')"
+        )
+        c.execute(
+            """
             INSERT INTO gif_tracker (gif_url, count, last_sent_by, last_sent_at)
             VALUES (?, 1, ?, datetime('now'))
             ON CONFLICT(gif_url) DO UPDATE SET
                 count = count + 1,
                 last_sent_by = ?,
                 last_sent_at = datetime('now')
-        """, (gif_url, str(user_id), str(user_id)))
+        """,
+            (gif_url, str(user_id), str(user_id)),
+        )
+
 
 def get_top_gifs(limit=10):
     """Get top GIFs by count"""
     try:
         with get_db() as conn:
             c = conn.cursor()
-            c.execute("""
+            c.execute(
+                """
                 SELECT gif_url, count, last_sent_by 
                 FROM gif_tracker 
                 ORDER BY count DESC 
                 LIMIT ?
-            """, (limit,))
+            """,
+                (limit,),
+            )
             return c.fetchall()
     except Exception as e:
         logger.error(f"Error getting top GIFs: {e}")
         return []
+
 
 def get_gif_by_rank(rank):
     """Get GIF URL by its rank position"""
     try:
         with get_db() as conn:
             c = conn.cursor()
-            c.execute("""
+            c.execute(
+                """
                 SELECT gif_url 
                 FROM gif_tracker 
                 ORDER BY count DESC 
                 LIMIT 1 OFFSET ?
-            """, (rank - 1,))
+            """,
+                (rank - 1,),
+            )
             result = c.fetchone()
             return result[0] if result else None
     except Exception as e:
