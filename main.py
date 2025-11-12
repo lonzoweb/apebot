@@ -459,8 +459,8 @@ async def eightball_command(ctx, *, question: str = None):
 user_usage = {}  # {'day': date, 'count': int, 'last_used': timestamp, 'streak': int, 'next_cooldown': int}
 
 @bot.command(name="tc")
-async def tarot_card(ctx, *, search: str = None):
-    """Draw a random tarot card or search for a specific one"""
+async def tarot_card(ctx):
+    """Draw a random tarot card"""
     user_id = ctx.author.id
     now = time.time()
     today = datetime.utcnow().date()
@@ -477,16 +477,10 @@ async def tarot_card(ctx, *, search: str = None):
 
     user_data = user_usage[user_id]
 
-    # First 3 uses: no cooldown (hook them in)
+    # First 3 uses: no cooldown (silent - just draw)
     if user_data['count'] < 3:
         user_data['count'] += 1
         user_data['streak'] += 1
-        
-        # Positive reinforcement for first pulls
-        if user_data['count'] == 1:
-            await ctx.send("✨ *The cards awaken...*")
-        elif user_data['count'] == 3:
-            await ctx.send("🔥 **3 cards drawn!** The veil thins...")
     else:
         # Generate cooldown AFTER the last pull (variable ratio - skewed toward 25s)
         if user_data['next_cooldown'] is None:
@@ -500,7 +494,7 @@ async def tarot_card(ctx, *, search: str = None):
             
             # Near miss psychology - "almost ready" teaser
             if remaining <= 5:
-                await ctx.send(f"Almost ready ...")
+                await ctx.send(f"Almost ready... {remaining}s")
                 return
             
             # Near miss psychology - builds anticipation
@@ -510,27 +504,22 @@ async def tarot_card(ctx, *, search: str = None):
             
             # Variable messaging (keeps it fresh)
             messages = [
-                f"The cards recharge ... {remaining}s remain.",
-                f"Patience ... {remaining}s until next pull.",
-                f"Relax ... {remaining}s.",
+                f"Recharging... {remaining}s remain.",
+                f"Patience... {remaining}s until next pull.",
+                f"Pull in {remaining}s.",
                 f"Rest... {remaining}s before the veil lifts again."
             ]
             await ctx.send(random.choice(messages))
             return
         
-        # Successful pull after cooldown
+        # Successful pull after cooldown (silent - just update tracking)
         user_data['last_used'] = now
         user_data['count'] += 1
         user_data['streak'] += 1
-        user_data['next_cooldown'] = None  # Reset for next time
-        
-    # Rare event: "Lucky pull" (5% chance, reduces next cooldown)
-    if random.random() < 0.05 and user_data['count'] >= 3:
-        user_data['next_cooldown'] = random.randint(5, 15)  # Short cooldown
-        await ctx.send("⚡ **LUCKY PULL!** The cards flow freely...")
+        user_data['next_cooldown'] = None  # Reset for
 
-    # Handle the tarot draw
-        await tarot.send_tarot_card(ctx)
+    # Always random draw (silent)
+    await tarot.send_tarot_card(ctx)
 
 
 @bot.command(name="moon")
