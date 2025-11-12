@@ -606,7 +606,7 @@ async def send_tarot_card(ctx, card_key=None):
     # Create embed
     embed = discord.Embed(
         title=card_name,
-        description=f"\n{emojis}  \n*({attribution})*\n*({att2})*\n\n{description}",
+        description=f"\n{emojis}  \n*({attribution})*\n*({card['att2']})*\n\n{description}",
         color=discord.Color.from_rgb(0, 0, 128),
     )
 
