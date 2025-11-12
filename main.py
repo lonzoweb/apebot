@@ -494,21 +494,19 @@ async def tarot_card(ctx):
             
             # Near miss psychology - "almost ready" teaser
             if remaining <= 5:
-                await ctx.send(f"Almost ready... {remaining}s")
+                await ctx.send(f"Almost ready")
                 return
             
             # Near miss psychology - builds anticipation
             if 3 < remaining <= 10:
-                await ctx.send(f"So close... {remaining}s...")
+                await ctx.send(f"So close...")
                 return
             
             # Variable messaging (keeps it fresh)
             messages = [
-                f"Recharging... {remaining}s remain.",
-                f"Patience... {remaining}s until next pull.",
-                f"Pull in {remaining}s.",
-                f"Rest... {remaining}s before the veil lifts again."
-            ]
+                f"Recharging...",
+                f"Patience...",
+                f"Rest..."
             await ctx.send(random.choice(messages))
             return
         
