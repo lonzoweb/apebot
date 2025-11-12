@@ -455,8 +455,8 @@ async def eightball_command(ctx, *, question: str = None):
         content=f"**{ctx.author.display_name}:** {question}\n🎱 **{random.choice(responses)}**"
     )
 
-# In-memory tracking with streak data
-user_usage = {}  # {'day': date, 'count': int, 'last_used': timestamp, 'streak': int, 'next_cooldown': int}
+# In-memory tracking - simplified
+user_usage = {}  # {'day': date, 'count': int, 'last_used': timestamp, 'next_cooldown': int}
 
 @bot.command(name="tc")
 async def tarot_card(ctx):
@@ -470,8 +470,7 @@ async def tarot_card(ctx):
         user_usage[user_id] = {
             'day': today, 
             'count': 0, 
-            'last_used': 0, 
-            'streak': 0,
+            'last_used': 0,
             'next_cooldown': None
         }
 
@@ -480,11 +479,10 @@ async def tarot_card(ctx):
     # First 3 uses: no cooldown (silent - just draw)
     if user_data['count'] < 3:
         user_data['count'] += 1
-        user_data['streak'] += 1
     else:
         # Generate cooldown AFTER the last pull (variable ratio - skewed toward 25s)
         if user_data['next_cooldown'] is None:
-            user_data['next_cooldown'] = int(random.triangular(15, 60, 25))
+            user_data['next_cooldown'] = int(random.triangular(5, 60, 16))
         
         cooldown = user_data['next_cooldown']
         time_since_last = now - user_data['last_used']
@@ -494,19 +492,19 @@ async def tarot_card(ctx):
             
             # Near miss psychology - "almost ready" teaser
             if remaining <= 5:
-                await ctx.send(f"Almost ready")
+                await ctx.send("Almost ready")
                 return
             
             # Near miss psychology - builds anticipation
             if 3 < remaining <= 10:
-                await ctx.send(f"So close...")
+                await ctx.send("So close...")
                 return
             
             # Variable messaging (keeps it fresh)
             messages = [
-                f"Recharging...",
-                f"Patience...",
-                f"Rest..."
+                "Recharging...",
+                "Patience...",
+                "Rest..."
             ]
             await ctx.send(random.choice(messages))
             return
@@ -514,12 +512,10 @@ async def tarot_card(ctx):
         # Successful pull after cooldown (silent - just update tracking)
         user_data['last_used'] = now
         user_data['count'] += 1
-        user_data['streak'] += 1
-        user_data['next_cooldown'] = None  # Reset for
+        user_data['next_cooldown'] = None  # Reset for next time
 
     # Always random draw (silent)
     await tarot.send_tarot_card(ctx)
-
 
 @bot.command(name="moon")
 @commands.cooldown(1, 10, commands.BucketType.user)
