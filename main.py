@@ -507,6 +507,7 @@ async def tarot_card(ctx):
                 f"Recharging...",
                 f"Patience...",
                 f"Rest..."
+                ]
             await ctx.send(random.choice(messages))
             return
         
