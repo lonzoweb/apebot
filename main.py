@@ -1271,6 +1271,44 @@ async def merge_quotes(ctx):
         conn_old.close()
         conn_new.close()
 
+# debug cmd
+
+# Global debug flag
+DEBUG_MODE = False
+
+@bot.command(name="debug")
+@commands.has_permissions(administrator=True)
+async def toggle_debug(ctx, state: str = None):
+    """Toggle debug mode on/off. When on, only admins can use commands."""
+    global DEBUG_MODE
+
+    if state is None:
+        await ctx.send(f"🔧 Debug mode is currently **{'ON' if DEBUG_MODE else 'OFF'}**.")
+        return
+
+    state = state.lower()
+    if state in ["on", "true", "enable"]:
+        DEBUG_MODE = True
+        await ctx.send("🧰 Debug mode **enabled** — only administrators can use commands.")
+    elif state in ["off", "false", "disable"]:
+        DEBUG_MODE = False
+        await ctx.send("✅ Debug mode **disabled** — all users can use commands again.")
+    else:
+        await ctx.send("Usage: `!debug on` or `!debug off`")
+
+# Global check that blocks commands when debug mode is on
+@bot.check
+async def globally_block_during_debug(ctx):
+    # Always allow administrators (so you can turn debug off)
+    if ctx.author.guild_permissions.administrator:
+        return True
+
+    # Block all other commands if debug mode is active
+    if DEBUG_MODE:
+        await ctx.send("🧱 The spirits are silent…")
+        return False
+
+    return True
 
 # ============================================================
 # RUN BOT
