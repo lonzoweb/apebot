@@ -242,12 +242,16 @@ HEBREW_MAP = {
 LETTER_REGEX = re.compile(r"[A-Z]")
 
 
-def reduce_to_single_digit(n: int) -> int:
+def reduce_to_single_digit(n: int, keep_master_numbers: bool = True) -> int:
     """
     Reduces a number to a single digit by repeatedly summing its digits.
-    Matches gematrinator.com behavior (no exceptions for 11, 22, 33).
+    Stops at master numbers (11, 22, 33) if keep_master_numbers is True.
+    This matches gematrinator.com's default "Reduction" behavior.
     """
     while n > 9:
+        # Stop if we hit a master number (11, 22, 33)
+        if keep_master_numbers and n in (11, 22, 33):
+            return n
         n = sum(int(d) for d in str(n))
     return n
 
@@ -262,9 +266,42 @@ def ordinal_values(text: str):
     return [ord(ch) - 64 for ch in text_to_letters(text)]
 
 
+def reduction_values(text: str):
+    """
+    Get reduction values where each letter is pre-reduced:
+    A=1, B=2...I=9, J=1, K=2...R=9, S=1, etc.
+    This matches gematrinator's "FullReduction" modifier.
+    """
+    letters = text_to_letters(text)
+    reduced = []
+    for ch in letters:
+        ordinal = ord(ch) - 64  # A=1, B=2, etc.
+        # Reduce ordinal value to single digit (no master number exception here)
+        while ordinal > 9:
+            ordinal = sum(int(d) for d in str(ordinal))
+        reduced.append(ordinal)
+    return reduced
+
+
 def reverse_values(text: str):
     """Get reverse ordinal values (Z=1, Y=2, ..., A=26)."""
     return [26 - (ord(ch) - 65) for ch in text_to_letters(text)]
+
+
+def reverse_reduction_values(text: str):
+    """
+    Get reverse reduction values where each letter is pre-reduced.
+    Z=1, Y=2...R=9, Q=1, etc.
+    """
+    letters = text_to_letters(text)
+    reduced = []
+    for ch in letters:
+        reverse = 26 - (ord(ch) - 65)  # Z=1, Y=2, etc.
+        # Reduce to single digit
+        while reverse > 9:
+            reverse = sum(int(d) for d in str(reverse))
+        reduced.append(reverse)
+    return reduced
 
 
 def hebrew_values(text: str):
@@ -319,12 +356,13 @@ def calculate_ordinal(text: str) -> int:
 
 def calculate_reduction(text: str) -> int:
     """
-    Calculate full reduction:
-    1. Sum all ordinal values
-    2. Reduce the total to a single digit
+    Calculate full reduction (gematrinator style):
+    1. Each letter gets its reduced ordinal value (J=1, K=2, etc.)
+    2. Sum all reduced values
+    3. If sum is 11, 22, or 33, keep it; otherwise reduce to single digit
     """
-    total = sum(ordinal_values(text))
-    return reduce_to_single_digit(total)
+    total = sum(reduction_values(text))
+    return reduce_to_single_digit(total, keep_master_numbers=True)
 
 
 def calculate_reverse(text: str) -> int:
@@ -334,12 +372,13 @@ def calculate_reverse(text: str) -> int:
 
 def calculate_reverse_reduction(text: str) -> int:
     """
-    Calculate reverse reduction:
-    1. Sum all reverse ordinal values
-    2. Reduce the total to a single digit
+    Calculate reverse reduction (gematrinator style):
+    1. Each letter gets its reduced reverse value
+    2. Sum all reduced values
+    3. If sum is 11, 22, or 33, keep it; otherwise reduce to single digit
     """
-    total = sum(reverse_values(text))
-    return reduce_to_single_digit(total)
+    total = sum(reverse_reduction_values(text))
+    return reduce_to_single_digit(total, keep_master_numbers=True)
 
 
 def calculate_fibonacci(text: str) -> int:
@@ -350,7 +389,9 @@ def calculate_fibonacci(text: str) -> int:
 def calculate_all_gematria(text: str):
     """Calculate all gematria cipher values for the given text."""
     ord_vals = ordinal_values(text)
+    red_vals = reduction_values(text)
     rev_vals = reverse_values(text)
+    rev_red_vals = reverse_reduction_values(text)
     heb_vals = hebrew_values(text)
     eng_vals = english_gematria_values(text)
     fib_vals = fibonacci_values(text)
@@ -359,9 +400,11 @@ def calculate_all_gematria(text: str):
         "hebrew": sum(heb_vals),
         "english": sum(eng_vals),
         "ordinal": sum(ord_vals),
-        "reduction": reduce_to_single_digit(sum(ord_vals)),
+        "reduction": reduce_to_single_digit(sum(red_vals), keep_master_numbers=True),
         "reverse": sum(rev_vals),
-        "reverse_reduction": reduce_to_single_digit(sum(rev_vals)),
+        "reverse_reduction": reduce_to_single_digit(
+            sum(rev_red_vals), keep_master_numbers=True
+        ),
         "fibonacci": sum(fib_vals),
     }
 
