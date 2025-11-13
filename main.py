@@ -839,6 +839,16 @@ async def gematria_command(ctx, *, text: str = None):
 
     results = calculate_all_gematria(text)
 
+    from helpers import reverse_reduction_values, reduce_to_single_digit
+
+    # In your command, before creating the embed:
+    print(f"Debug for '{text}':")
+    print(f"Reverse reduction values: {reverse_reduction_values(text)}")
+    print(f"Sum: {sum(reverse_reduction_values(text))}")
+    print(
+        f"Final: {reduce_to_single_digit(sum(reverse_reduction_values(text)), keep_master_numbers=True)}"
+    )
+
     embed = discord.Embed(
         title=f"Gematria for: {text}", color=discord.Color.dark_grey()
     )
