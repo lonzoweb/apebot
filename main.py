@@ -463,11 +463,22 @@ user_usage = (
 
 
 @bot.command(name="tc")
-async def tarot_card(ctx, *, search: str = None):
-    """Draw a random tarot card or search for a specific one"""
+async def tarot_card(ctx):
+    """Draw a random tarot card with intermittent reinforcement"""
     user_id = ctx.author.id
     now = time.time()
     today = datetime.utcnow().date()
+
+    # --- Admins bypass everything ---
+    if ctx.author.guild_permissions.administrator:
+        await tarot.send_tarot_card(ctx)
+        return
+
+    # --- Placeholder for future role bypass ---
+    # bypass_role_name = "Tarot Master"
+    # if any(role.name == bypass_role_name for role in ctx.author.roles):
+    #     await tarot.send_tarot_card(ctx)
+    #     return
 
     # Initialize/reset user tracking
     if user_id not in user_usage or user_usage[user_id]["day"] != today:
