@@ -845,7 +845,7 @@ async def gematria_command(ctx, *, text: str = None):
 
     embed.add_field(name="Hebrew", value=str(results["hebrew"]), inline=False)
     embed.add_field(name="English", value=str(results["english"]), inline=False)
-    embed.add_field(name="Ordinal", value=str(results["simple"]), inline=False)
+    embed.add_field(name="Ordinal", value=str(results["ordinal"]), inline=False)
     embed.add_field(name="Reduction", value=str(results["reduction"]), inline=False)
     embed.add_field(name="Reverse", value=str(results["reverse"]), inline=False)
     embed.add_field(
