@@ -496,7 +496,7 @@ async def tarot_card(ctx):
     # --- Variable-ratio cooldown after first 2 draws ---
     # Generate cooldown if not already set
     if user_data['next_cooldown'] is None:
-        user_data['next_cooldown'] = random.triangular(6, 60, 20)
+        user_data['next_cooldown'] = random.triangular(15, 60, 30)
 
     cooldown = user_data['next_cooldown']
     time_since_last = now - user_data['last_used']
