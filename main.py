@@ -114,7 +114,7 @@ async def on_message(message):
 async def on_command_error(ctx, error):
     """Global error handler for commands"""
     if isinstance(error, commands.CommandOnCooldown):
-        await ctx.send(f"⏳ Slow down! Try again in {error.retry_after:.1f} seconds.")
+        pass  # Silently ignore cooldown errors
     elif isinstance(error, commands.MissingPermissions):
         await ctx.send("🚫 You don't have permission to use this command.")
     elif isinstance(error, commands.CommandNotFound):
@@ -455,11 +455,15 @@ async def eightball_command(ctx, *, question: str = None):
         content=f"**{ctx.author.display_name}:** {question}\n🎱 **{random.choice(responses)}**"
     )
 
+
 import random, time
 from datetime import datetime
 
 # In-memory tracking
-user_usage = {}  # {'day': date, 'count': int, 'last_used': timestamp, 'next_cooldown': float}
+user_usage = (
+    {}
+)  # {'day': date, 'count': int, 'last_used': timestamp, 'next_cooldown': float}
+
 
 @bot.command(name="tc")
 async def tarot_card(ctx):
@@ -480,29 +484,29 @@ async def tarot_card(ctx):
     #     return
 
     # Initialize/reset user tracking
-    if user_id not in user_usage or user_usage[user_id]['day'] != today:
+    if user_id not in user_usage or user_usage[user_id]["day"] != today:
         user_usage[user_id] = {
-            'day': today,
-            'count': 0,
-            'last_used': 0,
-            'next_cooldown': None
+            "day": today,
+            "count": 0,
+            "last_used": 0,
+            "next_cooldown": None,
         }
 
     user_data = user_usage[user_id]
 
     # --- First 2 draws: no cooldown, immediate ---
-    if user_data['count'] < 2:
-        user_data['count'] += 1
+    if user_data["count"] < 2:
+        user_data["count"] += 1
         await tarot.send_tarot_card(ctx)
         return
 
     # --- Variable-ratio cooldown after first 2 draws ---
     # Generate cooldown if not already set
-    if user_data['next_cooldown'] is None:
-        user_data['next_cooldown'] = random.triangular(16, 60, 33)
+    if user_data["next_cooldown"] is None:
+        user_data["next_cooldown"] = random.triangular(16, 60, 33)
 
-    cooldown = user_data['next_cooldown']
-    time_since_last = now - user_data['last_used']
+    cooldown = user_data["next_cooldown"]
+    time_since_last = now - user_data["last_used"]
 
     if time_since_last < cooldown:
         # Ambiguous “recharging” message
@@ -512,18 +516,19 @@ async def tarot_card(ctx):
             "The abyss awaits...",
             "You will wait...",
             "Not on my watch...",
-            "The void beckons..."
+            "The void beckons...",
         ]
         await ctx.send(random.choice(messages))
         return
 
     # Successful draw: reset cooldown for next attempt
-    user_data['last_used'] = now
-    user_data['count'] += 1
-    user_data['next_cooldown'] = None
+    user_data["last_used"] = now
+    user_data["count"] += 1
+    user_data["next_cooldown"] = None
 
     # Always random draw
     await tarot.send_tarot_card(ctx)
+
 
 @bot.command(name="moon")
 @commands.cooldown(1, 10, commands.BucketType.user)
@@ -800,37 +805,100 @@ async def stats_command(ctx):
     await ctx.send(embed=embed)
 
 
-@bot.command(name="gem")
-async def gematria_command(ctx, *, text: str = None):
-    # If the command is replying to a message → use that text instead
-    if ctx.message.reference:
-        reply_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-        text = reply_msg.content
+@bot.command(name="gem", aliases=["gematria"])
+async def gematria(ctx, *, text: str = None):
+    """Calculate Hebrew gematria value of text"""
+    if text is None:
+        await ctx.send("❌ Please provide text to calculate. Usage: `.gem <text>`")
+        return
 
-    # Reject non-text (stickers, gifs, emojis, embeds, etc.)
-    if not text or not any(ch.isalnum() for ch in text):
-        return await ctx.reply(
-            "⚠️ No valid text found to evaluate.", mention_author=False
-        )
+    # Character limit check (53 characters)
+    if len(text) > 53:
+        await ctx.send("❌ Text exceeded input limit.")
+        return
 
-    results = calculate_all_gematria(text)
+    # Hebrew gematria values
+    hebrew_values = {
+        "א": 1,
+        "ב": 2,
+        "ג": 3,
+        "ד": 4,
+        "ה": 5,
+        "ו": 6,
+        "ז": 7,
+        "ח": 8,
+        "ט": 9,
+        "י": 10,
+        "כ": 20,
+        "ך": 20,
+        "ל": 30,
+        "מ": 40,
+        "ם": 40,
+        "נ": 50,
+        "ן": 50,
+        "ס": 60,
+        "ע": 70,
+        "פ": 80,
+        "ף": 80,
+        "צ": 90,
+        "ץ": 90,
+        "ק": 100,
+        "ר": 200,
+        "ש": 300,
+        "ת": 400,
+        # English letters (standard gematria)
+        "a": 1,
+        "b": 2,
+        "c": 3,
+        "d": 4,
+        "e": 5,
+        "f": 6,
+        "g": 7,
+        "h": 8,
+        "i": 9,
+        "j": 10,
+        "k": 20,
+        "l": 30,
+        "m": 40,
+        "n": 50,
+        "o": 60,
+        "p": 70,
+        "q": 80,
+        "r": 90,
+        "s": 100,
+        "t": 200,
+        "u": 300,
+        "v": 400,
+        "w": 500,
+        "x": 600,
+        "y": 700,
+        "z": 800,
+    }
 
-    from helpers import reverse_reduction_values, reduce_to_single_digit
+    total = 0
+    processed_chars = []
 
+    for char in text.lower():
+        if char in hebrew_values:
+            total += hebrew_values[char]
+            processed_chars.append(f"{char}={hebrew_values[char]}")
+
+    if total == 0:
+        await ctx.send("❌ No valid Hebrew or English letters found in text.")
+        return
+
+    # Create embed
     embed = discord.Embed(
-        title=f"Gematria for: {text}", color=discord.Color.dark_grey()
+        title="🔢 Gematria Calculator",
+        description=f"**Text:** {text}\n**Value:** {total}",
+        color=discord.Color.purple(),
     )
 
-    embed.add_field(name="Hebrew", value=str(results["hebrew"]), inline=False)
-    embed.add_field(name="English", value=str(results["english"]), inline=False)
-    embed.add_field(name="Ordinal", value=str(results["ordinal"]), inline=False)
-    embed.add_field(name="Reduction", value=str(results["reduction"]), inline=False)
-    embed.add_field(name="Reverse", value=str(results["reverse"]), inline=False)
-    embed.add_field(
-        name="Reverse Reduction", value=str(results["reverse_reduction"]), inline=False
-    )
+    if len(processed_chars) <= 20:  # Only show breakdown if not too long
+        breakdown = " + ".join(processed_chars)
+        embed.add_field(name="Breakdown", value=breakdown, inline=False)
 
-    await ctx.reply(embed=embed, mention_author=False)
+    await ctx.send(embed=embed)
 
 
 @bot.command(name="blessing")
@@ -1271,10 +1339,12 @@ async def merge_quotes(ctx):
         conn_old.close()
         conn_new.close()
 
+
 # debug cmd
 
 # Global debug flag
 DEBUG_MODE = False
+
 
 @bot.command(name="debug")
 @commands.has_permissions(administrator=True)
@@ -1283,18 +1353,23 @@ async def toggle_debug(ctx, state: str = None):
     global DEBUG_MODE
 
     if state is None:
-        await ctx.send(f"🔧 Debug mode is currently **{'ON' if DEBUG_MODE else 'OFF'}**.")
+        await ctx.send(
+            f"🔧 Debug mode is currently **{'ON' if DEBUG_MODE else 'OFF'}**."
+        )
         return
 
     state = state.lower()
     if state in ["on", "true", "enable"]:
         DEBUG_MODE = True
-        await ctx.send("🧰 Debug mode **enabled** — only administrators can use commands.")
+        await ctx.send(
+            "🧰 Debug mode **enabled** — only administrators can use commands."
+        )
     elif state in ["off", "false", "disable"]:
         DEBUG_MODE = False
         await ctx.send("✅ Debug mode **disabled** — all users can use commands again.")
     else:
         await ctx.send("Usage: `!debug on` or `!debug off`")
+
 
 # Global check that blocks commands when debug mode is on
 @bot.check
@@ -1309,6 +1384,7 @@ async def globally_block_during_debug(ctx):
         return False
 
     return True
+
 
 # ============================================================
 # RUN BOT
