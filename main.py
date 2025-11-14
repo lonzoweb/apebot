@@ -805,100 +805,41 @@ async def stats_command(ctx):
     await ctx.send(embed=embed)
 
 
-@bot.command(name="gem", aliases=["gematria"])
-async def gematria(ctx, *, text: str = None):
-    """Calculate Hebrew gematria value of text"""
-    if text is None:
-        await ctx.send("❌ Please provide text to calculate. Usage: `.gem <text>`")
-        return
+@bot.command(name="gem")
+async def gematria_command(ctx, *, text: str = None):
+    # If the command is replying to a message → use that text instead
+    if ctx.message.reference:
+        reply_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+        text = reply_msg.content
+
+    # Reject non-text (stickers, gifs, emojis, embeds, etc.)
+    if not text or not any(ch.isalnum() for ch in text):
+        return await ctx.reply(
+            "⚠️ No valid text found to evaluate.", mention_author=False
+        )
 
     # Character limit check (53 characters)
     if len(text) > 53:
-        await ctx.send("❌ Text exceeded input limit.")
-        return
+        return await ctx.reply("❌ Text exceeds limit.", mention_author=False)
 
-    # Hebrew gematria values
-    hebrew_values = {
-        "א": 1,
-        "ב": 2,
-        "ג": 3,
-        "ד": 4,
-        "ה": 5,
-        "ו": 6,
-        "ז": 7,
-        "ח": 8,
-        "ט": 9,
-        "י": 10,
-        "כ": 20,
-        "ך": 20,
-        "ל": 30,
-        "מ": 40,
-        "ם": 40,
-        "נ": 50,
-        "ן": 50,
-        "ס": 60,
-        "ע": 70,
-        "פ": 80,
-        "ף": 80,
-        "צ": 90,
-        "ץ": 90,
-        "ק": 100,
-        "ר": 200,
-        "ש": 300,
-        "ת": 400,
-        # English letters (standard gematria)
-        "a": 1,
-        "b": 2,
-        "c": 3,
-        "d": 4,
-        "e": 5,
-        "f": 6,
-        "g": 7,
-        "h": 8,
-        "i": 9,
-        "j": 10,
-        "k": 20,
-        "l": 30,
-        "m": 40,
-        "n": 50,
-        "o": 60,
-        "p": 70,
-        "q": 80,
-        "r": 90,
-        "s": 100,
-        "t": 200,
-        "u": 300,
-        "v": 400,
-        "w": 500,
-        "x": 600,
-        "y": 700,
-        "z": 800,
-    }
+    results = calculate_all_gematria(text)
 
-    total = 0
-    processed_chars = []
+    from helpers import reverse_reduction_values, reduce_to_single_digit
 
-    for char in text.lower():
-        if char in hebrew_values:
-            total += hebrew_values[char]
-            processed_chars.append(f"{char}={hebrew_values[char]}")
-
-    if total == 0:
-        await ctx.send("❌ No valid Hebrew or English letters found in text.")
-        return
-
-    # Create embed
     embed = discord.Embed(
-        title="🔢 Gematria Calculator",
-        description=f"**Text:** {text}\n**Value:** {total}",
-        color=discord.Color.purple(),
+        title=f"Gematria for: {text}", color=discord.Color.dark_grey()
     )
 
-    if len(processed_chars) <= 20:  # Only show breakdown if not too long
-        breakdown = " + ".join(processed_chars)
-        embed.add_field(name="Breakdown", value=breakdown, inline=False)
+    embed.add_field(name="Hebrew", value=str(results["hebrew"]), inline=False)
+    embed.add_field(name="English", value=str(results["english"]), inline=False)
+    embed.add_field(name="Ordinal", value=str(results["ordinal"]), inline=False)
+    embed.add_field(name="Reduction", value=str(results["reduction"]), inline=False)
+    embed.add_field(name="Reverse", value=str(results["reverse"]), inline=False)
+    embed.add_field(
+        name="Reverse Reduction", value=str(results["reverse_reduction"]), inline=False
+    )
 
-    await ctx.send(embed=embed)
+    await ctx.reply(embed=embed, mention_author=False)
 
 
 @bot.command(name="blessing")
