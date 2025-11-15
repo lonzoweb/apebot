@@ -53,21 +53,19 @@ bot_start_time = datetime.now()
 # ============================================================
 
 
+# Global check that blocks commands when debug mode is on
 @bot.check
-async def globally_block_channels(ctx):
-    """Block all commands except in allowed channels"""
-    # Admins can use commands anywhere
+async def globally_block_during_debug(ctx):
+    # Always allow administrators (so you can turn debug off)
     if ctx.author.guild_permissions.administrator:
         return True
 
-    # Public channels + private mod channel
-    ALLOWED_CHANNELS = [
-        CHANNEL_ID,  # Public channel 1
-        TEST_CHANNEL_ID,  # Public channel 2
-        MOD_CHANNEL_ID,  # Private mod channel
-    ]
+    # Block all other commands if debug mode is active
+    if DEBUG_MODE:
+        await ctx.send("🧱 The spirits are silent…")
+        return False
 
-    return ctx.channel.id in ALLOWED_CHANNELS
+    return True
 
 
 @bot.event
