@@ -4,6 +4,7 @@ General utility functions
 """
 
 import ephem
+import discord
 from config import AUTHORIZED_ROLES
 
 # ============================================================
