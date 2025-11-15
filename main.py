@@ -1332,45 +1332,7 @@ async def battle_command(
         )
 
     # Start the battle
-
-
-@bot.command(name="battle")
-async def battle_command(
-    ctx, user1: discord.Member = None, user2: discord.Member = None
-):
-    """Start or stop reaction battles (Admin/Caporegime only)
-
-    Usage:
-    .battle @user1 @user2  - Start battle
-    .battle stop           - End current battle
-    """
-
-    # Permission check: Admin or Caporegime role
-    if not (
-        ctx.author.guild_permissions.administrator
-        or any(role.name == "Caporegime" for role in ctx.author.roles)
-    ):
-        return await ctx.send("🚫 Peasant Detected")
-
-    # Handle stop command (if user1 is actually the word "stop")
-    if user1 and isinstance(user1, str) and user1.lower() == "stop":
-        await battle.stop_battle(ctx)
-        return
-
-    # Check if we got two valid users
-    if not user1 or not user2:
-        # Check if they typed "stop"
-        if ctx.message.content.lower().endswith("stop"):
-            await battle.stop_battle(ctx)
-            return
-
-        return await ctx.send(
-            "⚔️ **Battle Commands**\n\n"
-            "`.battle @user1 @user2` - Start a battle\n"
-            "`.battle stop` - End current battle"
-        )
-
-    # Start the battle
+    await battle.start_battle(ctx, user1, user2)
 
 
 # archive cmd
