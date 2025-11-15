@@ -1280,6 +1280,84 @@ async def merge_quotes(ctx):
         conn_old.close()
         conn_new.close()
 
+# archive cmd
+
+@bot.command(name="archive")
+async def archive_forum(ctx, which: str = None):
+    """Archive forum channels and create fresh replacements (Admin only)
+    
+    Usage:
+    .archive forum       - Archive #forum only
+    .archive forum-livi  - Archive #forum-livi only
+    .archive both        - Archive both channels
+    """
+    
+    # Admin only
+    if not ctx.author.guild_permissions.administrator:
+        return await ctx.send("🚫 Peasant Detected")
+    
+    # Validate input
+    valid_options = ["forum", "forum-livi", "both"]
+    if which not in valid_options:
+        return await ctx.send(
+            "⚠️ Usage:\n"
+            "`.archive forum` - Archive #forum\n"
+            "`.archive forum-livi` - Archive #forum-livi\n"
+            "`.archive both` - Archive both channels"
+        )
+    
+    guild = ctx.guild
+    channels_to_archive = []
+    
+    # Determine which channels to archive
+    if which == "both":
+        channels_to_archive = ["forum", "forum-livi"]
+    else:
+        channels_to_archive = [which]
+    
+    # Archive each channel
+    for channel_name in channels_to_archive:
+        try:
+            # Get the channel by exact name
+            old_channel = get_forum_channel(guild, channel_name)
+            
+            if not old_channel:
+                await ctx.send(f"⚠️ Channel `#{channel_name}` not found. Skipping...")
+                continue
+            
+            # Store channel properties
+            category = old_channel.category
+            position = old_channel.position
+            
+            # Generate archive name with current date
+            now = datetime.now()
+            archive_name = f"{channel_name}-{now.strftime('%b-%Y').lower()}"  # e.g., "forum-nov-2024"
+            
+            # Rename old channel to archive
+            await old_channel.edit(name=archive_name)
+            await ctx.send(f"📦 Channel `#{channel_name}` archived as `#{archive_name}`")
+            
+            # Create new fresh channel with same settings
+            new_channel = await guild.create_text_channel(
+                name=channel_name,
+                category=category,
+                position=position,
+                overwrites=old_channel.overwrites,  # Copy permissions
+                topic=old_channel.topic,
+                slowmode_delay=old_channel.slowmode_delay,
+                nsfw=old_channel.nsfw
+            )
+            
+            # Send confirmation in new channel
+            await new_channel.send(f"✨ **Fresh #{channel_name} channel created!** The old channel has been archived.")
+            
+            logger.info(f"{channel_name} archived by {ctx.author} - Old: {old_channel.id}, New: {new_channel.id}")
+            
+        except Exception as e:
+            logger.error(f"Error archiving {channel_name}: {e}")
+            await ctx.send(f"❌ Error archiving `#{channel_name}`: {e}")
+    
+    await ctx.send("✅ Archived")
 
 # debug cmd
 

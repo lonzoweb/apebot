@@ -19,6 +19,14 @@ def has_authorized_role(member):
     )
 
 
+# channel name
+
+
+def get_forum_channel(guild, channel_name):
+    """Get a channel by exact name match"""
+    return discord.utils.get(guild.channels, name=channel_name)
+
+
 # ============================================================
 # MESSAGE HELPERS
 # ============================================================
