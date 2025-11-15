@@ -16,6 +16,7 @@ import ephem
 import hierarchy
 import activity
 import time
+import battle
 from datetime import timedelta
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -53,6 +54,50 @@ bot_start_time = datetime.now()
 # ============================================================
 
 
+@bot.event
+async def on_message(message):
+    """Handle all message events"""
+    # Don't track bot messages
+    if message.author.bot:
+        await bot.process_commands(message)
+        return
+
+    # Log activity with your timezone
+    your_user_id = 154814148054745088
+    timezone_name, _ = get_user_timezone(your_user_id)
+
+    activity.log_message_activity(
+        timestamp=message.created_at,
+        user_id=str(message.author.id),
+        username=message.author.display_name,
+        user_timezone=timezone_name,
+    )
+
+    # Track GIFs from messages
+    gif_url = extract_gif_url(message)
+    if gif_url:
+        try:
+            increment_gif_count(gif_url, message.author.id)
+        except Exception as e:
+            logger.error(f"Error tracking GIF: {e}")
+
+    # Track battle messages
+    await battle.on_message_during_battle(message)
+
+    # Process commands (must be at the end!)
+    await bot.process_commands(message)
+
+
+@bot.event
+async def on_raw_reaction_add(payload):
+    """Track reactions for active battles"""
+    # Ignore bot reactions
+    if payload.user_id == bot.user.id:
+        return
+
+    await battle.on_reaction_during_battle(payload)
+
+
 @bot.check
 async def globally_block_channels(ctx):
     """Block all commands except in allowed channels"""
@@ -74,36 +119,6 @@ async def on_ready():
     activity.init_activity_db()
     logger.info(f"✅ Logged in as {bot.user}")
     tasks.setup_tasks(bot)
-
-
-@bot.event
-async def on_message(message):
-    """Handle all message events - activity tracking and GIF tracking"""
-    # Don't track bot messages
-    if message.author.bot:
-        await bot.process_commands(message)
-        return
-
-    # Use YOUR timezone for logging ALL messages (not the sender's timezone)
-    your_user_id = 154814148054745088
-    your_timezone_name, _ = get_user_timezone(your_user_id)
-
-    activity.log_message_activity(
-        timestamp=message.created_at,
-        user_id=str(message.author.id),
-        username=message.author.display_name,
-        user_timezone=your_timezone_name,  # Use YOUR timezone for all messages
-    )
-
-    # Track GIFs from messages
-    gif_url = extract_gif_url(message)
-    if gif_url:
-        try:
-            increment_gif_count(gif_url, message.author.id)
-        except Exception as e:
-            logger.error(f"Error tracking GIF: {e}")
-
-    await bot.process_commands(message)
 
 
 @bot.event
@@ -1275,6 +1290,51 @@ async def merge_quotes(ctx):
     finally:
         conn_old.close()
         conn_new.close()
+
+
+# battle cmd
+
+
+@bot.command(name="battle")
+async def battle_command(
+    ctx, action: str = None, user1: discord.Member = None, user2: discord.Member = None
+):
+    """Start or stop reaction battles (Admin/Caporegime only)
+
+    Usage:
+    .battle @user1 @user2  - Start battle
+    .battle stop           - End current battle
+    """
+
+    # Permission check: Admin or Caporegime role
+    if not (
+        ctx.author.guild_permissions.administrator
+        or any(role.name == "Caporegime" for role in ctx.author.roles)
+    ):
+        return await ctx.send("🚫 Peasant Detected")
+
+    # Handle stop command
+    if action and action.lower() == "stop":
+        await battle.stop_battle(ctx)
+        return
+
+    # Handle start battle - action is actually user1 when mentions are used
+    if isinstance(action, discord.Member):
+        # Command was: .battle @user1 @user2
+        user1 = action  # First mention
+        # user2 is already the second parameter
+
+        if not user2:
+            return await ctx.send("❌ Usage: `.battle @user1 @user2` or `.battle stop`")
+
+        await battle.start_battle(ctx, user1, user2)
+    else:
+        # Invalid usage
+        await ctx.send(
+            "⚔️ **Battle Commands**\n\n"
+            "`.battle @user1 @user2` - Start a battle\n"
+            "`.battle stop` - End current battle"
+        )
 
 
 # archive cmd
