@@ -142,15 +142,15 @@ async def end_battle_and_announce():
     winner, winner_count, loser_count = battle_data.get_winner()
 
     # Build results embed
-    embed = discord.Embed(title="⚔️ BATTLE RESULTS", color=discord.Color.red())
+    embed = discord.Embed(title="⚔️ AND THE WINNER IS", color=discord.Color.red())
 
     if winner:
         # Someone won
         loser = battle_data.user1 if winner == battle_data.user2 else battle_data.user2
 
         embed.add_field(
-            name=f"🏆 Winner: {winner.display_name}",
-            value=f"**{winner_count} reactions**\nGet ratioed! 💀",
+            name=f"🏆 {winner.display_name}",
+            value=f"**{winner_count} reactions**\nRatiod Niqqa",
             inline=False,
         )
 
@@ -161,7 +161,7 @@ async def end_battle_and_announce():
             else battle_data.user2_reactions
         )
         embed.add_field(
-            name=f"{winner.display_name} reactions:",
+            name=f"{winner.display_name}:",
             value=format_reactions(winner_reactions),
             inline=False,
         )
@@ -173,7 +173,7 @@ async def end_battle_and_announce():
             else battle_data.user1_reactions
         )
         embed.add_field(
-            name=f"{loser.display_name} reactions ({loser_count} total):",
+            name=f"{loser.display_name}:",
             value=format_reactions(loser_reactions),
             inline=False,
         )
@@ -181,7 +181,7 @@ async def end_battle_and_announce():
         # Tie
         embed.add_field(
             name="🤝 It's a Tie!",
-            value=f"Both warriors earned **{winner_count} reactions**",
+            value=f"Both vamps earned **{winner_count} reactions**",
             inline=False,
         )
 
