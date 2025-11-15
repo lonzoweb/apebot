@@ -1295,7 +1295,7 @@ async def merge_quotes(ctx):
 # battle cmd
 
 
-@bot.command(name="battle")
+@bot.command(name="vb")
 async def battle_command(ctx, *args):
     """Start or stop reaction battles (Admin/Caporegime only)"""
 
