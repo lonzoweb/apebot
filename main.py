@@ -108,7 +108,7 @@ async def globally_block_channels(ctx):
     # allow channels in these channel names
     ALLOWED_CHANNEL_NAMES = ["forum", "forum-livi", "emperor"]
 
-    return ctx.channel.id in ALLOWED_CHANNEL_NAMES
+    return ctx.channel.name in ALLOWED_CHANNEL_NAMES
 
 
 @bot.event
