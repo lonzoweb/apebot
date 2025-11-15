@@ -284,586 +284,7 @@ async def send_stats(ctx):
 # ============================================================
 
 HIERARCHY_DB = {
-    # JEWISH MYSTICISM
-    "lilith": {
-        "name": "Lilith",
-        "alt_names": ["The First Eve", "Queen of Demons", "Lilitu"],
-        "rank": "Queen of Demons",
-        "domain": "Night, Seduction, Infant Death",
-        "legions": "Lilin (demon children)",
-        "tradition": "Jewish mysticism, Kabbalah, Talmud",
-        "superior": "Samael (consort)",
-        "subordinates": "The Lilin (her demon children)",
-        "symbols": "Owl, screech owl, serpent, moon",
-        "description": "Adam's first wife who refused submission and fled Eden. Became queen of demons. Seduces men in sleep, strangles infants. Mother of demons. Consort of Samael. Appears in Isaiah 34:14."
-    },
-    
-    "samael": {
-        "name": "Samael",
-        "alt_names": ["Poison of God", "Venom of God", "Blind God"],
-        "rank": "Archangel/Demon Prince",
-        "domain": "Death, Accusation, Temptation",
-        "legions": "Unknown",
-        "tradition": "Jewish mysticism, Kabbalah, Talmud",
-        "superior": "Depends on tradition",
-        "subordinates": "Various demons, consort Lilith",
-        "symbols": "Sword, serpent, poison",
-        "description": "Fallen archangel, Angel of Death in some texts. Accused of being the serpent in Eden. Consort of Lilith. Rules the Fifth Heaven. Name means 'Venom of God.' Both angel and demon in different sources."
-    },
-    
-    # ISLAMIC TRADITION
-    "iblis": {
-        "name": "Iblis",
-        "alt_names": ["Shaytan", "Azazil"],
-        "rank": "Fallen Jinn Leader",
-        "domain": "Pride, Temptation, Misguidance",
-        "legions": "All shayatin (demons)",
-        "tradition": "Islamic (Quran, Hadith)",
-        "superior": "None among jinn",
-        "subordinates": "All shayatin and evil jinn",
-        "symbols": "Fire, pride, refusal",
-        "description": "Islamic devil figure. Originally righteous jinn Azazil who refused to bow to Adam out of pride. Cast out of Paradise. Granted respite until Judgment Day to test humanity. Father of all demons in Islam."
-    },
-    
-    # ADDITIONAL DEMONS FROM VARIOUS TRADITIONS
-    "abaddon": {
-        "name": "Abaddon",
-        "alt_names": ["Apollyon", "The Destroyer"],
-        "rank": "Angel/Demon of the Abyss",
-        "domain": "Destruction, The Abyss, Locusts",
-        "legions": "Locust army",
-        "tradition": "Christian (Book of Revelation)",
-        "superior": "Bound in the Abyss",
-        "subordinates": "Locust army from the pit",
-        "symbols": "Key to the Abyss, locusts, smoke",
-        "description": "Angel of the Abyss in Revelation 9:11. Name means 'Destruction' in Hebrew, 'Apollyon' in Greek. Commands locust army with scorpion tails released from bottomless pit during End Times."
-    },
-    
-    "mastema": {
-        "name": "Mastema",
-        "alt_names": ["Chief of Evil Spirits"],
-        "rank": "Prince of Demons",
-        "domain": "Hostility, Testing, Accusation",
-        "legions": "Unknown",
-        "tradition": "Book of Jubilees, Dead Sea Scrolls",
-        "superior": "Allowed to operate by God",
-        "subordinates": "Evil spirits",
-        "symbols": "Hostility, testing",
-        "description": "Chief of evil spirits in Book of Jubilees. Name means 'Hostility.' Tests humanity with permission from God. Parallel to Satan's role as accuser. Requested spirits to remain on earth after the Flood."
-    },
-    
-    "gressil": {
-        "name": "Gressil",
-        "alt_names": [],
-        "rank": "Demon",
-        "domain": "Impurity, Uncleanness",
-        "legions": "Unknown",
-        "tradition": "Christian Demonology",
-        "superior": "Various",
-        "subordinates": "Demons of impurity",
-        "symbols": "Filth",
-        "description": "Demon of impurity and uncleanness. Third demon of the Possession of Loudun in 17th century France. Specializes in temptation through uncleanliness and impure thoughts."
-    },
-    
-    "sonneillon": {
-        "name": "Sonneillon",
-        "alt_names": [],
-        "rank": "Demon",
-        "domain": "Hatred, Discord",
-        "legions": "Unknown",
-        "tradition": "Christian Demonology",
-        "superior": "Various",
-        "subordinates": "Demons of hatred",
-        "symbols": "Discord",
-        "description": "Demon of hatred who creates discord between people. Associated with the Loudun possessions. Promotes enmity and destroys relationships."
-    },
-    
-    "verrier": {
-        "name": "Verrier",
-        "alt_names": ["Verrine"],
-        "rank": "Demon",
-        "domain": "Impatience, Health",
-        "legions": "Unknown",
-        "tradition": "Christian Demonology",
-        "superior": "Various",
-        "subordinates": "Unknown",
-        "symbols": "Restlessness",
-        "description": "Demon of impatience and health afflictions. Second demon of Loudun possessions. Causes restlessness, anxiety, and various health problems."
-    },
-    
-    "python": {
-        "name": "Python",
-        "alt_names": ["Spirit of Divination"],
-        "rank": "Demon",
-        "domain": "Divination, False Prophecy",
-        "legions": "Unknown",
-        "tradition": "Christian (New Testament)",
-        "superior": "Various",
-        "subordinates": "Spirits of divination",
-        "symbols": "Serpent, divination",
-        "description": "Spirit of divination mentioned in Acts 16:16. Associated with false prophecy and fortune-telling. Named after Python serpent of Greek mythology slain by Apollo at Delphi."
-    },
-    
-    "naamah": {
-        "name": "Naamah",
-        "alt_names": ["The Pleasing One"],
-        "rank": "Demon Princess",
-        "domain": "Seduction, Lust",
-        "legions": "Unknown",
-        "tradition": "Jewish mysticism, Kabbalah",
-        "superior": "Various",
-        "subordinates": "Succubi",
-        "symbols": "Beauty, seduction",
-        "description": "Female demon of seduction, one of four queens of demons with Lilith. Name means 'pleasing.' Mother of demons through relations with fallen angels. Associated with Lilith as corrupter."
-    },
-    
-    "agrat bat mahlat": {
-        "name": "Agrat bat Mahlat",
-        "alt_names": ["Igrat"],
-        "rank": "Demon Queen",
-        "domain": "Night, Seduction",
-        "legions": "Hosts of demons",
-        "tradition": "Jewish mysticism, Zohar",
-        "superior": "One of four queens",
-        "subordinates": "Legions of demons",
-        "symbols": "Night, chariot",
-        "description": "One of four demon queens with Lilith. Rides in chariot, rules Wednesday nights. Mates with Samael. Commands hosts of demons who roam at night seducing men."
-    },
-    
-    "eisheth zenunim": {
-        "name": "Eisheth Zenunim",
-        "alt_names": ["Woman of Whoredom"],
-        "rank": "Demon Queen",
-        "domain": "Prostitution, Corruption",
-        "legions": "Unknown",
-        "tradition": "Jewish mysticism, Kabbalah",
-        "superior": "One of four queens",
-        "subordinates": "Demons of prostitution",
-        "symbols": "Corruption",
-        "description": "One of four demon queens with Lilith. Name means 'Woman of Whoredom.' Rules demons of sacred prostitution and temple corruption. Mates with fallen angels."
-    },
-    
-    # ADDITIONAL WATCHERS
-    "baraqiel": {
-        "name": "Baraqiel",
-        "alt_names": ["Barakel", "Lightning of God"],
-        "rank": "Watcher",
-        "domain": "Astrology, Lightning",
-        "legions": "Unknown",
-        "tradition": "Book of Enoch",
-        "superior": "Semyaza",
-        "subordinates": "None specified",
-        "symbols": "Lightning, stars",
-        "description": "Watcher who taught astrology. Name means 'Lightning of God.' One of the leaders of the 200 Watchers who descended to breed with human women."
-    },
-    
-    "armaros": {
-        "name": "Armaros",
-        "alt_names": ["Arazyal"],
-        "rank": "Watcher",
-        "domain": "Resolving Enchantments",
-        "legions": "Unknown",
-        "tradition": "Book of Enoch",
-        "superior": "Semyaza",
-        "subordinates": "None specified",
-        "symbols": "Enchantments, counter-spells",
-        "description": "Watcher who taught the resolving of enchantments. One of the 200 fallen angels who taught forbidden knowledge to humanity."
-    },
-    
-    "penemue": {
-        "name": "Penemue",
-        "alt_names": ["Penemu"],
-        "rank": "Watcher",
-        "domain": "Writing, Wisdom",
-        "legions": "Unknown",
-        "tradition": "Book of Enoch",
-        "superior": "Semyaza",
-        "subordinates": "None specified",
-        "symbols": "Tablet, stylus, bitter wisdom",
-        "description": "Watcher who taught humans writing with ink and paper. Taught bitter and sweet wisdom. Led many into error through his teachings."
-    },
-    
-    "gadreel": {
-        "name": "Gadreel",
-        "alt_names": ["Wall of God"],
-        "rank": "Watcher",
-        "domain": "Warfare, Deception",
-        "legions": "Unknown",
-        "tradition": "Book of Enoch",
-        "superior": "Semyaza",
-        "subordinates": "None specified",
-        "symbols": "Weapons of war",
-        "description": "Watcher who taught the making of weapons of war and instruments of death. Led Eve astray according to some traditions. Introduced warfare and killing to humanity."
-    },
-    
-    "sariel": {
-        "name": "Sariel",
-        "alt_names": ["Suriel", "Prince of God"],
-        "rank": "Watcher/Archangel",
-        "domain": "Moon, Lunar cycles",
-        "legions": "Unknown",
-        "tradition": "Book of Enoch",
-        "superior": "Ambiguous (both angelic and fallen)",
-        "subordinates": "None specified",
-        "symbols": "Moon, lunar knowledge",
-        "description": "Taught the course of the moon. Listed among both holy angels and fallen Watchers in different texts. Name means 'Prince of God' or 'Command of God.'"
-    },
-    
-    "tamiel": {
-        "name": "Tamiel",
-        "alt_names": ["Kasdaye", "Perfection of God"],
-        "rank": "Watcher",
-        "domain": "Demon conjuration",
-        "legions": "Unknown",
-        "tradition": "Book of Enoch",
-        "superior": "Semyaza",
-        "subordinates": "None specified",
-        "symbols": "Summoning, spirits",
-        "description": "Watcher who taught humans how to conjure demons and evil spirits. Showed humanity various strikes and blows. Name means 'Perfection of God.'"
-    },
-    
-    "yeqon": {
-        "name": "Yeqon",
-        "alt_names": [],
-        "rank": "Watcher",
-        "domain": "Seduction, Leading astray",
-        "legions": "Unknown",
-        "tradition": "Book of Enoch",
-        "superior": "Semyaza",
-        "subordinates": "None specified",
-        "symbols": "Seduction",
-        "description": "Watcher who led astray the sons of God (angels) and brought them down to Earth to breed with human women. Instrumental in the initial corruption of the Watchers."
-    },
-    
-    # ADDITIONAL NOTABLE DEMONS
-    "moloch": {
-        "name": "Moloch",
-        "alt_names": ["Molech", "Molekh"],
-        "rank": "Prince/Demon God",
-        "domain": "Child Sacrifice, Fire",
-        "legions": "Unknown",
-        "tradition": "Hebrew Bible, Christian",
-        "superior": "Various (associated with Thaumiel)",
-        "subordinates": "Demons of cruelty",
-        "symbols": "Bronze statue, fire, bull head",
-        "description": "Ancient Canaanite deity associated with child sacrifice. Children were burned alive in his bronze statue. Mentioned multiple times in Hebrew Bible as abomination. Associated with Satan in Milton's Paradise Lost."
-    },
-    
-    "dagon": {
-        "name": "Dagon",
-        "alt_names": ["Dagan"],
-        "rank": "Demon Prince",
-        "domain": "Sea, Fish, Grain",
-        "legions": "Unknown",
-        "tradition": "Philistine, Hebrew Bible",
-        "superior": "Various",
-        "subordinates": "Sea demons",
-        "symbols": "Fish body, grain",
-        "description": "Philistine deity, god of grain and fish. Depicted as merman. Temple collapsed when Ark of Covenant was placed there. Chief deity of Philistines mentioned in Judges and Samuel."
-    },
-    
-    "chemosh": {
-        "name": "Chemosh",
-        "alt_names": [],
-        "rank": "Demon God",
-        "domain": "War, Moabites",
-        "legions": "Unknown",
-        "tradition": "Hebrew Bible, Moabite",
-        "superior": "Various",
-        "subordinates": "Demons of war",
-        "symbols": "War, destruction",
-        "description": "National god of Moabites. Associated with human sacrifice. Mentioned in Hebrew Bible as abomination. Solomon built high place for Chemosh. Rival to Yahweh in ancient Near East."
-    },
-    
-    "baal": {
-        "name": "Baal",
-        "alt_names": ["Baal Hadad", "Lord"],
-        "rank": "Demon Prince/God",
-        "domain": "Storms, Fertility, False Worship",
-        "legions": "Various",
-        "tradition": "Canaanite, Hebrew Bible",
-        "superior": "Becomes demon in Judeo-Christian tradition",
-        "subordinates": "Various Baalim",
-        "symbols": "Bull, lightning, storm",
-        "description": "Chief Canaanite deity meaning 'Lord.' Storm and fertility god. Major rival to Yahweh worship. Became demon in Judeo-Christian tradition. Elijah challenged prophets of Baal on Mount Carmel."
-    },
-    
-    "astaroth": {
-        "name": "Astaroth",
-        "alt_names": ["Astarte", "Ashtoreth", "Ishtar"],
-        "rank": "Great Duke",
-        "domain": "Knowledge, Secrets, Past/Future",
-        "legions": "40",
-        "tradition": "Phoenician goddess, Ars Goetia",
-        "superior": "Lucifer",
-        "subordinates": "40 legions",
-        "symbols": "Star, evening star",
-        "description": "Originally Phoenician/Canaanite fertility goddess Astarte. Became great duke of hell. Appears riding dragon, holding viper. Answers questions, reveals secrets. Dangerous breath requires magical defense."
-    },
-    
-    "adramelech": {
-        "name": "Adramelech",
-        "alt_names": ["King of Fire"],
-        "rank": "Grand Chancellor of Hell",
-        "domain": "Fire, Pride, Clothing",
-        "legions": "Unknown",
-        "tradition": "Assyrian, Christian Demonology",
-        "superior": "High-ranking infernal nobility",
-        "subordinates": "Various demons",
-        "symbols": "Peacock, mule, human upper body",
-        "description": "Assyrian sun god who became Grand Chancellor of Hell. President of the High Council of Devils. Appears as peacock or mule with human upper body. Associated with fire worship and child sacrifice."
-    },
-    
-    "lucifuge rofocale": {
-        "name": "Lucifuge Rofocale",
-        "alt_names": ["Focalor variant"],
-        "rank": "Prime Minister of Hell",
-        "domain": "Wealth, Pacts, Avoidance of Light",
-        "legions": "Unknown",
-        "tradition": "Grimorium Verum, Grand Grimoire",
-        "superior": "Lucifer",
-        "subordinates": "Manages infernal contracts",
-        "symbols": "Fleeing light, contracts",
-        "description": "Prime Minister of Hell in grimoire tradition. Name means 'He who flees light.' Controls wealth and treasures of the world. Manages pacts between demons and humans. Appears in Grand Grimoire."
-    },
-    
-    "mephistopheles": {
-        "name": "Mephistopheles",
-        "alt_names": ["Mephisto"],
-        "rank": "Demon",
-        "domain": "Pacts, Souls, Deception",
-        "legions": "Unknown",
-        "tradition": "German Folklore, Faust Legend",
-        "superior": "Lucifer (in most versions)",
-        "subordinates": "Various",
-        "symbols": "Pact, quill, Faust",
-        "description": "Demon from Faust legend who makes pact for Doctor Faustus's soul. Sophisticated, cultured demon. Name possibly from Hebrew 'mephir' (destroyer) and 'tophel' (liar). Made famous by Marlowe and Goethe."
-    },
-    
-    "eurynome": {
-        "name": "Eurynome",
-        "alt_names": ["Prince of Death"],
-        "rank": "Superior Demon",
-        "domain": "Death, Corpses, Teeth",
-        "legions": "Unknown",
-        "tradition": "Christian Demonology",
-        "superior": "Lucifer",
-        "subordinates": "Demons of death",
-        "symbols": "Rotting corpse, long teeth, fox pelt",
-        "description": "Prince of Death with hideously long teeth. Feeds on corpses. Appears covered in fox pelts. Name from Greek mythology (a different entity). Demon of horrible appearance who presides over death."
-    },
-    
-    "leonard": {
-        "name": "Leonard",
-        "alt_names": ["Master Leonard"],
-        "rank": "Grand Master of Sabbaths",
-        "domain": "Witches' Sabbaths, Black Magic",
-        "legions": "Unknown",
-        "tradition": "European Witchcraft, Inquisition Records",
-        "superior": "Satan",
-        "subordinates": "Witches, minor demons",
-        "symbols": "Black goat, three horns",
-        "description": "Inspector General of Black Magic and Grand Master of Nocturnal Orgies. Appears as large black goat with three horns. Presides over witches' sabbaths. Mentioned in witch trial records."
-    },
-    
-    "buer": {
-        "name": "Buer",
-        "alt_names": [],
-        "rank": "President",
-        "domain": "Healing, Philosophy, Herbs",
-        "legions": "50",
-        "tradition": "Ars Goetia",
-        "superior": "Lucifer",
-        "subordinates": "50 legions",
-        "symbols": "Star/wheel with five goat legs, lion head",
-        "description": "President of Hell appearing as five-rayed star with lion head in center and goat legs. Teaches philosophy, natural and moral logic. Heals all diseases, provides good familiars. One of few healing demons."
-    }
-}
-
-# ============================================================
-# HELPER FUNCTIONS
-# ============================================================
-
-def get_random_entity():
-    """Get a random entity from the hierarchy"""
-    return random.choice(list(HIERARCHY_DB.keys()))
-
-def search_hierarchy(keyword):
-    """Search hierarchy by keyword in name, domain, or description"""
-    keyword_lower = keyword.lower()
-    results = []
-    
-    for key, entity in HIERARCHY_DB.items():
-        # Search in name, alt names, domain, and description
-        if (keyword_lower in entity["name"].lower() or
-            keyword_lower in entity["domain"].lower() or
-            keyword_lower in entity["description"].lower() or
-            any(keyword_lower in alt.lower() for alt in entity.get("alt_names", []))):
-            results.append((key, entity))
-    
-    return results
-
-def get_entity_list(page=1, per_page=20):
-    """Get paginated list of all entities"""
-    sorted_keys = sorted(HIERARCHY_DB.keys(), key=lambda k: HIERARCHY_DB[k]["name"])
-    total = len(sorted_keys)
-    total_pages = (total + per_page - 1) // per_page
-    
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    
-    page_keys = sorted_keys[start_idx:end_idx]
-    page_entities = [(k, HIERARCHY_DB[k]) for k in page_keys]
-    
-    return page_entities, page, total_pages, total
-
-def get_entities_by_tradition(tradition):
-    """Get all entities from a specific tradition"""
-    results = []
-    tradition_lower = tradition.lower()
-    
-    for key, entity in HIERARCHY_DB.items():
-        if tradition_lower in entity["tradition"].lower():
-            results.append((key, entity))
-    
-    return results
-
-def get_entities_by_rank(rank):
-    """Get all entities of a specific rank"""
-    results = []
-    rank_lower = rank.lower()
-    
-    for key, entity in HIERARCHY_DB.items():
-        if rank_lower in entity["rank"].lower():
-            results.append((key, entity))
-    
-    return results
-
-def get_goetia_spirits():
-    """Get all 72 Goetia spirits in order"""
-    goetia_order = [
-        "bael", "agares", "vassago", "samigina", "marbas", "valefor", "amon", "barbatos", 
-        "paimon", "buer", "gusion", "sitri", "beleth", "leraje", "eligos", "zepar", 
-        "botis", "bathin", "sallos", "purson", "marax", "ipos", "aim", "naberius", 
-        "glasya-labolas", "bune", "ronove", "berith", "astaroth", "forneus", "foras", 
-        "asmoday", "gaap", "furfur", "marchosias", "stolas", "phenex", "halphas", 
-        "malphas", "raum", "focalor", "vepar", "sabnock", "shax", "vine", "bifrons", 
-        "uvall", "haagenti", "crocell", "furcas", "balam", "alloces", "caim", "murmur", 
-        "orobas", "gremory", "ose", "amy", "orias", "vapula", "zagan", "volac", 
-        "andras", "haures", "andrealphus", "kimaris", "amdusias", "belial", "decarabia", 
-        "seere", "dantalion", "andromalius"
-    ]
-    
-    return [(key, HIERARCHY_DB[key]) for key in goetia_order if key in HIERARCHY_DB]
-
-def get_full_hierarchy_chart():
-    """Generate ASCII hierarchy chart"""
-    chart = """
-═══════════════════════════════════════════
-        HIERARCHY OF THE FALLEN
-═══════════════════════════════════════════
-
-👑 SUPREME RULER
-   Lucifer/Satan (The Adversary)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-⚔️ THE SEVEN PRINCES (Deadly Sins)
-   ├─ Lucifer - Pride
-   ├─ Mammon - Greed  
-   ├─ Asmodeus - Lust
-   ├─ Leviathan - Envy
-   ├─ Beelzebub - Gluttony
-   ├─ Satan/Amon - Wrath
-   └─ Belphegor - Sloth
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-👁️ THE WATCHERS (Book of Enoch)
-   ├─ Semyaza - Leader (200 Watchers)
-   ├─ Azazel - Forbidden Knowledge
-   ├─ Kokabiel - Astrology
-   ├─ Baraqiel - Lightning/Astrology
-   ├─ Armaros - Enchantments
-   ├─ Penemue - Writing
-   ├─ Gadreel - Warfare
-   ├─ Sariel - Moon
-   ├─ Tamiel - Demon Conjuration
-   └─ Yeqon - Seduction
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🗡️ ARS GOETIA (72 Demons) - NOW COMPLETE!
-   
-   Kings (9): Bael, Paimon, Beleth, Purson,
-             Asmoday, Vine, Balam, Zagan, Belial
-   
-   Dukes (26): Agares, Valefor, Barbatos, Gusion,
-              Eligos, Zepar, Bathin, Sallos, Astaroth,
-              and 17 more...
-   
-   Princes (11): Vassago, Sitri, Ipos, Gaap,
-                Stolas, Orobas, Seere, and 4 more...
-   
-   Marquises (17): Samigina, Leraje, Naberius,
-                   Ronove, Forneus, Marchosias,
-                   Phenex, and 10 more...
-   
-   Counts/Presidents/Knights: 9 more spirits
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🌑 QLIPHOTH (Kabbalah Shadow Tree)
-   ├─ Thaumiel - Duality (Satan & Moloch)
-   ├─ Ghagiel - Hindrance (Beelzebub)
-   ├─ Satariel - Concealment (Lucifuge)
-   └─ Gamchicoth - Disruption (Astaroth)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🏺 MESOPOTAMIAN HIERARCHY
-   ├─ Pazuzu - King of Wind Demons
-   ├─ Labubu - Wind Demon
-   ├─ Lamashtu - Child Killer
-   └─ Lilitu - Night Demons
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✡️ JEWISH MYSTICISM
-   ├─ Lilith - Queen of Demons
-   ├─ Samael - Angel of Death
-   ├─ Naamah - Seduction
-   ├─ Agrat bat Mahlat - Night Queen
-   └─ Eisheth Zenunim - Whoredom
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-☪️ ISLAMIC TRADITION
-   └─ Iblis - Fallen Jinn Leader
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📜 OTHER NOTABLE DEMONS
-   ├─ Abaddon/Apollyon - Angel of the Abyss
-   ├─ Moloch - Child Sacrifice
-   ├─ Dagon - Philistine Sea God
-   ├─ Baal - Storm God/False Worship
-   ├─ Adramelech - Grand Chancellor
-   ├─ Lucifuge Rofocale - Prime Minister
-   ├─ Mephistopheles - Soul Pacts
-   └─ Mastema - Chief of Evil Spirits
-
-Use .hierarchy [name] for detailed info
-Use .hierarchy random for random entity
-Use .hierarchy search [keyword] to find entities
-Use .hierarchy goetia for all 72 spirits
-Use .hierarchy tradition [name] for tradition-specific
-"""
-    return chart
-
-
- # SUPREME RULER
-    "lucifer": {
+     "lucifer": {
         "name": "Lucifer",
         "alt_names": ["Satan", "The Adversary", "Light-Bearer", "Morning Star"],
         "rank": "Supreme Ruler",
@@ -3506,3 +2927,579 @@ Use .hierarchy tradition [name] for tradition-specific
         "description": "Demon encountered in Enochian magic workings. Related or identical to Choronzon in some systems. Represents barriers and obstacles to spiritual attainment. Mentioned in John Dee's Enochian system."
     },
     
+    # JEWISH MYSTICISM
+    "lilith": {
+        "name": "Lilith",
+        "alt_names": ["The First Eve", "Queen of Demons", "Lilitu"],
+        "rank": "Queen of Demons",
+        "domain": "Night, Seduction, Infant Death",
+        "legions": "Lilin (demon children)",
+        "tradition": "Jewish mysticism, Kabbalah, Talmud",
+        "superior": "Samael (consort)",
+        "subordinates": "The Lilin (her demon children)",
+        "symbols": "Owl, screech owl, serpent, moon",
+        "description": "Adam's first wife who refused submission and fled Eden. Became queen of demons. Seduces men in sleep, strangles infants. Mother of demons. Consort of Samael. Appears in Isaiah 34:14."
+    },
+    
+    "samael": {
+        "name": "Samael",
+        "alt_names": ["Poison of God", "Venom of God", "Blind God"],
+        "rank": "Archangel/Demon Prince",
+        "domain": "Death, Accusation, Temptation",
+        "legions": "Unknown",
+        "tradition": "Jewish mysticism, Kabbalah, Talmud",
+        "superior": "Depends on tradition",
+        "subordinates": "Various demons, consort Lilith",
+        "symbols": "Sword, serpent, poison",
+        "description": "Fallen archangel, Angel of Death in some texts. Accused of being the serpent in Eden. Consort of Lilith. Rules the Fifth Heaven. Name means 'Venom of God.' Both angel and demon in different sources."
+    },
+    
+    # ISLAMIC TRADITION
+    "iblis": {
+        "name": "Iblis",
+        "alt_names": ["Shaytan", "Azazil"],
+        "rank": "Fallen Jinn Leader",
+        "domain": "Pride, Temptation, Misguidance",
+        "legions": "All shayatin (demons)",
+        "tradition": "Islamic (Quran, Hadith)",
+        "superior": "None among jinn",
+        "subordinates": "All shayatin and evil jinn",
+        "symbols": "Fire, pride, refusal",
+        "description": "Islamic devil figure. Originally righteous jinn Azazil who refused to bow to Adam out of pride. Cast out of Paradise. Granted respite until Judgment Day to test humanity. Father of all demons in Islam."
+    },
+    
+    # ADDITIONAL DEMONS FROM VARIOUS TRADITIONS
+    "abaddon": {
+        "name": "Abaddon",
+        "alt_names": ["Apollyon", "The Destroyer"],
+        "rank": "Angel/Demon of the Abyss",
+        "domain": "Destruction, The Abyss, Locusts",
+        "legions": "Locust army",
+        "tradition": "Christian (Book of Revelation)",
+        "superior": "Bound in the Abyss",
+        "subordinates": "Locust army from the pit",
+        "symbols": "Key to the Abyss, locusts, smoke",
+        "description": "Angel of the Abyss in Revelation 9:11. Name means 'Destruction' in Hebrew, 'Apollyon' in Greek. Commands locust army with scorpion tails released from bottomless pit during End Times."
+    },
+    
+    "mastema": {
+        "name": "Mastema",
+        "alt_names": ["Chief of Evil Spirits"],
+        "rank": "Prince of Demons",
+        "domain": "Hostility, Testing, Accusation",
+        "legions": "Unknown",
+        "tradition": "Book of Jubilees, Dead Sea Scrolls",
+        "superior": "Allowed to operate by God",
+        "subordinates": "Evil spirits",
+        "symbols": "Hostility, testing",
+        "description": "Chief of evil spirits in Book of Jubilees. Name means 'Hostility.' Tests humanity with permission from God. Parallel to Satan's role as accuser. Requested spirits to remain on earth after the Flood."
+    },
+    
+    "gressil": {
+        "name": "Gressil",
+        "alt_names": [],
+        "rank": "Demon",
+        "domain": "Impurity, Uncleanness",
+        "legions": "Unknown",
+        "tradition": "Christian Demonology",
+        "superior": "Various",
+        "subordinates": "Demons of impurity",
+        "symbols": "Filth",
+        "description": "Demon of impurity and uncleanness. Third demon of the Possession of Loudun in 17th century France. Specializes in temptation through uncleanliness and impure thoughts."
+    },
+    
+    "sonneillon": {
+        "name": "Sonneillon",
+        "alt_names": [],
+        "rank": "Demon",
+        "domain": "Hatred, Discord",
+        "legions": "Unknown",
+        "tradition": "Christian Demonology",
+        "superior": "Various",
+        "subordinates": "Demons of hatred",
+        "symbols": "Discord",
+        "description": "Demon of hatred who creates discord between people. Associated with the Loudun possessions. Promotes enmity and destroys relationships."
+    },
+    
+    "verrier": {
+        "name": "Verrier",
+        "alt_names": ["Verrine"],
+        "rank": "Demon",
+        "domain": "Impatience, Health",
+        "legions": "Unknown",
+        "tradition": "Christian Demonology",
+        "superior": "Various",
+        "subordinates": "Unknown",
+        "symbols": "Restlessness",
+        "description": "Demon of impatience and health afflictions. Second demon of Loudun possessions. Causes restlessness, anxiety, and various health problems."
+    },
+    
+    "python": {
+        "name": "Python",
+        "alt_names": ["Spirit of Divination"],
+        "rank": "Demon",
+        "domain": "Divination, False Prophecy",
+        "legions": "Unknown",
+        "tradition": "Christian (New Testament)",
+        "superior": "Various",
+        "subordinates": "Spirits of divination",
+        "symbols": "Serpent, divination",
+        "description": "Spirit of divination mentioned in Acts 16:16. Associated with false prophecy and fortune-telling. Named after Python serpent of Greek mythology slain by Apollo at Delphi."
+    },
+    
+    "naamah": {
+        "name": "Naamah",
+        "alt_names": ["The Pleasing One"],
+        "rank": "Demon Princess",
+        "domain": "Seduction, Lust",
+        "legions": "Unknown",
+        "tradition": "Jewish mysticism, Kabbalah",
+        "superior": "Various",
+        "subordinates": "Succubi",
+        "symbols": "Beauty, seduction",
+        "description": "Female demon of seduction, one of four queens of demons with Lilith. Name means 'pleasing.' Mother of demons through relations with fallen angels. Associated with Lilith as corrupter."
+    },
+    
+    "agrat bat mahlat": {
+        "name": "Agrat bat Mahlat",
+        "alt_names": ["Igrat"],
+        "rank": "Demon Queen",
+        "domain": "Night, Seduction",
+        "legions": "Hosts of demons",
+        "tradition": "Jewish mysticism, Zohar",
+        "superior": "One of four queens",
+        "subordinates": "Legions of demons",
+        "symbols": "Night, chariot",
+        "description": "One of four demon queens with Lilith. Rides in chariot, rules Wednesday nights. Mates with Samael. Commands hosts of demons who roam at night seducing men."
+    },
+    
+    "eisheth zenunim": {
+        "name": "Eisheth Zenunim",
+        "alt_names": ["Woman of Whoredom"],
+        "rank": "Demon Queen",
+        "domain": "Prostitution, Corruption",
+        "legions": "Unknown",
+        "tradition": "Jewish mysticism, Kabbalah",
+        "superior": "One of four queens",
+        "subordinates": "Demons of prostitution",
+        "symbols": "Corruption",
+        "description": "One of four demon queens with Lilith. Name means 'Woman of Whoredom.' Rules demons of sacred prostitution and temple corruption. Mates with fallen angels."
+    },
+    
+    # ADDITIONAL WATCHERS
+    "baraqiel": {
+        "name": "Baraqiel",
+        "alt_names": ["Barakel", "Lightning of God"],
+        "rank": "Watcher",
+        "domain": "Astrology, Lightning",
+        "legions": "Unknown",
+        "tradition": "Book of Enoch",
+        "superior": "Semyaza",
+        "subordinates": "None specified",
+        "symbols": "Lightning, stars",
+        "description": "Watcher who taught astrology. Name means 'Lightning of God.' One of the leaders of the 200 Watchers who descended to breed with human women."
+    },
+    
+    "armaros": {
+        "name": "Armaros",
+        "alt_names": ["Arazyal"],
+        "rank": "Watcher",
+        "domain": "Resolving Enchantments",
+        "legions": "Unknown",
+        "tradition": "Book of Enoch",
+        "superior": "Semyaza",
+        "subordinates": "None specified",
+        "symbols": "Enchantments, counter-spells",
+        "description": "Watcher who taught the resolving of enchantments. One of the 200 fallen angels who taught forbidden knowledge to humanity."
+    },
+    
+    "penemue": {
+        "name": "Penemue",
+        "alt_names": ["Penemu"],
+        "rank": "Watcher",
+        "domain": "Writing, Wisdom",
+        "legions": "Unknown",
+        "tradition": "Book of Enoch",
+        "superior": "Semyaza",
+        "subordinates": "None specified",
+        "symbols": "Tablet, stylus, bitter wisdom",
+        "description": "Watcher who taught humans writing with ink and paper. Taught bitter and sweet wisdom. Led many into error through his teachings."
+    },
+    
+    "gadreel": {
+        "name": "Gadreel",
+        "alt_names": ["Wall of God"],
+        "rank": "Watcher",
+        "domain": "Warfare, Deception",
+        "legions": "Unknown",
+        "tradition": "Book of Enoch",
+        "superior": "Semyaza",
+        "subordinates": "None specified",
+        "symbols": "Weapons of war",
+        "description": "Watcher who taught the making of weapons of war and instruments of death. Led Eve astray according to some traditions. Introduced warfare and killing to humanity."
+    },
+    
+    "sariel": {
+        "name": "Sariel",
+        "alt_names": ["Suriel", "Prince of God"],
+        "rank": "Watcher/Archangel",
+        "domain": "Moon, Lunar cycles",
+        "legions": "Unknown",
+        "tradition": "Book of Enoch",
+        "superior": "Ambiguous (both angelic and fallen)",
+        "subordinates": "None specified",
+        "symbols": "Moon, lunar knowledge",
+        "description": "Taught the course of the moon. Listed among both holy angels and fallen Watchers in different texts. Name means 'Prince of God' or 'Command of God.'"
+    },
+    
+    "tamiel": {
+        "name": "Tamiel",
+        "alt_names": ["Kasdaye", "Perfection of God"],
+        "rank": "Watcher",
+        "domain": "Demon conjuration",
+        "legions": "Unknown",
+        "tradition": "Book of Enoch",
+        "superior": "Semyaza",
+        "subordinates": "None specified",
+        "symbols": "Summoning, spirits",
+        "description": "Watcher who taught humans how to conjure demons and evil spirits. Showed humanity various strikes and blows. Name means 'Perfection of God.'"
+    },
+    
+    "yeqon": {
+        "name": "Yeqon",
+        "alt_names": [],
+        "rank": "Watcher",
+        "domain": "Seduction, Leading astray",
+        "legions": "Unknown",
+        "tradition": "Book of Enoch",
+        "superior": "Semyaza",
+        "subordinates": "None specified",
+        "symbols": "Seduction",
+        "description": "Watcher who led astray the sons of God (angels) and brought them down to Earth to breed with human women. Instrumental in the initial corruption of the Watchers."
+    },
+    
+    # ADDITIONAL NOTABLE DEMONS
+    "moloch": {
+        "name": "Moloch",
+        "alt_names": ["Molech", "Molekh"],
+        "rank": "Prince/Demon God",
+        "domain": "Child Sacrifice, Fire",
+        "legions": "Unknown",
+        "tradition": "Hebrew Bible, Christian",
+        "superior": "Various (associated with Thaumiel)",
+        "subordinates": "Demons of cruelty",
+        "symbols": "Bronze statue, fire, bull head",
+        "description": "Ancient Canaanite deity associated with child sacrifice. Children were burned alive in his bronze statue. Mentioned multiple times in Hebrew Bible as abomination. Associated with Satan in Milton's Paradise Lost."
+    },
+    
+    "dagon": {
+        "name": "Dagon",
+        "alt_names": ["Dagan"],
+        "rank": "Demon Prince",
+        "domain": "Sea, Fish, Grain",
+        "legions": "Unknown",
+        "tradition": "Philistine, Hebrew Bible",
+        "superior": "Various",
+        "subordinates": "Sea demons",
+        "symbols": "Fish body, grain",
+        "description": "Philistine deity, god of grain and fish. Depicted as merman. Temple collapsed when Ark of Covenant was placed there. Chief deity of Philistines mentioned in Judges and Samuel."
+    },
+    
+    "chemosh": {
+        "name": "Chemosh",
+        "alt_names": [],
+        "rank": "Demon God",
+        "domain": "War, Moabites",
+        "legions": "Unknown",
+        "tradition": "Hebrew Bible, Moabite",
+        "superior": "Various",
+        "subordinates": "Demons of war",
+        "symbols": "War, destruction",
+        "description": "National god of Moabites. Associated with human sacrifice. Mentioned in Hebrew Bible as abomination. Solomon built high place for Chemosh. Rival to Yahweh in ancient Near East."
+    },
+    
+    "baal": {
+        "name": "Baal",
+        "alt_names": ["Baal Hadad", "Lord"],
+        "rank": "Demon Prince/God",
+        "domain": "Storms, Fertility, False Worship",
+        "legions": "Various",
+        "tradition": "Canaanite, Hebrew Bible",
+        "superior": "Becomes demon in Judeo-Christian tradition",
+        "subordinates": "Various Baalim",
+        "symbols": "Bull, lightning, storm",
+        "description": "Chief Canaanite deity meaning 'Lord.' Storm and fertility god. Major rival to Yahweh worship. Became demon in Judeo-Christian tradition. Elijah challenged prophets of Baal on Mount Carmel."
+    },
+    
+    "astaroth": {
+        "name": "Astaroth",
+        "alt_names": ["Astarte", "Ashtoreth", "Ishtar"],
+        "rank": "Great Duke",
+        "domain": "Knowledge, Secrets, Past/Future",
+        "legions": "40",
+        "tradition": "Phoenician goddess, Ars Goetia",
+        "superior": "Lucifer",
+        "subordinates": "40 legions",
+        "symbols": "Star, evening star",
+        "description": "Originally Phoenician/Canaanite fertility goddess Astarte. Became great duke of hell. Appears riding dragon, holding viper. Answers questions, reveals secrets. Dangerous breath requires magical defense."
+    },
+    
+    "adramelech": {
+        "name": "Adramelech",
+        "alt_names": ["King of Fire"],
+        "rank": "Grand Chancellor of Hell",
+        "domain": "Fire, Pride, Clothing",
+        "legions": "Unknown",
+        "tradition": "Assyrian, Christian Demonology",
+        "superior": "High-ranking infernal nobility",
+        "subordinates": "Various demons",
+        "symbols": "Peacock, mule, human upper body",
+        "description": "Assyrian sun god who became Grand Chancellor of Hell. President of the High Council of Devils. Appears as peacock or mule with human upper body. Associated with fire worship and child sacrifice."
+    },
+    
+    "lucifuge rofocale": {
+        "name": "Lucifuge Rofocale",
+        "alt_names": ["Focalor variant"],
+        "rank": "Prime Minister of Hell",
+        "domain": "Wealth, Pacts, Avoidance of Light",
+        "legions": "Unknown",
+        "tradition": "Grimorium Verum, Grand Grimoire",
+        "superior": "Lucifer",
+        "subordinates": "Manages infernal contracts",
+        "symbols": "Fleeing light, contracts",
+        "description": "Prime Minister of Hell in grimoire tradition. Name means 'He who flees light.' Controls wealth and treasures of the world. Manages pacts between demons and humans. Appears in Grand Grimoire."
+    },
+    
+    "mephistopheles": {
+        "name": "Mephistopheles",
+        "alt_names": ["Mephisto"],
+        "rank": "Demon",
+        "domain": "Pacts, Souls, Deception",
+        "legions": "Unknown",
+        "tradition": "German Folklore, Faust Legend",
+        "superior": "Lucifer (in most versions)",
+        "subordinates": "Various",
+        "symbols": "Pact, quill, Faust",
+        "description": "Demon from Faust legend who makes pact for Doctor Faustus's soul. Sophisticated, cultured demon. Name possibly from Hebrew 'mephir' (destroyer) and 'tophel' (liar). Made famous by Marlowe and Goethe."
+    },
+    
+    "eurynome": {
+        "name": "Eurynome",
+        "alt_names": ["Prince of Death"],
+        "rank": "Superior Demon",
+        "domain": "Death, Corpses, Teeth",
+        "legions": "Unknown",
+        "tradition": "Christian Demonology",
+        "superior": "Lucifer",
+        "subordinates": "Demons of death",
+        "symbols": "Rotting corpse, long teeth, fox pelt",
+        "description": "Prince of Death with hideously long teeth. Feeds on corpses. Appears covered in fox pelts. Name from Greek mythology (a different entity). Demon of horrible appearance who presides over death."
+    },
+    
+    "leonard": {
+        "name": "Leonard",
+        "alt_names": ["Master Leonard"],
+        "rank": "Grand Master of Sabbaths",
+        "domain": "Witches' Sabbaths, Black Magic",
+        "legions": "Unknown",
+        "tradition": "European Witchcraft, Inquisition Records",
+        "superior": "Satan",
+        "subordinates": "Witches, minor demons",
+        "symbols": "Black goat, three horns",
+        "description": "Inspector General of Black Magic and Grand Master of Nocturnal Orgies. Appears as large black goat with three horns. Presides over witches' sabbaths. Mentioned in witch trial records."
+    },
+    
+    "buer": {
+        "name": "Buer",
+        "alt_names": [],
+        "rank": "President",
+        "domain": "Healing, Philosophy, Herbs",
+        "legions": "50",
+        "tradition": "Ars Goetia",
+        "superior": "Lucifer",
+        "subordinates": "50 legions",
+        "symbols": "Star/wheel with five goat legs, lion head",
+        "description": "President of Hell appearing as five-rayed star with lion head in center and goat legs. Teaches philosophy, natural and moral logic. Heals all diseases, provides good familiars. One of few healing demons."
+    }
+}
+
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
+
+def get_random_entity():
+    """Get a random entity from the hierarchy"""
+    return random.choice(list(HIERARCHY_DB.keys()))
+
+def search_hierarchy(keyword):
+    """Search hierarchy by keyword in name, domain, or description"""
+    keyword_lower = keyword.lower()
+    results = []
+    
+    for key, entity in HIERARCHY_DB.items():
+        # Search in name, alt names, domain, and description
+        if (keyword_lower in entity["name"].lower() or
+            keyword_lower in entity["domain"].lower() or
+            keyword_lower in entity["description"].lower() or
+            any(keyword_lower in alt.lower() for alt in entity.get("alt_names", []))):
+            results.append((key, entity))
+    
+    return results
+
+def get_entity_list(page=1, per_page=20):
+    """Get paginated list of all entities"""
+    sorted_keys = sorted(HIERARCHY_DB.keys(), key=lambda k: HIERARCHY_DB[k]["name"])
+    total = len(sorted_keys)
+    total_pages = (total + per_page - 1) // per_page
+    
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    
+    page_keys = sorted_keys[start_idx:end_idx]
+    page_entities = [(k, HIERARCHY_DB[k]) for k in page_keys]
+    
+    return page_entities, page, total_pages, total
+
+def get_entities_by_tradition(tradition):
+    """Get all entities from a specific tradition"""
+    results = []
+    tradition_lower = tradition.lower()
+    
+    for key, entity in HIERARCHY_DB.items():
+        if tradition_lower in entity["tradition"].lower():
+            results.append((key, entity))
+    
+    return results
+
+def get_entities_by_rank(rank):
+    """Get all entities of a specific rank"""
+    results = []
+    rank_lower = rank.lower()
+    
+    for key, entity in HIERARCHY_DB.items():
+        if rank_lower in entity["rank"].lower():
+            results.append((key, entity))
+    
+    return results
+
+def get_goetia_spirits():
+    """Get all 72 Goetia spirits in order"""
+    goetia_order = [
+        "bael", "agares", "vassago", "samigina", "marbas", "valefor", "amon", "barbatos", 
+        "paimon", "buer", "gusion", "sitri", "beleth", "leraje", "eligos", "zepar", 
+        "botis", "bathin", "sallos", "purson", "marax", "ipos", "aim", "naberius", 
+        "glasya-labolas", "bune", "ronove", "berith", "astaroth", "forneus", "foras", 
+        "asmoday", "gaap", "furfur", "marchosias", "stolas", "phenex", "halphas", 
+        "malphas", "raum", "focalor", "vepar", "sabnock", "shax", "vine", "bifrons", 
+        "uvall", "haagenti", "crocell", "furcas", "balam", "alloces", "caim", "murmur", 
+        "orobas", "gremory", "ose", "amy", "orias", "vapula", "zagan", "volac", 
+        "andras", "haures", "andrealphus", "kimaris", "amdusias", "belial", "decarabia", 
+        "seere", "dantalion", "andromalius"
+    ]
+    
+    return [(key, HIERARCHY_DB[key]) for key in goetia_order if key in HIERARCHY_DB]
+
+def get_full_hierarchy_chart():
+    """Generate ASCII hierarchy chart"""
+    chart = """
+═══════════════════════════════════════════
+        HIERARCHY OF THE FALLEN
+═══════════════════════════════════════════
+
+👑 SUPREME RULER
+   Lucifer/Satan (The Adversary)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚔️ THE SEVEN PRINCES (Deadly Sins)
+   ├─ Lucifer - Pride
+   ├─ Mammon - Greed  
+   ├─ Asmodeus - Lust
+   ├─ Leviathan - Envy
+   ├─ Beelzebub - Gluttony
+   ├─ Satan/Amon - Wrath
+   └─ Belphegor - Sloth
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👁️ THE WATCHERS (Book of Enoch)
+   ├─ Semyaza - Leader (200 Watchers)
+   ├─ Azazel - Forbidden Knowledge
+   ├─ Kokabiel - Astrology
+   ├─ Baraqiel - Lightning/Astrology
+   ├─ Armaros - Enchantments
+   ├─ Penemue - Writing
+   ├─ Gadreel - Warfare
+   ├─ Sariel - Moon
+   ├─ Tamiel - Demon Conjuration
+   └─ Yeqon - Seduction
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🗡️ ARS GOETIA (72 Demons) - NOW COMPLETE!
+   
+   Kings (9): Bael, Paimon, Beleth, Purson,
+             Asmoday, Vine, Balam, Zagan, Belial
+   
+   Dukes (26): Agares, Valefor, Barbatos, Gusion,
+              Eligos, Zepar, Bathin, Sallos, Astaroth,
+              and 17 more...
+   
+   Princes (11): Vassago, Sitri, Ipos, Gaap,
+                Stolas, Orobas, Seere, and 4 more...
+   
+   Marquises (17): Samigina, Leraje, Naberius,
+                   Ronove, Forneus, Marchosias,
+                   Phenex, and 10 more...
+   
+   Counts/Presidents/Knights: 9 more spirits
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🌑 QLIPHOTH (Kabbalah Shadow Tree)
+   ├─ Thaumiel - Duality (Satan & Moloch)
+   ├─ Ghagiel - Hindrance (Beelzebub)
+   ├─ Satariel - Concealment (Lucifuge)
+   └─ Gamchicoth - Disruption (Astaroth)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🏺 MESOPOTAMIAN HIERARCHY
+   ├─ Pazuzu - King of Wind Demons
+   ├─ Labubu - Wind Demon
+   ├─ Lamashtu - Child Killer
+   └─ Lilitu - Night Demons
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✡️ JEWISH MYSTICISM
+   ├─ Lilith - Queen of Demons
+   ├─ Samael - Angel of Death
+   ├─ Naamah - Seduction
+   ├─ Agrat bat Mahlat - Night Queen
+   └─ Eisheth Zenunim - Whoredom
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+☪️ ISLAMIC TRADITION
+   └─ Iblis - Fallen Jinn Leader
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📜 OTHER NOTABLE DEMONS
+   ├─ Abaddon/Apollyon - Angel of the Abyss
+   ├─ Moloch - Child Sacrifice
+   ├─ Dagon - Philistine Sea God
+   ├─ Baal - Storm God/False Worship
+   ├─ Adramelech - Grand Chancellor
+   ├─ Lucifuge Rofocale - Prime Minister
+   ├─ Mephistopheles - Soul Pacts
+   └─ Mastema - Chief of Evil Spirits
+
+Use .hierarchy [name] for detailed info
+Use .hierarchy random for random entity
+Use .hierarchy search [keyword] to find entities
+Use .hierarchy goetia for all 72 spirits
+Use .hierarchy tradition [name] for tradition-specific
+"""
+    return chart
