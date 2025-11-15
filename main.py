@@ -1077,8 +1077,12 @@ async def commands_command(ctx):
 
 
 @bot.command(name="location")
-async def location_command(ctx, *, args: str):
+async def location_command(ctx, *, args: str = None):
     """Set your timezone location"""
+    # Check if location provided
+    if not args:
+        return await ctx.send("❌ Please provide a location. Usage: `.location Los Angeles`")
+    
     args_split = args.split()
     target_member = ctx.author
     location_query = args
