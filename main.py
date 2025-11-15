@@ -1296,42 +1296,32 @@ async def merge_quotes(ctx):
 
 
 @bot.command(name="battle")
-async def battle_command(
-    ctx, user1: discord.Member = None, user2: discord.Member = None
-):
-    """Start or stop reaction battles (Admin/Caporegime only)
+async def battle_command(ctx, *args):
+    """Start or stop reaction battles (Admin/Caporegime only)"""
 
-    Usage:
-    .battle @user1 @user2  - Start battle
-    .battle stop           - End current battle
-    """
-
-    # Permission check: Admin or Caporegime role
+    # Permission check
     if not (
         ctx.author.guild_permissions.administrator
         or any(role.name == "Caporegime" for role in ctx.author.roles)
     ):
         return await ctx.send("🚫 Peasant Detected")
 
-    # Handle stop command (if user1 is actually the word "stop")
-    if user1 and isinstance(user1, str) and user1.lower() == "stop":
+    # Check for stop command
+    if len(args) == 1 and args[0].lower() == "stop":
         await battle.stop_battle(ctx)
         return
 
-    # Check if we got two valid users
-    if not user1 or not user2:
-        # Check if they typed "stop"
-        if ctx.message.content.lower().endswith("stop"):
-            await battle.stop_battle(ctx)
-            return
-
+    # Check for two mentions
+    if len(ctx.message.mentions) != 2:
         return await ctx.send(
             "⚔️ **Battle Commands**\n\n"
             "`.battle @user1 @user2` - Start a battle\n"
             "`.battle stop` - End current battle"
         )
 
-    # Start the battle
+    user1 = ctx.message.mentions[0]
+    user2 = ctx.message.mentions[1]
+
     await battle.start_battle(ctx, user1, user2)
 
 

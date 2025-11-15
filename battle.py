@@ -249,8 +249,8 @@ async def start_battle(ctx, user1: discord.Member, user2: discord.Member):
 
     # Announce battle
     embed = discord.Embed(
-        title="⚔️ BATTLE COMMENCES",
-        description=f"Between {user1.mention} and {user2.mention}!\n\nReact to their messages to vote.\n⏰ **5 minutes!**",
+        title="⚔️ FIGHT",
+        description=f"{user1.mention} vs {user2.mention}!\n\nReact to their messages to vote.\n⏰",
         color=discord.Color.orange(),
     )
     await ctx.send(embed=embed)
