@@ -837,7 +837,7 @@ async def gematria_command(ctx, *, text: str = None):
 
     embed.add_field(name="**Reverse**", value=results["reverse"], inline=True)
     embed.add_field(
-        name="**Reverse Reduction**", value=results["reverse_reduction"], inline=True
+        name="**Rev Reduction**", value=results["reverse_reduction"], inline=True
     )
 
     embed.add_field(name="**Standard**", value=results["hebrew"], inline=True)
@@ -845,7 +845,7 @@ async def gematria_command(ctx, *, text: str = None):
 
     embed.add_field(name="**Sumerian**", value=results["sumerian"], inline=True)
     embed.add_field(
-        name="**Reverse Sumerian**", value=results["reverse_sumerian"], inline=True
+        name="**Rev Sumerian**", value=results["reverse_sumerian"], inline=True
     )
 
     await ctx.reply(embed=embed, mention_author=False)
@@ -963,7 +963,7 @@ async def hierarchy_command(ctx, *, args: str = None):
 # key
 
 
-@bot.command(name="kek")
+@bot.command(name="key")
 async def kek_command(ctx):
     """Sends a specific sticker 6 times (2 min cooldown for non-admins)"""
 
