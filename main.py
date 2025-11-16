@@ -976,20 +976,6 @@ async def kek_command(ctx):
     # Check if user is admin
     is_admin = ctx.author.guild_permissions.administrator
 
-    # Rate limit check for non-admins
-    if not is_admin:
-        user_id = ctx.author.id
-        current_time = time.time()
-
-        if user_id in kek_cooldowns:
-            time_passed = current_time - kek_cooldowns[user_id]
-            if time_passed < 460:  # 120 seconds = 2 minutes
-                remaining = int(460 - time_passed)
-                return await ctx.reply(f"⏰ Key is within you", mention_author=False)
-
-        # Update cooldown
-        kek_cooldowns[user_id] = current_time
-
     # Replace with your actual sticker ID
     STICKER_ID = (
         1416504837436342324  # Get this from right-clicking the sticker -> Copy ID
