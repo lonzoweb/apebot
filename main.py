@@ -831,17 +831,18 @@ async def gematria_command(ctx, *, text: str = None):
 
     embed = discord.Embed(title=f"{text}", color=0x5865F2)
 
-    # Row 1 - 4 fields
+    # 4 rows × 2 columns
     embed.add_field(name="**Ordinal**", value=results["ordinal"], inline=True)
     embed.add_field(name="**Reduction**", value=results["reduction"], inline=True)
+
     embed.add_field(name="**Reverse**", value=results["reverse"], inline=True)
     embed.add_field(
         name="**Reverse Reduction**", value=results["reverse_reduction"], inline=True
     )
 
-    # Row 2 - 4 fields
     embed.add_field(name="**Standard**", value=results["hebrew"], inline=True)
     embed.add_field(name="**Latin**", value=results["latin"], inline=True)
+
     embed.add_field(name="**Sumerian**", value=results["sumerian"], inline=True)
     embed.add_field(
         name="**Reverse Sumerian**", value=results["reverse_sumerian"], inline=True
@@ -962,13 +963,29 @@ async def hierarchy_command(ctx, *, args: str = None):
 # key
 
 
-@bot.command(name="key")
+@bot.command(name="kek")
 async def kek_command(ctx):
-    """Sends a specific sticker 6 times"""
-    # Replace this with your actual sticker ID
-    STICKER_ID = (
-        1416504837436342324  # Get this from right-clicking the sticker -> Copy ID
-    )
+    """Sends a specific sticker 6 times (2 min cooldown for non-admins)"""
+
+    # Check if user is admin
+    is_admin = ctx.author.guild_permissions.administrator
+
+    # Rate limit check for non-admins
+    if not is_admin:
+        user_id = ctx.author.id
+        current_time = time.time()
+
+        if user_id in kek_cooldowns:
+            time_passed = current_time - kek_cooldowns[user_id]
+            if time_passed < 460:  # 120 seconds = 2 minutes
+                remaining = int(460 - time_passed)
+                return await ctx.reply(f"⏰ Key is within you", mention_author=False)
+
+        # Update cooldown
+        kek_cooldowns[user_id] = current_time
+
+    # Replace with your actual sticker ID
+    STICKER_ID = 1234567890  # Get this from right-clicking the sticker -> Copy ID
 
     try:
         sticker = await ctx.guild.fetch_sticker(STICKER_ID)
