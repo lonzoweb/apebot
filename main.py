@@ -818,6 +818,7 @@ async def stats_command(ctx):
 
 @bot.command(name="gem")
 async def gematria_command(ctx, *, text: str = None):
+    # --- handle reply or plain text ---
     if ctx.message.reference:
         reply_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
         text = reply_msg.content
@@ -831,30 +832,20 @@ async def gematria_command(ctx, *, text: str = None):
 
     embed = discord.Embed(title=f"{text}", color=0x5865F2)
 
-    # Row 1
-    embed.add_field(name="**Ordinal**", value=results["ordinal"], inline=True)
-    embed.add_field(name="**Reduction**", value=results["reduction"], inline=True)
-    embed.add_field(name="\u200b", value="\u200b", inline=False)
+    block = f"""
+```ansi
+[0;32mOrdinal[0m          [1;32m{results['ordinal']:>4}[0m     [0;36mReverse Reduction[0m  [1;36m{results['reverse_reduction']:>4}[0m
+[0;34mReduction[0m        [1;34m{results['reduction']:>4}[0m   [0;35mReverse[0m            [1;35m{results['reverse']:>4}[0m
+[0;33mStandard[0m         [1;33m{results['hebrew']:>4}[0m      [0;95mLatin[0m              [1;95m{results['latin']:>4}[0m
+[0;32mSumerian[0m         [1;32m{results['sumerian']:>4}[0m    [0;93mRev Sumerian[0m       [1;93m{results['reverse_sumerian']:>4}[0m
+```"""
 
-    # Row 2
-    embed.add_field(name="**Reverse**", value=results["reverse"], inline=True)
-    embed.add_field(
-        name="**Rev Reduction**", value=results["reverse_reduction"], inline=True
-    )
-    embed.add_field(name="\u200b", value="\u200b", inline=False)
-
-    # Row 3
-    embed.add_field(name="**Standard**", value=results["hebrew"], inline=True)
-    embed.add_field(name="**Latin**", value=results["latin"], inline=True)
-    embed.add_field(name="\u200b", value="\u200b", inline=False)
-
-    # Row 4
-    embed.add_field(name="**Sumerian**", value=results["sumerian"], inline=True)
-    embed.add_field(
-        name="**Rev Sumerian**", value=results["reverse_sumerian"], inline=True
-    )
-
+    # --- ⬇️ ADD THESE TWO LINES HERE ⬇️ ---
+    embed.add_field(name="", value=block, inline=False)
     await ctx.reply(embed=embed, mention_author=False)
+
+
+# --- ⬆️ END HERE ⬆️ ---
 
 
 @bot.command(name="blessing")
