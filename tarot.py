@@ -623,8 +623,11 @@ async def send_tarot_card(ctx, card_key=None):
     file = discord.File(image_path, filename=f"{card_key}.png")
     embed.set_image(url=f"attachment://{card_key}.png")
 
-    # Add username in smallest text
+    # Add username in smallest text (skip for admins or specific role)
+    EXEMPT_ROLE_ID = None  # Replace with your role ID
+    if not ctx.author.guild_permissions.administrator and not discord.utils.get(ctx.author.roles, id=EXEMPT_ROLE_ID):
     embed.set_footer(text=f"{ctx.author.name}")
+
 
     # Send to Discord
     await ctx.send(file=file, embed=embed)
