@@ -818,12 +818,10 @@ async def stats_command(ctx):
 
 @bot.command(name="gem")
 async def gematria_command(ctx, *, text: str = None):
-    # If the command is replying to a message → use that text instead
     if ctx.message.reference:
         reply_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
         text = reply_msg.content
 
-    # Reject non-text (stickers, gifs, emojis, embeds, etc.)
     if not text or not any(ch.isalnum() for ch in text):
         return await ctx.reply(
             "⚠️ No valid text found to evaluate.", mention_author=False
@@ -831,35 +829,22 @@ async def gematria_command(ctx, *, text: str = None):
 
     results = calculate_all_gematria(text)
 
-    embed = discord.Embed(
-        title=f"**{text}**", color=0x2B2D31  # Dark grey to match Discord's dark theme
+    embed = discord.Embed(title=f"{text}", color=0x5865F2)
+
+    # Row 1 - 4 fields
+    embed.add_field(name="**Ordinal**", value=results["ordinal"], inline=True)
+    embed.add_field(name="**Reduction**", value=results["reduction"], inline=True)
+    embed.add_field(name="**Reverse**", value=results["reverse"], inline=True)
+    embed.add_field(
+        name="**Reverse Reduction**", value=results["reverse_reduction"], inline=True
     )
 
-    # Row 1 - Green, Blue, Green (matching gematrinator colors)
-    embed.add_field(name="🟢 Ordinal", value=f"**{results['ordinal']}**", inline=True)
+    # Row 2 - 4 fields
+    embed.add_field(name="**Standard**", value=results["hebrew"], inline=True)
+    embed.add_field(name="**Latin**", value=results["latin"], inline=True)
+    embed.add_field(name="**Sumerian**", value=results["sumerian"], inline=True)
     embed.add_field(
-        name="🔵 Reduction", value=f"**{results['reduction']}**", inline=True
-    )
-    embed.add_field(name="🟢 Reverse", value=f"**{results['reverse']}**", inline=True)
-
-    # Row 2 - Cyan
-    embed.add_field(
-        name="🔷 Reverse Reduction",
-        value=f"**{results['reverse_reduction']}**",
-        inline=True,
-    )
-    embed.add_field(name="🟡 Standard", value=f"**{results['hebrew']}**", inline=True)
-    embed.add_field(name="🟣 Latin", value=f"**{results['latin']}**", inline=True)
-
-    # Row 3 - Yellow/Beige colors
-    embed.add_field(name="🟢 Sumerian", value=f"**{results['sumerian']}**", inline=True)
-    embed.add_field(
-        name="🟡 Reverse Sumerian",
-        value=f"**{results['reverse_sumerian']}**",
-        inline=True,
-    )
-    embed.add_field(
-        name="\u200b", value="\u200b", inline=True  # Empty field for spacing
+        name="**Reverse Sumerian**", value=results["reverse_sumerian"], inline=True
     )
 
     await ctx.reply(embed=embed, mention_author=False)
