@@ -623,5 +623,8 @@ async def send_tarot_card(ctx, card_key=None):
     file = discord.File(image_path, filename=f"{card_key}.png")
     embed.set_image(url=f"attachment://{card_key}.png")
 
+    # Add username in smallest text
+    embed.set_footer(text=f"{ctx.author.name}")
+
     # Send to Discord
     await ctx.send(file=file, embed=embed)
