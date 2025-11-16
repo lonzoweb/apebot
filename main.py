@@ -831,22 +831,35 @@ async def gematria_command(ctx, *, text: str = None):
 
     results = calculate_all_gematria(text)
 
-    embed = discord.Embed(title=f"**{text}**", color=discord.Color.dark_grey())
-
-    # Row 1 - 4 columns
-    embed.add_field(name="Ordinal", value=str(results["ordinal"]), inline=True)
-    embed.add_field(name="Reduction", value=str(results["reduction"]), inline=True)
-    embed.add_field(name="Reverse", value=str(results["reverse"]), inline=True)
-    embed.add_field(
-        name="Reverse Reduction", value=str(results["reverse_reduction"]), inline=True
+    embed = discord.Embed(
+        title=f"**{text}**", color=0x2B2D31  # Dark grey to match Discord's dark theme
     )
 
-    # Row 2 - 4 columns
-    embed.add_field(name="Standard", value=str(results["hebrew"]), inline=True)
-    embed.add_field(name="Latin", value=str(results["latin"]), inline=True)
-    embed.add_field(name="Sumerian", value=str(results["sumerian"]), inline=True)
+    # Row 1 - Green, Blue, Green (matching gematrinator colors)
+    embed.add_field(name="🟢 Ordinal", value=f"**{results['ordinal']}**", inline=True)
     embed.add_field(
-        name="Reverse Sumerian", value=str(results["reverse_sumerian"]), inline=True
+        name="🔵 Reduction", value=f"**{results['reduction']}**", inline=True
+    )
+    embed.add_field(name="🟢 Reverse", value=f"**{results['reverse']}**", inline=True)
+
+    # Row 2 - Cyan
+    embed.add_field(
+        name="🔷 Reverse Reduction",
+        value=f"**{results['reverse_reduction']}**",
+        inline=True,
+    )
+    embed.add_field(name="🟡 Standard", value=f"**{results['hebrew']}**", inline=True)
+    embed.add_field(name="🟣 Latin", value=f"**{results['latin']}**", inline=True)
+
+    # Row 3 - Yellow/Beige colors
+    embed.add_field(name="🟢 Sumerian", value=f"**{results['sumerian']}**", inline=True)
+    embed.add_field(
+        name="🟡 Reverse Sumerian",
+        value=f"**{results['reverse_sumerian']}**",
+        inline=True,
+    )
+    embed.add_field(
+        name="\u200b", value="\u200b", inline=True  # Empty field for spacing
     )
 
     await ctx.reply(embed=embed, mention_author=False)
