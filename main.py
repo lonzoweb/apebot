@@ -832,14 +832,31 @@ async def gematria_command(ctx, *, text: str = None):
 
     embed = discord.Embed(title=f"{text}", color=0x5865F2)
 
-    # --- compact table-style code block ---
+    # --- narrow Gematrinator-style code block ---
     block = f"""```
-┌─────────────┬─────┬───────────────┬─────┐
-│ Ordinal     │{results['ordinal']:>3} │ Rev Reduction │{results['reverse_reduction']:>3} │
-│ Reduction   │{results['reduction']:>3} │ Reverse       │{results['reverse']:>3} │
-│ Standard    │{results['hebrew']:>3} │ Latin         │{results['latin']:>3} │
-│ Sumerian    │{results['sumerian']:>3} │ Rev Sumerian  │{results['reverse_sumerian']:>3} │
-└─────────────┴─────┴───────────────┴─────┘
+Ordinal
+  {results['ordinal']}
+
+Standard
+  {results['hebrew']}
+
+Reduction
+  {results['reduction']}
+
+Reverse Reduction
+  {results['reverse_reduction']}
+
+Reverse
+  {results['reverse']}
+
+Latin
+  {results['latin']}
+
+Sumerian
+  {results['sumerian']}
+
+Rev Sumerian
+  {results['reverse_sumerian']}
 ```"""
 
     # --- ⬇️ ADD THESE TWO LINES HERE ⬇️ ---
