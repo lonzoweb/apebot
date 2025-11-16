@@ -360,6 +360,45 @@ def fibonacci_values(text: str):
     return [fib_map[ord(ch) - 65] for ch in letters]
 
 
+def latin_values(text: str):
+    """
+    Get Latin Gematria values (classical Latin alphabet order).
+    Letter order: A B C D E F G H I K L M N O P Q R S T U X Y Z J V W
+    Values: 1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,900
+    """
+    # Map letters to their Latin gematria values
+    latin_map = {
+        "A": 1,
+        "B": 2,
+        "C": 3,
+        "D": 4,
+        "E": 5,
+        "F": 6,
+        "G": 7,
+        "H": 8,
+        "I": 9,
+        "K": 10,
+        "L": 20,
+        "M": 30,
+        "N": 40,
+        "O": 50,
+        "P": 60,
+        "Q": 70,
+        "R": 80,
+        "S": 90,
+        "T": 100,
+        "U": 200,
+        "X": 300,
+        "Y": 400,
+        "Z": 500,
+        "J": 600,
+        "V": 700,
+        "W": 900,
+    }
+    letters = text_to_letters(text)
+    return [latin_map.get(ch, 0) for ch in letters]
+
+
 def calculate_ordinal(text: str) -> int:
     """Calculate simple ordinal sum (A=1, B=2, ..., Z=26)."""
     return sum(ordinal_values(text))
@@ -393,6 +432,11 @@ def calculate_fibonacci(text: str) -> int:
     return sum(fibonacci_values(text))
 
 
+def calculate_latin(text: str) -> int:
+    """Calculate Latin Gematria sum."""
+    return sum(latin_values(text))
+
+
 def calculate_all_gematria(text: str):
     """Calculate all gematria cipher values for the given text."""
     ord_vals = ordinal_values(text)
@@ -402,6 +446,7 @@ def calculate_all_gematria(text: str):
     heb_vals = hebrew_values(text)
     eng_vals = english_gematria_values(text)
     fib_vals = fibonacci_values(text)
+    lat_vals = latin_values(text)
 
     return {
         "hebrew": sum(heb_vals),
@@ -411,6 +456,7 @@ def calculate_all_gematria(text: str):
         "reverse": sum(rev_vals),
         "reverse_reduction": sum(rev_red_vals),
         "fibonacci": sum(fib_vals),
+        "latin": sum(lat_vals),
     }
 
 

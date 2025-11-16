@@ -844,6 +844,7 @@ async def gematria_command(ctx, *, text: str = None):
     embed.add_field(name="Hebrew", value=str(results["hebrew"]), inline=False)
     embed.add_field(name="English", value=str(results["english"]), inline=False)
     embed.add_field(name="Ordinal", value=str(results["ordinal"]), inline=False)
+    embed.add_field(name="Latin", value=str(results["latin"]), inline=False)
     embed.add_field(name="Reduction", value=str(results["reduction"]), inline=False)
     embed.add_field(name="Reverse", value=str(results["reverse"]), inline=False)
     embed.add_field(
@@ -960,6 +961,30 @@ async def hierarchy_command(ctx, *, args: str = None):
             await ctx.send(
                 f"❌ No entity found matching '{args}'. Try `.hierarchy search {args}` or `.hierarchy random`"
             )
+
+
+# key
+
+
+@bot.command(name="key")
+async def kek_command(ctx):
+    """Sends a specific sticker 6 times"""
+    # Replace this with your actual sticker ID
+    STICKER_ID = (
+        1416504837436342324  # Get this from right-clicking the sticker -> Copy ID
+    )
+
+    try:
+        sticker = await ctx.guild.fetch_sticker(STICKER_ID)
+        for _ in range(6):
+            await ctx.send(stickers=[sticker])
+    except discord.NotFound:
+        await ctx.reply(
+            "❌ Sticker not found! Make sure it's from this server.",
+            mention_author=False,
+        )
+    except discord.HTTPException as e:
+        await ctx.reply(f"❌ Failed to send sticker: {e}", mention_author=False)
 
 
 # ============================================================
@@ -1081,8 +1106,10 @@ async def location_command(ctx, *, args: str = None):
     """Set your timezone location"""
     # Check if location provided
     if not args:
-        return await ctx.send("❌ Please provide a location. Usage: `.location Los Angeles`")
-    
+        return await ctx.send(
+            "❌ Please provide a location. Usage: `.location Los Angeles`"
+        )
+
     args_split = args.split()
     target_member = ctx.author
     location_query = args
