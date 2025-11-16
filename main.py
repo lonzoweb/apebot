@@ -829,26 +829,24 @@ async def gematria_command(ctx, *, text: str = None):
             "⚠️ No valid text found to evaluate.", mention_author=False
         )
 
-    # Character limit check (53 characters)
-    if len(text) > 53:
-        return await ctx.reply("❌ Text exceeds limit.", mention_author=False)
-
     results = calculate_all_gematria(text)
 
-    from helpers import reverse_reduction_values, reduce_to_single_digit
+    embed = discord.Embed(title=f"**{text}**", color=discord.Color.dark_grey())
 
-    embed = discord.Embed(
-        title=f"Gematria for: {text}", color=discord.Color.dark_grey()
+    # Row 1 - 4 columns
+    embed.add_field(name="Ordinal", value=str(results["ordinal"]), inline=True)
+    embed.add_field(name="Reduction", value=str(results["reduction"]), inline=True)
+    embed.add_field(name="Reverse", value=str(results["reverse"]), inline=True)
+    embed.add_field(
+        name="Reverse Reduction", value=str(results["reverse_reduction"]), inline=True
     )
 
-    embed.add_field(name="Hebrew", value=str(results["hebrew"]), inline=False)
-    embed.add_field(name="English", value=str(results["english"]), inline=False)
-    embed.add_field(name="Ordinal", value=str(results["ordinal"]), inline=False)
-    embed.add_field(name="Latin", value=str(results["latin"]), inline=False)
-    embed.add_field(name="Reduction", value=str(results["reduction"]), inline=False)
-    embed.add_field(name="Reverse", value=str(results["reverse"]), inline=False)
+    # Row 2 - 4 columns
+    embed.add_field(name="Standard", value=str(results["hebrew"]), inline=True)
+    embed.add_field(name="Latin", value=str(results["latin"]), inline=True)
+    embed.add_field(name="Sumerian", value=str(results["sumerian"]), inline=True)
     embed.add_field(
-        name="Reverse Reduction", value=str(results["reverse_reduction"]), inline=False
+        name="Reverse Sumerian", value=str(results["reverse_sumerian"]), inline=True
     )
 
     await ctx.reply(embed=embed, mention_author=False)

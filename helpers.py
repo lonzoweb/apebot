@@ -325,6 +325,11 @@ def english_gematria_values(text: str):
     return [v * 6 for v in ordinal_values(text)]
 
 
+def reverse_sumerian_values(text: str):
+    """Reverse Sumerian is Reverse * 6."""
+    return [v * 6 for v in reverse_values(text)]
+
+
 def fibonacci_values(text: str):
     """Get Fibonacci sequence values for each letter."""
     # Fibonacci values for A-Z from the gematrinator code
@@ -437,6 +442,16 @@ def calculate_latin(text: str) -> int:
     return sum(latin_values(text))
 
 
+def calculate_sumerian(text: str) -> int:
+    """Calculate Sumerian (Ordinal × 6) sum."""
+    return sum(english_gematria_values(text))
+
+
+def calculate_reverse_sumerian(text: str) -> int:
+    """Calculate Reverse Sumerian (Reverse × 6) sum."""
+    return sum(reverse_sumerian_values(text))
+
+
 def calculate_all_gematria(text: str):
     """Calculate all gematria cipher values for the given text."""
     ord_vals = ordinal_values(text)
@@ -445,6 +460,7 @@ def calculate_all_gematria(text: str):
     rev_red_vals = reverse_reduction_values(text)
     heb_vals = hebrew_values(text)
     eng_vals = english_gematria_values(text)
+    rev_sum_vals = reverse_sumerian_values(text)
     fib_vals = fibonacci_values(text)
     lat_vals = latin_values(text)
 
@@ -457,6 +473,8 @@ def calculate_all_gematria(text: str):
         "reverse_reduction": sum(rev_red_vals),
         "fibonacci": sum(fib_vals),
         "latin": sum(lat_vals),
+        "sumerian": sum(eng_vals),
+        "reverse_sumerian": sum(rev_sum_vals),
     }
 
 
