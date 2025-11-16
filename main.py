@@ -818,53 +818,43 @@ async def stats_command(ctx):
 
 @bot.command(name="gem")
 async def gematria_command(ctx, *, text: str = None):
-    # --- handle reply or plain text ---
+    # If the command is replying to a message → use that text instead
     if ctx.message.reference:
         reply_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
         text = reply_msg.content
 
+    # Reject non-text (stickers, gifs, emojis, embeds, etc.)
     if not text or not any(ch.isalnum() for ch in text):
         return await ctx.reply(
             "⚠️ No valid text found to evaluate.", mention_author=False
         )
 
+    # Character limit check (53 characters)
+    if len(text) > 53:
+        return await ctx.reply("❌ Text exceeds limit.", mention_author=False)
+
     results = calculate_all_gematria(text)
 
-    embed = discord.Embed(title=f"{text}", color=0x5865F2)
+    from helpers import reverse_reduction_values, reduce_to_single_digit
 
-    # --- narrow Gematrinator-style code block ---
-    block = f"""```
-Ordinal
-  {results['ordinal']}
+    embed = discord.Embed(
+        title=f"Gematria for: {text}", color=discord.Color.dark_grey()
+    )
 
-Standard
-  {results['hebrew']}
+    embed.add_field(name="Hebrew", value=str(results["hebrew"]), inline=False)
+    embed.add_field(name="English", value=str(results["english"]), inline=False)
+    embed.add_field(name="Ordinal", value=str(results["ordinal"]), inline=False)
+    embed.add_field(name="Reduction", value=str(results["reduction"]), inline=False)
+    embed.add_field(name="Reverse", value=str(results["reverse"]), inline=False)
+    embed.add_field(
+        name="Reverse Reduction", value=str(results["reverse_reduction"]), inline=False
+    )
+    embed.add_field(name="Latin", value=str(results["latin"]), inline=False)
+    embed.add_field(
+        name="Reverse Sumerian", value=str(results["reverse_sumerian"]), inline=False
+    )
 
-Reduction
-  {results['reduction']}
-
-Reverse Reduction
-  {results['reverse_reduction']}
-
-Reverse
-  {results['reverse']}
-
-Latin
-  {results['latin']}
-
-Sumerian
-  {results['sumerian']}
-
-Rev Sumerian
-  {results['reverse_sumerian']}
-```"""
-
-    # --- ⬇️ ADD THESE TWO LINES HERE ⬇️ ---
-    embed.add_field(name="", value=block, inline=False)
     await ctx.reply(embed=embed, mention_author=False)
-
-
-# --- ⬆️ END HERE ⬆️ ---
 
 
 @bot.command(name="blessing")
