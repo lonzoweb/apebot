@@ -832,12 +832,14 @@ async def gematria_command(ctx, *, text: str = None):
 
     embed = discord.Embed(title=f"{text}", color=0x5865F2)
 
-    block = f"""
-```ansi
-[0;32mOrdinal[0m          [1;32m{results['ordinal']:>4}[0m     [0;36mReverse Reduction[0m  [1;36m{results['reverse_reduction']:>4}[0m
-[0;34mReduction[0m        [1;34m{results['reduction']:>4}[0m   [0;35mReverse[0m            [1;35m{results['reverse']:>4}[0m
-[0;33mStandard[0m         [1;33m{results['hebrew']:>4}[0m      [0;95mLatin[0m              [1;95m{results['latin']:>4}[0m
-[0;32mSumerian[0m         [1;32m{results['sumerian']:>4}[0m    [0;93mRev Sumerian[0m       [1;93m{results['reverse_sumerian']:>4}[0m
+    # --- compact table-style code block ---
+    block = f"""```
+┌─────────────┬─────┬───────────────┬─────┐
+│ Ordinal     │{results['ordinal']:>3} │ Rev Reduction │{results['reverse_reduction']:>3} │
+│ Reduction   │{results['reduction']:>3} │ Reverse       │{results['reverse']:>3} │
+│ Standard    │{results['hebrew']:>3} │ Latin         │{results['latin']:>3} │
+│ Sumerian    │{results['sumerian']:>3} │ Rev Sumerian  │{results['reverse_sumerian']:>3} │
+└─────────────┴─────┴───────────────┴─────┘
 ```"""
 
     # --- ⬇️ ADD THESE TWO LINES HERE ⬇️ ---
