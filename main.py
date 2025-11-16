@@ -991,7 +991,9 @@ async def kek_command(ctx):
         kek_cooldowns[user_id] = current_time
 
     # Replace with your actual sticker ID
-    STICKER_ID = 1234567890  # Get this from right-clicking the sticker -> Copy ID
+    STICKER_ID = (
+        1416504837436342324  # Get this from right-clicking the sticker -> Copy ID
+    )
 
     try:
         sticker = await ctx.guild.fetch_sticker(STICKER_ID)
