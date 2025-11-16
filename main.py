@@ -831,18 +831,24 @@ async def gematria_command(ctx, *, text: str = None):
 
     embed = discord.Embed(title=f"{text}", color=0x5865F2)
 
-    # 4 rows × 2 columns
+    # Row 1
     embed.add_field(name="**Ordinal**", value=results["ordinal"], inline=True)
     embed.add_field(name="**Reduction**", value=results["reduction"], inline=True)
+    embed.add_field(name="\u200b", value="\u200b", inline=False)
 
+    # Row 2
     embed.add_field(name="**Reverse**", value=results["reverse"], inline=True)
     embed.add_field(
         name="**Rev Reduction**", value=results["reverse_reduction"], inline=True
     )
+    embed.add_field(name="\u200b", value="\u200b", inline=False)
 
+    # Row 3
     embed.add_field(name="**Standard**", value=results["hebrew"], inline=True)
     embed.add_field(name="**Latin**", value=results["latin"], inline=True)
+    embed.add_field(name="\u200b", value="\u200b", inline=False)
 
+    # Row 4
     embed.add_field(name="**Sumerian**", value=results["sumerian"], inline=True)
     embed.add_field(
         name="**Rev Sumerian**", value=results["reverse_sumerian"], inline=True
