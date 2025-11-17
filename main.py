@@ -967,6 +967,9 @@ async def hierarchy_command(ctx, *, args: str = None):
 
 
 #  key
+time
+
+# Dictionary to store the last time the command was used
 last_used = {}
 
 @bot.command(name="key")
@@ -985,9 +988,6 @@ async def kek_command(ctx):
             time_since_last_use = current_time - last_used["key"]
             if time_since_last_use < cooldown_duration:
                 return  # Silently ignore the command
-        
-        # Update the last used time
-        last_used["key"] = current_time
 
     # Replace with your actual sticker ID
     STICKER_ID = (
@@ -998,6 +998,11 @@ async def kek_command(ctx):
         sticker = await ctx.guild.fetch_sticker(STICKER_ID)
         for _ in range(6):
             await ctx.send(stickers=[sticker])
+        
+        # Only update cooldown after successful execution for non-admins
+        if not is_admin:
+            last_used["key"] = time.time()
+            
     except discord.NotFound:
         await ctx.reply(
             "❌ Sticker not found! Make sure it's from this server.",
@@ -1005,8 +1010,6 @@ async def kek_command(ctx):
         )
     except discord.HTTPException as e:
         await ctx.reply(f"❌ Failed to send sticker: {e}", mention_author=False)
-
-
 
 # ============================================================
 # ACTIVITY COMMAND
