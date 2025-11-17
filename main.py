@@ -967,7 +967,6 @@ async def hierarchy_command(ctx, *, args: str = None):
 
 
 #  key
-time
 
 # Dictionary to store the last time the command was used
 last_used = {}
@@ -996,6 +995,11 @@ async def kek_command(ctx):
 
     try:
         sticker = await ctx.guild.fetch_sticker(STICKER_ID)
+        
+        # Send tribute message for non-admins only
+        if not is_admin:
+            await ctx.send(f"ᵘˢᵉʳ {ctx.author.name} ʰᵃˢ ᵖᵃⁱᵈ ᵗʳⁱᵇᵘᵗᵉ ᵗᵒ ᴮʸʳᵒⁿ")
+        
         for _ in range(6):
             await ctx.send(stickers=[sticker])
         
