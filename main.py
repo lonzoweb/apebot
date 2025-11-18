@@ -1028,6 +1028,10 @@ async def kek_command(ctx):
 
 # weather
 
+# Add this at the top with your other dictionaries
+weather_user_cooldowns = {}  # Track per-user cooldowns (3 sec)
+weather_user_hourly = {}     # Track per-user hourly usage
+
 @bot.command(name="w")
 async def weather_command(ctx, *, location: str = None):
     """Gets current weather for a location (zip code, city, neighborhood, etc.)"""
@@ -1036,8 +1040,34 @@ async def weather_command(ctx, *, location: str = None):
         await ctx.reply("❌ Please provide a location! Usage: `.w <location>`", mention_author=False)
         return
     
-    # You'll need to get a free API key from https://openweathermap.org/api
-    API_KEY = "904009bb087585331892946d3b7a5386"  # Replace with your actual API key
+    # Check if user is admin
+    is_admin = ctx.author.guild_permissions.administrator
+    
+    if not is_admin:
+        current_time = time.time()
+        user_id = ctx.author.id
+        
+        # Check per-user cooldown (3 seconds)
+        if user_id in weather_user_cooldowns:
+            time_since_last = current_time - weather_user_cooldowns[user_id]
+            if time_since_last < 3:
+                return  # Silently ignore
+        
+        # Check per-user hourly limit (30 per hour)
+        if user_id not in weather_user_hourly:
+            weather_user_hourly[user_id] = []
+        
+        # Remove entries older than 1 hour
+        weather_user_hourly[user_id] = [t for t in weather_user_hourly[user_id] if current_time - t < 3600]
+        
+        if len(weather_user_hourly[user_id]) >= 30:
+            return  # Silently ignore
+        
+        # Update usage tracking
+        weather_user_cooldowns[user_id] = current_time
+        weather_user_hourly[user_id].append(current_time)
+    
+    API_KEY = "904009bb087585331892946d3b7a5386"
     
     if API_KEY == "YOUR_API_KEY_HERE":
         await ctx.reply("❌ Weather API key not configured!", mention_author=False)
@@ -1048,10 +1078,6 @@ async def weather_command(ctx, *, location: str = None):
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
-                print(f"Status Code: {response.status}")
-                response_text = await response.text()
-                print(f"Response: {response_text}")
-                
                 if response.status == 200:
                     data = await response.json()
                     
@@ -1074,9 +1100,8 @@ async def weather_command(ctx, *, location: str = None):
                     await ctx.reply(f"❌ Failed to fetch weather data. Status: {response.status}", mention_author=False)
                     
     except Exception as e:
-        print(f"Exception: {type(e).__name__}: {e}")
         await ctx.reply(f"❌ Error: {e}", mention_author=False)
-        
+             
 # ============================================================
 # ACTIVITY COMMAND
 # ============================================================
