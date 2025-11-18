@@ -1038,6 +1038,10 @@ async def weather_command(ctx, *, location: str = None):
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
+                print(f"Status Code: {response.status}")
+                response_text = await response.text()
+                print(f"Response: {response_text}")
+                
                 if response.status == 200:
                     data = await response.json()
                     
@@ -1054,12 +1058,15 @@ async def weather_command(ctx, *, location: str = None):
                     
                 elif response.status == 404:
                     await ctx.reply(f"❌ Location '{location}' not found!", mention_author=False)
+                elif response.status == 401:
+                    await ctx.reply("❌ Invalid API key! Check your OpenWeatherMap API key.", mention_author=False)
                 else:
-                    await ctx.reply("❌ Failed to fetch weather data.", mention_author=False)
+                    await ctx.reply(f"❌ Failed to fetch weather data. Status: {response.status}", mention_author=False)
                     
     except Exception as e:
+        print(f"Exception: {type(e).__name__}: {e}")
         await ctx.reply(f"❌ Error: {e}", mention_author=False)
-
+        
 # ============================================================
 # ACTIVITY COMMAND
 # ============================================================
