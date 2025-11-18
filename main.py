@@ -997,9 +997,8 @@ async def kek_command(ctx):
     try:
         sticker = await ctx.guild.fetch_sticker(STICKER_ID)
 
-        # Send tribute message for non-admins only
-        if not is_admin:
-            await ctx.send(f"{ctx.author.display_name} ʰᵃˢ ᵖᵃᶦᵈ ᵗʳᶦᵇᵘᵗᵉ")
+        # Send tribute message for everyone
+        await ctx.send(f"{ctx.author.display_name} ʰᵃˢ ᵖᵃᶦᵈ ᵗʳᶦᵇᵘᵗᵉ")
 
         for _ in range(6):
             await ctx.send(stickers=[sticker])
