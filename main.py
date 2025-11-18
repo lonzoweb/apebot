@@ -853,6 +853,17 @@ async def gematria_command(ctx, *, text: str = None):
     embed.add_field(
         name="Reverse Sumerian", value=str(results["reverse_sumerian"]), inline=False
     )
+    
+    
+    # Add username in footer (skip for admins)
+    EXEMPT_ROLE_ID = None  # Replace with your role ID if you want role exemption
+
+    is_exempt = ctx.author.guild_permissions.administrator
+    if EXEMPT_ROLE_ID:
+        is_exempt = is_exempt or discord.utils.get(ctx.author.roles, id=EXEMPT_ROLE_ID)
+
+    if not is_exempt:
+        embed.set_footer(text=f"{ctx.author.display_name}")
 
     await ctx.reply(embed=embed, mention_author=False)
 
