@@ -1016,6 +1016,49 @@ async def kek_command(ctx):
     except discord.HTTPException as e:
         await ctx.reply(f"❌ Failed to send sticker: {e}", mention_author=False)
 
+# weather
+
+@bot.command(name="w")
+async def weather_command(ctx, *, location: str = None):
+    """Gets current weather for a location (zip code, city, neighborhood, etc.)"""
+    
+    if not location:
+        await ctx.reply("❌ Please provide a location! Usage: `.w <location>`", mention_author=False)
+        return
+    
+    # You'll need to get a free API key from https://openweathermap.org/api
+    API_KEY = "aa80eb47b42e72b378b015f7d1cb0cbb"  # Replace with your actual API key
+    
+    if API_KEY == "YOUR_API_KEY_HERE":
+        await ctx.reply("❌ Weather API key not configured!", mention_author=False)
+        return
+    
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={location}&appid={API_KEY}&units=metric"
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    # Extract weather data
+                    location_name = data['name']
+                    country = data['sys']['country']
+                    temp_c = data['main']['temp']
+                    temp_f = (temp_c * 9/5) + 32
+                    condition = data['weather'][0]['description'].title()
+                    
+                    # Format output
+                    weather_msg = f"**{location_name}, {country}**\n{condition} • {temp_f:.1f}°F / {temp_c:.1f}°C"
+                    await ctx.send(weather_msg)
+                    
+                elif response.status == 404:
+                    await ctx.reply(f"❌ Location '{location}' not found!", mention_author=False)
+                else:
+                    await ctx.reply("❌ Failed to fetch weather data.", mention_author=False)
+                    
+    except Exception as e:
+        await ctx.reply(f"❌ Error: {e}", mention_author=False)
 
 # ============================================================
 # ACTIVITY COMMAND
