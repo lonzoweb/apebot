@@ -1033,7 +1033,7 @@ async def weather_command(ctx, *, location: str = None):
         await ctx.reply("❌ Weather API key not configured!", mention_author=False)
         return
     
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={location}&appid={API_KEY}&units=metric"
+    url = f"https://api.openweathermap.org/data/2.5/weather?q={location}&appid={API_KEY}&units=metric"
     
     try:
         async with aiohttp.ClientSession() as session:
