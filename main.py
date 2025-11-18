@@ -1275,12 +1275,22 @@ async def location_command(ctx, *, args: str = None):
     except asyncio.TimeoutError:
         await ctx.send("⌛ Timeout. Location setting cancelled.")
 
-
 @bot.command(name="time")
 async def time_command(ctx, member: discord.Member = None):
     """Check time for a user"""
+    
+    # Check if replying to a message
+    if ctx.message.reference and not member:
+        try:
+            reply_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+            member = reply_msg.author
+        except:
+            pass
+    
+    # Default to command author if no member specified
     if not member:
         member = ctx.author
+    
     timezone_name, city = get_user_timezone(member.id)
     if not timezone_name or not city:
         await ctx.send(
@@ -1294,7 +1304,6 @@ async def time_command(ctx, member: discord.Member = None):
     except Exception as e:
         logger.error(f"Error getting time: {e}")
         await ctx.send(f"❌ Error getting time: {e}")
-
 
 # ============================================================
 # DATABASE MAINTENANCE COMMANDS (Admin only)
