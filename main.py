@@ -1027,7 +1027,7 @@ async def weather_command(ctx, *, location: str = None):
         return
     
     # You'll need to get a free API key from https://openweathermap.org/api
-    API_KEY = "aa80eb47b42e72b378b015f7d1cb0cbb"  # Replace with your actual API key
+    API_KEY = "904009bb087585331892946d3b7a5386"  # Replace with your actual API key
     
     if API_KEY == "YOUR_API_KEY_HERE":
         await ctx.reply("❌ Weather API key not configured!", mention_author=False)
