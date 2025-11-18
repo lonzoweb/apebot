@@ -429,7 +429,7 @@ async def roll_command(ctx):
     """Roll a random number between 1-33"""
     await asyncio.sleep(0.5)  # Brief pause
     result = random.randint(1, 33)
-    await ctx.send(f"🎲 **{result}**")
+    await ctx.send(f"{ctx.author.display_name} rolls 🎲 **{result}**")
 
 
 @bot.command(name="8ball")
