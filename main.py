@@ -94,8 +94,14 @@ async def on_raw_reaction_add(payload):
     # Ignore bot reactions
     if payload.user_id == bot.user.id:
         return
+    
+    # Get the channel
+    channel = bot.get_channel(payload.channel_id)
+    if not channel:
+        return
+    
+    await battle.on_reaction_during_battle(payload, channel)
 
-    await battle.on_reaction_during_battle(payload)
 
 
 @bot.check
@@ -117,6 +123,7 @@ async def on_ready():
     init_db()
     init_gif_table()
     activity.init_activity_db()
+    battle.init_battle_db()
     logger.info(f"✅ Logged in as {bot.user}")
     tasks.setup_tasks(bot)
 
@@ -1443,33 +1450,42 @@ async def merge_quotes(ctx):
 
 @bot.command(name="vb")
 async def battle_command(ctx, *args):
-    """Start or stop reaction battles (Admin/Caporegime only)"""
-
-    # Permission check
-    if not (
-        ctx.author.guild_permissions.administrator
-        or any(role.name == "Caporegime" for role in ctx.author.roles)
-    ):
+    """Reaction battle system (Admin/Caporegime only to start/stop, everyone can view scoreboard)
+    
+    Usage:
+    .vb @user1 @user2  - Start battle
+    .vb stop           - End current battle
+    .vb top            - View scoreboard (everyone)
+    """
+    
+    # Handle scoreboard (everyone can use)
+    if len(args) == 1 and args[0].lower() == "top":
+        await battle.show_scoreboard(ctx)
+        return
+    
+    # Permission check for start/stop: Admin or Caporegime role
+    if not (ctx.author.guild_permissions.administrator or 
+            any(role.name == "Caporegime" for role in ctx.author.roles)):
         return await ctx.send("🚫 Peasant Detected")
-
-    # Check for stop command
+    
+    # Handle stop command
     if len(args) == 1 and args[0].lower() == "stop":
         await battle.stop_battle(ctx)
         return
-
-    # Check for two mentions
+    
+    # Check for two mentions to start battle
     if len(ctx.message.mentions) != 2:
         return await ctx.send(
             "⚔️ **Battle Commands**\n\n"
-            "`.battle @user1 @user2` - Start a battle\n"
-            "`.battle stop` - End current battle"
+            "`.vb @user1 @user2` - Start a battle (Admin/Caporegime)\n"
+            "`.vb stop` - End current battle (Admin/Caporegime)\n"
+            "`.vb top` - View scoreboard (Everyone)"
         )
-
+    
     user1 = ctx.message.mentions[0]
     user2 = ctx.message.mentions[1]
-
+    
     await battle.start_battle(ctx, user1, user2)
-
 
 # archive cmd
 
