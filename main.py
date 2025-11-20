@@ -16,6 +16,7 @@ import ephem
 import hierarchy
 import activity
 import time
+import urllib.parse
 import battle
 from datetime import timedelta
 from datetime import datetime
@@ -94,14 +95,13 @@ async def on_raw_reaction_add(payload):
     # Ignore bot reactions
     if payload.user_id == bot.user.id:
         return
-    
+
     # Get the channel
     channel = bot.get_channel(payload.channel_id)
     if not channel:
         return
-    
-    await battle.on_reaction_during_battle(payload, channel)
 
+    await battle.on_reaction_during_battle(payload, channel)
 
 
 @bot.check
@@ -860,8 +860,7 @@ async def gematria_command(ctx, *, text: str = None):
     embed.add_field(
         name="Reverse Sumerian", value=str(results["reverse_sumerian"]), inline=False
     )
-    
-    
+
     # Add username in footer (skip for admins)
     EXEMPT_ROLE_ID = None  # Replace with your role ID if you want role exemption
 
@@ -1033,82 +1032,214 @@ async def kek_command(ctx):
     except discord.HTTPException as e:
         await ctx.reply(f"❌ Failed to send sticker: {e}", mention_author=False)
 
+
 # weather
 
 # Add this at the top with your other dictionaries
 weather_user_cooldowns = {}  # Track per-user cooldowns (3 sec)
-weather_user_hourly = {}     # Track per-user hourly usage
+weather_user_hourly = {}  # Track per-user hourly usage
+
 
 @bot.command(name="w")
 async def weather_command(ctx, *, location: str = None):
     """Gets current weather for a location (zip code, city, neighborhood, etc.)"""
-    
+
+    # If no location provided, try to get user's saved location
     if not location:
-        await ctx.reply("❌ Please provide a location! Usage: `.w <location>`", mention_author=False)
-        return
-    
+        timezone_name, city = get_user_timezone(ctx.author.id)
+        if city:
+            location = city
+        else:
+            await ctx.reply(
+                "❌ Please provide a location or set your location with `.location <city>`",
+                mention_author=False,
+            )
+            return
+
     # Check if user is admin
     is_admin = ctx.author.guild_permissions.administrator
-    
+
     if not is_admin:
         current_time = time.time()
         user_id = ctx.author.id
-        
+
         # Check per-user cooldown (3 seconds)
         if user_id in weather_user_cooldowns:
             time_since_last = current_time - weather_user_cooldowns[user_id]
             if time_since_last < 3:
                 return  # Silently ignore
-        
+
         # Check per-user hourly limit (30 per hour)
         if user_id not in weather_user_hourly:
             weather_user_hourly[user_id] = []
-        
+
         # Remove entries older than 1 hour
-        weather_user_hourly[user_id] = [t for t in weather_user_hourly[user_id] if current_time - t < 3600]
-        
+        weather_user_hourly[user_id] = [
+            t for t in weather_user_hourly[user_id] if current_time - t < 3600
+        ]
+
         if len(weather_user_hourly[user_id]) >= 30:
             return  # Silently ignore
-        
+
         # Update usage tracking
         weather_user_cooldowns[user_id] = current_time
         weather_user_hourly[user_id].append(current_time)
-    
+
     API_KEY = "904009bb087585331892946d3b7a5386"
-    
+
     if API_KEY == "YOUR_API_KEY_HERE":
         await ctx.reply("❌ Weather API key not configured!", mention_author=False)
         return
-    
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={location}&appid={API_KEY}&units=metric"
-    
+
+    # Smart format: if it's "city state", convert to "city,state,us"
+    location_parts = location.lower().split()
+    us_states = {
+        "california",
+        "ca",
+        "texas",
+        "tx",
+        "florida",
+        "fl",
+        "new york",
+        "ny",
+        "pennsylvania",
+        "pa",
+        "illinois",
+        "il",
+        "ohio",
+        "oh",
+        "georgia",
+        "ga",
+        "north carolina",
+        "nc",
+        "michigan",
+        "mi",
+        "new jersey",
+        "nj",
+        "virginia",
+        "va",
+        "washington",
+        "wa",
+        "arizona",
+        "az",
+        "massachusetts",
+        "ma",
+        "tennessee",
+        "tn",
+        "indiana",
+        "in",
+        "missouri",
+        "mo",
+        "maryland",
+        "md",
+        "wisconsin",
+        "wi",
+        "colorado",
+        "co",
+        "minnesota",
+        "mn",
+        "south carolina",
+        "sc",
+        "alabama",
+        "al",
+        "louisiana",
+        "la",
+        "kentucky",
+        "ky",
+        "oregon",
+        "or",
+        "oklahoma",
+        "ok",
+        "connecticut",
+        "ct",
+        "utah",
+        "ut",
+        "iowa",
+        "ia",
+        "nevada",
+        "nv",
+        "arkansas",
+        "ar",
+        "mississippi",
+        "ms",
+        "kansas",
+        "ks",
+        "new mexico",
+        "nm",
+        "nebraska",
+        "ne",
+        "idaho",
+        "id",
+        "west virginia",
+        "wv",
+        "hawaii",
+        "hi",
+        "new hampshire",
+        "nh",
+        "maine",
+        "me",
+        "rhode island",
+        "ri",
+        "montana",
+        "mt",
+        "delaware",
+        "de",
+        "south dakota",
+        "sd",
+        "north dakota",
+        "nd",
+        "alaska",
+        "ak",
+        "vermont",
+        "vt",
+        "wyoming",
+        "wy",
+    }
+
+    if len(location_parts) == 2 and location_parts[1] in us_states:
+        # Convert "stockton california" to "stockton,ca,us"
+        location = f"{location_parts[0]},{location_parts[1]},us"
+
+    # URL encode the location to handle spaces
+    encoded_location = urllib.parse.quote(location)
+    url = f"https://api.openweathermap.org/data/2.5/weather?q={encoded_location}&appid={API_KEY}&units=metric"
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 if response.status == 200:
                     data = await response.json()
-                    
+
                     # Extract weather data
-                    location_name = data['name']
-                    country = data['sys']['country']
-                    temp_c = data['main']['temp']
-                    temp_f = (temp_c * 9/5) + 32
-                    condition = data['weather'][0]['description'].title()
-                    
+                    location_name = data["name"]
+                    country = data["sys"]["country"]
+                    temp_c = data["main"]["temp"]
+                    temp_f = (temp_c * 9 / 5) + 32
+                    condition = data["weather"][0]["description"].title()
+
                     # Format output
                     weather_msg = f"**{location_name}, {country}**\n{condition} • {temp_f:.1f}°F / {temp_c:.1f}°C"
                     await ctx.send(weather_msg)
-                    
+
                 elif response.status == 404:
-                    await ctx.reply(f"❌ Location '{location}' not found!", mention_author=False)
+                    await ctx.reply(
+                        f"❌ Location '{location}' not found!", mention_author=False
+                    )
                 elif response.status == 401:
-                    await ctx.reply("❌ Invalid API key! Check your OpenWeatherMap API key.", mention_author=False)
+                    await ctx.reply(
+                        "❌ Invalid API key! Check your OpenWeatherMap API key.",
+                        mention_author=False,
+                    )
                 else:
-                    await ctx.reply(f"❌ Failed to fetch weather data. Status: {response.status}", mention_author=False)
-                    
+                    await ctx.reply(
+                        f"❌ Failed to fetch weather data. Status: {response.status}",
+                        mention_author=False,
+                    )
+
     except Exception as e:
         await ctx.reply(f"❌ Error: {e}", mention_author=False)
-             
+
+
 # ============================================================
 # ACTIVITY COMMAND
 # ============================================================
@@ -1275,22 +1406,25 @@ async def location_command(ctx, *, args: str = None):
     except asyncio.TimeoutError:
         await ctx.send("⌛ Timeout. Location setting cancelled.")
 
+
 @bot.command(name="time")
 async def time_command(ctx, member: discord.Member = None):
     """Check time for a user"""
-    
+
     # Check if replying to a message
     if ctx.message.reference and not member:
         try:
-            reply_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+            reply_msg = await ctx.channel.fetch_message(
+                ctx.message.reference.message_id
+            )
             member = reply_msg.author
         except:
             pass
-    
+
     # Default to command author if no member specified
     if not member:
         member = ctx.author
-    
+
     timezone_name, city = get_user_timezone(member.id)
     if not timezone_name or not city:
         await ctx.send(
@@ -1304,6 +1438,7 @@ async def time_command(ctx, member: discord.Member = None):
     except Exception as e:
         logger.error(f"Error getting time: {e}")
         await ctx.send(f"❌ Error getting time: {e}")
+
 
 # ============================================================
 # DATABASE MAINTENANCE COMMANDS (Admin only)
@@ -1460,28 +1595,30 @@ async def merge_quotes(ctx):
 @bot.command(name="vb")
 async def battle_command(ctx, *args):
     """Reaction battle system (Admin/Caporegime only to start/stop, everyone can view scoreboard)
-    
+
     Usage:
     .vb @user1 @user2  - Start battle
     .vb stop           - End current battle
     .vb top            - View scoreboard (everyone)
     """
-    
+
     # Handle scoreboard (everyone can use)
     if len(args) == 1 and args[0].lower() == "top":
         await battle.show_scoreboard(ctx)
         return
-    
+
     # Permission check for start/stop: Admin or Caporegime role
-    if not (ctx.author.guild_permissions.administrator or 
-            any(role.name == "Caporegime" for role in ctx.author.roles)):
+    if not (
+        ctx.author.guild_permissions.administrator
+        or any(role.name == "Caporegime" for role in ctx.author.roles)
+    ):
         return await ctx.send("🚫 Peasant Detected")
-    
+
     # Handle stop command
     if len(args) == 1 and args[0].lower() == "stop":
         await battle.stop_battle(ctx)
         return
-    
+
     # Check for two mentions to start battle
     if len(ctx.message.mentions) != 2:
         return await ctx.send(
@@ -1490,11 +1627,12 @@ async def battle_command(ctx, *args):
             "`.vb stop` - End current battle (Admin/Caporegime)\n"
             "`.vb top` - View scoreboard (Everyone)"
         )
-    
+
     user1 = ctx.message.mentions[0]
     user2 = ctx.message.mentions[1]
-    
+
     await battle.start_battle(ctx, user1, user2)
+
 
 # archive cmd
 
