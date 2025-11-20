@@ -1044,7 +1044,33 @@ weather_user_hourly = {}  # Track per-user hourly usage
 async def weather_command(ctx, *, location: str = None):
     """Gets current weather for a location (zip code, city, neighborhood, etc.)"""
 
-    # If no location provided, try to get user's saved location
+    # Check if this is a reply to another user's message
+    if ctx.message.reference and not location:
+        try:
+            replied_message = await ctx.channel.fetch_message(
+                ctx.message.reference.message_id
+            )
+            replied_user = replied_message.author
+
+            # Try to get replied user's location first
+            timezone_name, city = get_user_timezone(replied_user.id)
+            if city:
+                location = city
+            else:
+                # If replied user has no location, try command user's location
+                timezone_name, city = get_user_timezone(ctx.author.id)
+                if city:
+                    location = city
+                else:
+                    await ctx.reply(
+                        "❌ Neither you nor the user you replied to has a location set. Use `.location <city>` to set one.",
+                        mention_author=False,
+                    )
+                    return
+        except:
+            pass  # If we can't fetch the message, continue with normal logic
+
+    # If no location provided and not a reply, try to get user's saved location
     if not location:
         timezone_name, city = get_user_timezone(ctx.author.id)
         if city:
