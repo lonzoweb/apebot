@@ -1033,8 +1033,6 @@ async def kek_command(ctx):
         await ctx.reply(f"❌ Failed to send sticker: {e}", mention_author=False)
 
 
-# weather
-
 # Add this at the top with your other dictionaries
 weather_user_cooldowns = {}  # Track per-user cooldowns (3 sec)
 weather_user_hourly = {}  # Track per-user hourly usage
@@ -1117,118 +1115,80 @@ async def weather_command(ctx, *, location: str = None):
         await ctx.reply("❌ Weather API key not configured!", mention_author=False)
         return
 
-    # Smart format: if it's "city state", convert to "city,state,us"
-    location_parts = location.lower().split()
-    us_states = {
-        "california",
-        "ca",
-        "texas",
-        "tx",
-        "florida",
-        "fl",
-        "new york",
-        "ny",
-        "pennsylvania",
-        "pa",
-        "illinois",
-        "il",
-        "ohio",
-        "oh",
-        "georgia",
-        "ga",
-        "north carolina",
-        "nc",
-        "michigan",
-        "mi",
-        "new jersey",
-        "nj",
-        "virginia",
-        "va",
-        "washington",
-        "wa",
-        "arizona",
-        "az",
-        "massachusetts",
-        "ma",
-        "tennessee",
-        "tn",
-        "indiana",
-        "in",
-        "missouri",
-        "mo",
-        "maryland",
-        "md",
-        "wisconsin",
-        "wi",
-        "colorado",
-        "co",
-        "minnesota",
-        "mn",
-        "south carolina",
-        "sc",
-        "alabama",
-        "al",
-        "louisiana",
-        "la",
-        "kentucky",
-        "ky",
-        "oregon",
-        "or",
-        "oklahoma",
-        "ok",
-        "connecticut",
-        "ct",
-        "utah",
-        "ut",
-        "iowa",
-        "ia",
-        "nevada",
-        "nv",
-        "arkansas",
-        "ar",
-        "mississippi",
-        "ms",
-        "kansas",
-        "ks",
-        "new mexico",
-        "nm",
-        "nebraska",
-        "ne",
-        "idaho",
-        "id",
-        "west virginia",
-        "wv",
-        "hawaii",
-        "hi",
-        "new hampshire",
-        "nh",
-        "maine",
-        "me",
-        "rhode island",
-        "ri",
-        "montana",
-        "mt",
-        "delaware",
-        "de",
-        "south dakota",
-        "sd",
-        "north dakota",
-        "nd",
-        "alaska",
-        "ak",
-        "vermont",
-        "vt",
-        "wyoming",
-        "wy",
+    # State abbreviations and full names mapped to abbreviations
+    us_state_abbrevs = {
+        "alabama": "al", "al": "al",
+        "alaska": "ak", "ak": "ak",
+        "arizona": "az", "az": "az",
+        "arkansas": "ar", "ar": "ar",
+        "california": "ca", "ca": "ca",
+        "colorado": "co", "co": "co",
+        "connecticut": "ct", "ct": "ct",
+        "delaware": "de", "de": "de",
+        "florida": "fl", "fl": "fl",
+        "georgia": "ga", "ga": "ga",
+        "hawaii": "hi", "hi": "hi",
+        "idaho": "id", "id": "id",
+        "illinois": "il", "il": "il",
+        "indiana": "in", "in": "in",
+        "iowa": "ia", "ia": "ia",
+        "kansas": "ks", "ks": "ks",
+        "kentucky": "ky", "ky": "ky",
+        "louisiana": "la", "la": "la",
+        "maine": "me", "me": "me",
+        "maryland": "md", "md": "md",
+        "massachusetts": "ma", "ma": "ma",
+        "michigan": "mi", "mi": "mi",
+        "minnesota": "mn", "mn": "mn",
+        "mississippi": "ms", "ms": "ms",
+        "missouri": "mo", "mo": "mo",
+        "montana": "mt", "mt": "mt",
+        "nebraska": "ne", "ne": "ne",
+        "nevada": "nv", "nv": "nv",
+        "new hampshire": "nh", "nh": "nh",
+        "new jersey": "nj", "nj": "nj",
+        "new mexico": "nm", "nm": "nm",
+        "new york": "ny", "ny": "ny",
+        "north carolina": "nc", "nc": "nc",
+        "north dakota": "nd", "nd": "nd",
+        "ohio": "oh", "oh": "oh",
+        "oklahoma": "ok", "ok": "ok",
+        "oregon": "or", "or": "or",
+        "pennsylvania": "pa", "pa": "pa",
+        "rhode island": "ri", "ri": "ri",
+        "south carolina": "sc", "sc": "sc",
+        "south dakota": "sd", "sd": "sd",
+        "tennessee": "tn", "tn": "tn",
+        "texas": "tx", "tx": "tx",
+        "utah": "ut", "ut": "ut",
+        "vermont": "vt", "vt": "vt",
+        "virginia": "va", "va": "va",
+        "washington": "wa", "wa": "wa",
+        "west virginia": "wv", "wv": "wv",
+        "wisconsin": "wi", "wi": "wi",
+        "wyoming": "wy", "wy": "wy",
     }
 
-    if len(location_parts) == 2 and location_parts[1] in us_states:
-        # Convert "stockton california" to "stockton,ca,us"
-        location = f"{location_parts[0]},{location_parts[1]},us"
-
-    # URL encode the location to handle spaces
-    encoded_location = urllib.parse.quote(location)
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={encoded_location}&appid={API_KEY}&units=metric"
+    location_stripped = location.strip()
+    location_parts = location_stripped.lower().split()
+    
+    # Determine the API URL based on input type
+    if location_stripped.isdigit() and len(location_stripped) == 5:
+        # US zip code - use zip endpoint with US country code
+        url = f"https://api.openweathermap.org/data/2.5/weather?zip={location_stripped},us&appid={API_KEY}&units=metric"
+    
+    elif location_parts and location_parts[-1] in us_state_abbrevs:
+        # Last word is a US state - format as "city,state,us"
+        state_abbrev = us_state_abbrevs[location_parts[-1]]
+        city = " ".join(location_parts[:-1])
+        formatted_location = f"{city},{state_abbrev},us"
+        encoded_location = urllib.parse.quote(formatted_location)
+        url = f"https://api.openweathermap.org/data/2.5/weather?q={encoded_location}&appid={API_KEY}&units=metric"
+    
+    else:
+        # Default - use location as-is
+        encoded_location = urllib.parse.quote(location_stripped)
+        url = f"https://api.openweathermap.org/data/2.5/weather?q={encoded_location}&appid={API_KEY}&units=metric"
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -1264,7 +1224,6 @@ async def weather_command(ctx, *, location: str = None):
 
     except Exception as e:
         await ctx.reply(f"❌ Error: {e}", mention_author=False)
-
 
 # ============================================================
 # ACTIVITY COMMAND
