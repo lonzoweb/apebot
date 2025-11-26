@@ -1117,66 +1117,116 @@ async def weather_command(ctx, *, location: str = None):
 
     # State abbreviations and full names mapped to abbreviations
     us_state_abbrevs = {
-        "alabama": "al", "al": "al",
-        "alaska": "ak", "ak": "ak",
-        "arizona": "az", "az": "az",
-        "arkansas": "ar", "ar": "ar",
-        "california": "ca", "ca": "ca",
-        "colorado": "co", "co": "co",
-        "connecticut": "ct", "ct": "ct",
-        "delaware": "de", "de": "de",
-        "florida": "fl", "fl": "fl",
-        "georgia": "ga", "ga": "ga",
-        "hawaii": "hi", "hi": "hi",
-        "idaho": "id", "id": "id",
-        "illinois": "il", "il": "il",
-        "indiana": "in", "in": "in",
-        "iowa": "ia", "ia": "ia",
-        "kansas": "ks", "ks": "ks",
-        "kentucky": "ky", "ky": "ky",
-        "louisiana": "la", "la": "la",
-        "maine": "me", "me": "me",
-        "maryland": "md", "md": "md",
-        "massachusetts": "ma", "ma": "ma",
-        "michigan": "mi", "mi": "mi",
-        "minnesota": "mn", "mn": "mn",
-        "mississippi": "ms", "ms": "ms",
-        "missouri": "mo", "mo": "mo",
-        "montana": "mt", "mt": "mt",
-        "nebraska": "ne", "ne": "ne",
-        "nevada": "nv", "nv": "nv",
-        "new hampshire": "nh", "nh": "nh",
-        "new jersey": "nj", "nj": "nj",
-        "new mexico": "nm", "nm": "nm",
-        "new york": "ny", "ny": "ny",
-        "north carolina": "nc", "nc": "nc",
-        "north dakota": "nd", "nd": "nd",
-        "ohio": "oh", "oh": "oh",
-        "oklahoma": "ok", "ok": "ok",
-        "oregon": "or", "or": "or",
-        "pennsylvania": "pa", "pa": "pa",
-        "rhode island": "ri", "ri": "ri",
-        "south carolina": "sc", "sc": "sc",
-        "south dakota": "sd", "sd": "sd",
-        "tennessee": "tn", "tn": "tn",
-        "texas": "tx", "tx": "tx",
-        "utah": "ut", "ut": "ut",
-        "vermont": "vt", "vt": "vt",
-        "virginia": "va", "va": "va",
-        "washington": "wa", "wa": "wa",
-        "west virginia": "wv", "wv": "wv",
-        "wisconsin": "wi", "wi": "wi",
-        "wyoming": "wy", "wy": "wy",
+        "alabama": "al",
+        "al": "al",
+        "alaska": "ak",
+        "ak": "ak",
+        "arizona": "az",
+        "az": "az",
+        "arkansas": "ar",
+        "ar": "ar",
+        "california": "ca",
+        "ca": "ca",
+        "colorado": "co",
+        "co": "co",
+        "connecticut": "ct",
+        "ct": "ct",
+        "delaware": "de",
+        "de": "de",
+        "florida": "fl",
+        "fl": "fl",
+        "georgia": "ga",
+        "ga": "ga",
+        "hawaii": "hi",
+        "hi": "hi",
+        "idaho": "id",
+        "id": "id",
+        "illinois": "il",
+        "il": "il",
+        "indiana": "in",
+        "in": "in",
+        "iowa": "ia",
+        "ia": "ia",
+        "kansas": "ks",
+        "ks": "ks",
+        "kentucky": "ky",
+        "ky": "ky",
+        "louisiana": "la",
+        "la": "la",
+        "maine": "me",
+        "me": "me",
+        "maryland": "md",
+        "md": "md",
+        "massachusetts": "ma",
+        "ma": "ma",
+        "michigan": "mi",
+        "mi": "mi",
+        "minnesota": "mn",
+        "mn": "mn",
+        "mississippi": "ms",
+        "ms": "ms",
+        "missouri": "mo",
+        "mo": "mo",
+        "montana": "mt",
+        "mt": "mt",
+        "nebraska": "ne",
+        "ne": "ne",
+        "nevada": "nv",
+        "nv": "nv",
+        "new hampshire": "nh",
+        "nh": "nh",
+        "new jersey": "nj",
+        "nj": "nj",
+        "new mexico": "nm",
+        "nm": "nm",
+        "new york": "ny",
+        "ny": "ny",
+        "north carolina": "nc",
+        "nc": "nc",
+        "north dakota": "nd",
+        "nd": "nd",
+        "ohio": "oh",
+        "oh": "oh",
+        "oklahoma": "ok",
+        "ok": "ok",
+        "oregon": "or",
+        "or": "or",
+        "pennsylvania": "pa",
+        "pa": "pa",
+        "rhode island": "ri",
+        "ri": "ri",
+        "south carolina": "sc",
+        "sc": "sc",
+        "south dakota": "sd",
+        "sd": "sd",
+        "tennessee": "tn",
+        "tn": "tn",
+        "texas": "tx",
+        "tx": "tx",
+        "utah": "ut",
+        "ut": "ut",
+        "vermont": "vt",
+        "vt": "vt",
+        "virginia": "va",
+        "va": "va",
+        "washington": "wa",
+        "wa": "wa",
+        "west virginia": "wv",
+        "wv": "wv",
+        "wisconsin": "wi",
+        "wi": "wi",
+        "wyoming": "wy",
+        "wy": "wy",
     }
 
     location_stripped = location.strip()
     location_parts = location_stripped.lower().split()
-    
+
     # Determine the API URL based on input type
     if location_stripped.isdigit() and len(location_stripped) == 5:
         # US zip code - use zip endpoint with US country code
         url = f"https://api.openweathermap.org/data/2.5/weather?zip={location_stripped},us&appid={API_KEY}&units=metric"
-    
+
     elif location_parts and location_parts[-1] in us_state_abbrevs:
         # Last word is a US state - format as "city,state,us"
         state_abbrev = us_state_abbrevs[location_parts[-1]]
@@ -1184,7 +1234,7 @@ async def weather_command(ctx, *, location: str = None):
         formatted_location = f"{city},{state_abbrev},us"
         encoded_location = urllib.parse.quote(formatted_location)
         url = f"https://api.openweathermap.org/data/2.5/weather?q={encoded_location}&appid={API_KEY}&units=metric"
-    
+
     else:
         # Default - use location as-is
         encoded_location = urllib.parse.quote(location_stripped)
@@ -1224,6 +1274,7 @@ async def weather_command(ctx, *, location: str = None):
 
     except Exception as e:
         await ctx.reply(f"❌ Error: {e}", mention_author=False)
+
 
 # ============================================================
 # ACTIVITY COMMAND
@@ -1390,6 +1441,102 @@ async def location_command(ctx, *, args: str = None):
             await ctx.send("❌ Location setting cancelled.")
     except asyncio.TimeoutError:
         await ctx.send("⌛ Timeout. Location setting cancelled.")
+
+
+# Slot machine slots
+
+# Cooldown tracking for pull command
+pull_cooldowns = {}
+
+
+@bot.command(name="pull")
+async def pull_command(ctx):
+    """Slot machine with dark occult casino theme"""
+
+    # Check cooldown (6 seconds, silent)
+    user_id = ctx.author.id
+    current_time = time.time()
+
+    if user_id in pull_cooldowns:
+        time_since_last = current_time - pull_cooldowns[user_id]
+        if time_since_last < 6:
+            return  # Silently ignore
+
+    # Update cooldown
+    pull_cooldowns[user_id] = current_time
+
+    # Slot symbols
+    symbols = ["🏴‍☠️", "🗝️", "🗡️", "🃏", "💎", "🔱", "🦇"]
+
+    # Send initial spinning message
+    msg = await ctx.send("🎲 | 🎲 | 🎲")
+
+    # Animate with 3 random spins
+    for _ in range(3):
+        await asyncio.sleep(0.3)
+        spin = [random.choice(symbols) for _ in range(3)]
+        await msg.edit(content=f"{spin[0]} | {spin[1]} | {spin[2]}")
+
+    # Final result
+    await asyncio.sleep(0.3)
+    result = [random.choice(symbols) for _ in range(3)]
+
+    # Check for wins
+    if result[0] == result[1] == result[2]:
+        # 3 matching - JACKPOT
+        final_msg = f"{result[0]} | {result[1]} | {result[2]}\nJACKPOT! {result[0]}\n{ctx.author.mention}"
+    elif result[0] == result[1] or result[1] == result[2] or result[0] == result[2]:
+        # 2 matching - WINNER
+        winning_symbol = (
+            result[0]
+            if result[0] == result[1]
+            else (result[1] if result[1] == result[2] else result[0])
+        )
+        final_msg = f"{result[0]} | {result[1]} | {result[2]}\nWINNER! {winning_symbol}\n{ctx.author.mention}"
+    else:
+        # No match - insult
+        insults = [
+            "Pathetic.",
+            "Trash.",
+            "Garbage.",
+            "Awful.",
+            "Weak.",
+            "Embarrassing.",
+            "Yikes.",
+            "Oof.",
+            "Cringe.",
+            "Terrible.",
+            "Horrendous.",
+            "Tragic.",
+            "Broke.",
+            "Washed.",
+            "Cooked.",
+            "Mid.",
+            "Kys.",
+            "Loser.",
+            "It's over.",
+        ]
+        insult = random.choice(insults)
+        final_msg = (
+            f"{result[0]} | {result[1]} | {result[2]}\n{insult}\n{ctx.author.mention}"
+        )
+
+    await msg.edit(content=final_msg)
+
+
+# qd quick delete
+
+
+@bot.command(name="qd")
+async def quick_delete_command(ctx, *, message: str = None):
+    """Quick delete - deletes your message after 1 second"""
+
+    # Delete the command message after 1 second
+    await asyncio.sleep(1)
+    try:
+        await ctx.message.delete()
+    except:
+        pass  # Silently fail if message is already deleted or bot lacks permissions
 
 
 @bot.command(name="time")
@@ -1576,7 +1723,7 @@ async def merge_quotes(ctx):
 
 # battle cmd
 
-
+'''
 @bot.command(name="vb")
 async def battle_command(ctx, *args):
     """Reaction battle system (Admin/Caporegime only to start/stop, everyone can view scoreboard)
@@ -1617,7 +1764,7 @@ async def battle_command(ctx, *args):
     user2 = ctx.message.mentions[1]
 
     await battle.start_battle(ctx, user1, user2)
-
+'''
 
 # archive cmd
 
