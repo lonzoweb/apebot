@@ -1512,6 +1512,9 @@ async def pull_command(ctx):
 async def execute_pull(ctx):
     """Execute the slot machine pull animation and result"""
 
+    # Add 1 second delay before rolling
+    await asyncio.sleep(1)
+
     # Slot symbols
     symbols = ["🏴‍☠️", "🗝️", "🗡️", "🃏", "💎", "🔱", "🦇"]
 
