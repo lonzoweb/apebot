@@ -1445,25 +1445,72 @@ async def location_command(ctx, *, args: str = None):
 
 # Slot machine slots
 
-# Cooldown tracking for pull command
-pull_cooldowns = {}
+# Tracking for pull command with intermittent reinforcement
+user_pull_usage = {}
 
 
 @bot.command(name="pull")
 async def pull_command(ctx):
-    """Slot machine with dark occult casino theme"""
+    """Slot machine with dark occult casino theme and intermittent reinforcement"""
 
-    # Check cooldown (6 seconds, silent)
     user_id = ctx.author.id
-    current_time = time.time()
+    now = time.time()
 
-    if user_id in pull_cooldowns:
-        time_since_last = current_time - pull_cooldowns[user_id]
-        if time_since_last < 6:
-            return  # Silently ignore
+    # --- Admins bypass everything ---
+    if ctx.author.guild_permissions.administrator:
+        await execute_pull(ctx)
+        return
 
-    # Update cooldown
-    pull_cooldowns[user_id] = current_time
+    # Initialize user tracking
+    if user_id not in user_pull_usage:
+        user_pull_usage[user_id] = {
+            "timestamps": [],
+            "last_used": 0,
+            "next_cooldown": None,
+        }
+
+    user_data = user_pull_usage[user_id]
+
+    # Remove timestamps older than 3 minutes
+    user_data["timestamps"] = [t for t in user_data["timestamps"] if now - t < 180]
+
+    # --- First 20 pulls per 3 minutes: no cooldown ---
+    if len(user_data["timestamps"]) < 20:
+        user_data["timestamps"].append(now)
+        await execute_pull(ctx)
+        return
+
+    # --- Variable-ratio cooldown after 20 pulls ---
+    # Generate cooldown if not already set
+    if user_data["next_cooldown"] is None:
+        user_data["next_cooldown"] = random.triangular(8, 30, 15)
+
+    cooldown = user_data["next_cooldown"]
+    time_since_last = now - user_data["last_used"]
+
+    if time_since_last < cooldown:
+        # Ambiguous "recharging" message (same as tarot)
+        messages = [
+            "Rest...",
+            "Patience...",
+            "Junkie...",
+            "You will wait...",
+            "Not on my watch...",
+            "Sit tight...",
+        ]
+        await ctx.send(random.choice(messages))
+        return
+
+    # Successful pull: reset cooldown for next attempt
+    user_data["last_used"] = now
+    user_data["timestamps"].append(now)
+    user_data["next_cooldown"] = None
+
+    await execute_pull(ctx)
+
+
+async def execute_pull(ctx):
+    """Execute the slot machine pull animation and result"""
 
     # Slot symbols
     symbols = ["🏴‍☠️", "🗝️", "🗡️", "🃏", "💎", "🔱", "🦇"]
