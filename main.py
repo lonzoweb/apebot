@@ -1516,7 +1516,19 @@ async def execute_pull(ctx):
     await asyncio.sleep(1)
 
     # Slot symbols
-    symbols = ["🏴‍☠️", "🗝️", "🗡️", "🃏", "💎", "🔱", "🦇"]
+    symbols = [
+        "🏴‍☠️",
+        "🗝️",
+        "🗡️",
+        "🃏",
+        "💎",
+        "🔱",
+        "🦇",
+        "⭐",
+        "🪦",
+        "👑",
+        "<:emoji_name:1427107096670900226>",
+    ]
 
     # Send initial spinning message
     msg = await ctx.send("🎲 | 🎲 | 🎲")
