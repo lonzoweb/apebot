@@ -1450,6 +1450,65 @@ user_pull_usage = {}
 
 
 @bot.command(name="pull")
+async def pull_command(ctx):
+    """Slot machine with dark occult casino theme and intermittent reinforcement"""
+
+    user_id = ctx.author.id
+    now = time.time()
+
+    # --- Admins bypass everything ---
+    if ctx.author.guild_permissions.administrator:
+        await execute_pull(ctx)
+        return
+
+    # Initialize user tracking
+    if user_id not in user_pull_usage:
+        user_pull_usage[user_id] = {
+            "timestamps": [],
+            "last_used": 0,
+            "next_cooldown": None,
+        }
+
+    user_data = user_pull_usage[user_id]
+
+    # Remove timestamps older than 3 minutes
+    user_data["timestamps"] = [t for t in user_data["timestamps"] if now - t < 180]
+
+    # --- First 20 pulls per 3 minutes: no cooldown ---
+    if len(user_data["timestamps"]) < 20:
+        user_data["timestamps"].append(now)
+        await execute_pull(ctx)
+        return
+
+    # --- Variable-ratio cooldown after 20 pulls ---
+    # Generate cooldown if not already set
+    if user_data["next_cooldown"] is None:
+        user_data["next_cooldown"] = random.triangular(8, 30, 15)
+
+    cooldown = user_data["next_cooldown"]
+    time_since_last = now - user_data["last_used"]
+
+    if time_since_last < cooldown:
+        # Ambiguous "recharging" message (same as tarot)
+        messages = [
+            "Rest...",
+            "Patience...",
+            "The abyss awaits...",
+            "You will wait...",
+            "Not on my watch...",
+            "The void beckons...",
+        ]
+        await ctx.send(random.choice(messages))
+        return
+
+    # Successful pull: reset cooldown for next attempt
+    user_data["last_used"] = now
+    user_data["timestamps"].append(now)
+    user_data["next_cooldown"] = None
+
+    await execute_pull(ctx)
+
+
 async def execute_pull(ctx):
     """Execute the slot machine pull animation and result with weighted odds and near-misses"""
 
@@ -1461,16 +1520,12 @@ async def execute_pull(ctx):
     symbols = {
         "common": ["🏴‍☠️", "🗝️", "🗡️", "🃏", "🪦"],
         "medium": ["🔱", "🦇", "⭐"],
-        "rare": ["💎", "👑", "<:emoji_name:1427107096670900226>"]
+        "rare": ["💎", "👑", "<:emoji_name:1427107096670900226>"],
     }
 
     # Weighted symbol pool for random generation
     # (common appear far more often than medium/rare)
-    weighted_pool = (
-        symbols["common"] * 10 +
-        symbols["medium"] * 4 +
-        symbols["rare"] * 1
-    )
+    weighted_pool = symbols["common"] * 10 + symbols["medium"] * 4 + symbols["rare"] * 1
 
     # Send initial spinning message
     msg = await ctx.send("🎲 | 🎲 | 🎲")
@@ -1483,16 +1538,16 @@ async def execute_pull(ctx):
         await asyncio.sleep(d)
         spin = [random.choice(list(weighted_pool)) for _ in range(3)]
         await msg.edit(content=f"{spin[0]} | {spin[1]} | {spin[2]}")
-        
+
     # ============================================================
     #                  FINAL RESULT LOGIC
     # ============================================================
     #
     # 🎯 Distribution target (engagement curve):
-    # • 45% Dead spins
-    # • 20% Small wins (2 matches)
-    # • 20% Near misses (almost wins)
-    # • 10% Medium wins (3 matching common/medium)
+    # • 54% Dead spins
+    # • 15% Small wins (2 matches)
+    # • 22.5% Near misses (almost wins)
+    # • 7.5% Medium wins (3 matching common/medium)
     # • 1% Big win (3 matching rare symbols)
     #
     # ============================================================
@@ -1504,37 +1559,32 @@ async def execute_pull(ctx):
         symbol = random.choice(symbols["rare"])
         result = [symbol, symbol, symbol]
 
-    # --- MEDIUM WIN (10%) ---
-    elif roll < 0.11:
+    # --- MEDIUM WIN (7.5%) ---
+    elif roll < 0.085:
         pool = symbols["common"] + symbols["medium"]
         symbol = random.choice(pool)
         result = [symbol, symbol, symbol]
 
-    # --- SMALL WIN (20%) ---
-    elif roll < 0.31:
+    # --- SMALL WIN (15%) ---
+    elif roll < 0.235:
         symbol = random.choice(weighted_pool)
         # choose 2 matching, 1 random non-matching
         other = random.choice([s for s in weighted_pool if s != symbol])
         # randomize position
-        pattern = random.choice([
-            [symbol, symbol, other],
-            [symbol, other, symbol],
-            [other, symbol, symbol]
-        ])
+        pattern = random.choice(
+            [[symbol, symbol, other], [symbol, other, symbol], [other, symbol, symbol]]
+        )
         result = pattern
 
-    # --- NEAR MISS (20%) ---
-    elif roll < 0.51:
+    # --- NEAR MISS (22.5%) ---
+    elif roll < 0.46:
         symbol = random.choice(weighted_pool)
         near = random.choice([s for s in weighted_pool if s != symbol])
         # 2 symbols in a row, 3rd just off
-        pattern = random.choice([
-            [symbol, symbol, near],
-            [near, symbol, symbol]
-        ])
+        pattern = random.choice([[symbol, symbol, near], [near, symbol, symbol]])
         result = pattern
 
-    # --- DEAD SPIN (everything else ~49%) ---
+    # --- DEAD SPIN (everything else ~54%) ---
     else:
         result = random.sample(weighted_pool, 3)
 
@@ -1544,24 +1594,48 @@ async def execute_pull(ctx):
 
     r1, r2, r3 = result
 
-    # 3 Match (big or medium win)
+    # 3 Match - check if rare or common/medium
     if r1 == r2 == r3:
-        final_msg = f"{r1} | {r2} | {r3}\nJACKPOT! {r1}\n{ctx.author.mention}"
+        if r1 in symbols["rare"]:
+            # Big win (1%)
+            final_msg = f"{r1} | {r2} | {r3}\n**JACKPOT!** {r1}\n{ctx.author.mention}"
+        else:
+            # Medium win (7.5%)
+            medium_msgs = ["**Hit!**", "**Score!**", "**Got em!**", "**Connect!**"]
+            final_msg = f"{r1} | {r2} | {r3}\n{random.choice(medium_msgs)} {r1}\n{ctx.author.mention}"
 
-    # 2 Match (small win)
+    # 2 Match - small win (15%)
     elif r1 == r2 or r2 == r3 or r1 == r3:
         winning_symbol = r1 if r1 == r2 else (r2 if r2 == r3 else r1)
-        final_msg = f"{r1} | {r2} | {r3}\nWINNER! {winning_symbol}\n{ctx.author.mention}"
+        small_msgs = ["Push.", "Match.", "Pair.", "Almost."]
+        final_msg = f"{r1} | {r2} | {r3}\n{random.choice(small_msgs)} {winning_symbol}\n{ctx.author.mention}"
 
     # No match (dead spin or near-miss)
     else:
         insults = [
-            "Pathetic.", "Trash.", "Garbage.", "Awful.", "Weak.",
-            "Embarrassing.", "Yikes.", "Oof.", "Cringe.", "Terrible.",
-            "Horrendous.", "Tragic.", "Broke.", "Washed.", "Cooked.",
-            "Mid.", "Kys.", "Loser.", "It's over."
+            "Pathetic.",
+            "Trash.",
+            "Garbage.",
+            "Awful.",
+            "Weak.",
+            "Embarrassing.",
+            "Yikes.",
+            "Oof.",
+            "Cringe.",
+            "Terrible.",
+            "Horrendous.",
+            "Tragic.",
+            "Broke.",
+            "Washed.",
+            "Cooked.",
+            "Mid.",
+            "Kys.",
+            "Loser.",
+            "It's over.",
         ]
-        final_msg = f"{r1} | {r2} | {r3}\n{random.choice(insults)}\n{ctx.author.mention}"
+        final_msg = (
+            f"{r1} | {r2} | {r3}\n{random.choice(insults)}\n{ctx.author.mention}"
+        )
 
     await asyncio.sleep(0.3)
     await msg.edit(content=final_msg)
