@@ -214,6 +214,86 @@ def get_life_path_traits(number):
         22: "Master builder, practical idealist, powerful manifester (Master Number)",
         33: "Master teacher, compassionate leader, spiritual uplifter (Master Number)",
     }
+    return traits.get(number, "Unknown")
+
+
+def get_chinese_zodiac_animal(year):
+    """Get Chinese zodiac animal and emoji based on year"""
+    animals = [
+        ("Rat", "🐀"),
+        ("Ox", "🐂"),
+        ("Tiger", "🐅"),
+        ("Rabbit", "🐇"),
+        ("Dragon", "🐉"),
+        ("Snake", "🐍"),
+        ("Horse", "🐴"),
+        ("Goat", "🐐"),
+        ("Monkey", "🐒"),
+        ("Rooster", "🐓"),
+        ("Dog", "🐕"),
+        ("Pig", "🐖"),
+    ]
+    # Chinese zodiac started in 1924 (Year of the Rat)
+    # Calculate offset from 1924
+    index = (year - 1924) % 12
+    return animals[index]
+
+
+def get_chinese_zodiac_element(year):
+    """Get Chinese zodiac element based on year"""
+    elements = ["Wood", "Fire", "Earth", "Metal", "Water"]
+    # Elements cycle every 2 years, starting with Wood in 1924-1925
+    index = ((year - 1924) // 2) % 5
+    return elements[index]
+
+
+def get_chinese_animal_traits(animal):
+    """Get personality traits for Chinese zodiac animals"""
+    traits = {
+        "Rat": "Quick-witted, resourceful, versatile, kind",
+        "Ox": "Diligent, dependable, strong, determined",
+        "Tiger": "Brave, confident, competitive, unpredictable",
+        "Rabbit": "Quiet, elegant, kind, responsible",
+        "Dragon": "Confident, intelligent, enthusiastic, charismatic",
+        "Snake": "Enigmatic, intuitive, introspective, refined",
+        "Horse": "Energetic, independent, free-spirited, adventurous",
+        "Goat": "Calm, gentle, sympathetic, creative",
+        "Monkey": "Sharp, smart, curious, mischievous",
+        "Rooster": "Observant, hardworking, courageous, confident",
+        "Dog": "Loyal, honest, prudent, reliable",
+        "Pig": "Compassionate, generous, diligent, kind-hearted",
+    }
+    return traits.get(animal, "Unknown")
+
+
+def get_chinese_element_traits(element):
+    """Get personality traits for Chinese zodiac elements"""
+    traits = {
+        "Wood": "Compassionate, cooperative, expansive, idealistic",
+        "Fire": "Passionate, dynamic, adventurous, leadership-oriented",
+        "Earth": "Grounded, stable, practical, nurturing",
+        "Metal": "Determined, strong-willed, disciplined, ambitious",
+        "Water": "Intuitive, diplomatic, empathetic, flexible",
+    }
+    return traits.get(element, "Unknown")
+
+
+def get_generation(year):
+    """Get generation based on birth year"""
+    if year >= 2013:
+        return "Gen Alpha"
+    elif year >= 1997:
+        return "Gen Z"
+    elif year >= 1981:
+        return "Millennial"
+    elif year >= 1965:
+        return "Gen X"
+    elif year >= 1946:
+        return "Boomer"
+    elif year >= 1928:
+        return "Silent Generation"
+    else:
+        return "Greatest Generation"
 
 
 import re

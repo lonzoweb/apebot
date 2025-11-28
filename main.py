@@ -616,10 +616,13 @@ async def moon_command(ctx):
         await ctx.send(f"❌ Error calculating moon phase: {str(e)}")
 
 
+# lifepath
+
+
 @bot.command(name="lp")
 @commands.cooldown(1, 5, commands.BucketType.user)
 async def lifepathnumber_command(ctx, date: str = None):
-    """Calculate Life Path Number from birthdate"""
+    """Calculate Life Path Number from birthdate with Chinese Zodiac"""
     if not date:
         return await ctx.send(
             "❌ Please provide a date.\n"
@@ -645,6 +648,22 @@ async def lifepathnumber_command(ctx, date: str = None):
         life_path = calculate_life_path(month, day, year)
         traits = get_life_path_traits(life_path)
 
+        # Calculate Chinese Zodiac
+        zodiac_animal, zodiac_emoji = get_chinese_zodiac_animal(year)
+        zodiac_element = get_chinese_zodiac_element(year)
+        animal_traits = get_chinese_animal_traits(zodiac_animal)
+        element_traits = get_chinese_element_traits(zodiac_element)
+
+        # Calculate age
+        today = datetime.now()
+        age = today.year - year
+        # Adjust if birthday hasn't happened yet this year
+        if (today.month, today.day) < (month, day):
+            age -= 1
+
+        # Get generation
+        generation = get_generation(year)
+
         # Format date nicely
         date_obj = datetime(year, month, day)
         formatted_date = date_obj.strftime("%B %d, %Y")
@@ -663,6 +682,22 @@ async def lifepathnumber_command(ctx, date: str = None):
         )
 
         embed.add_field(name="Traits", value=traits, inline=False)
+
+        # Compact combined field
+        compact_info = (
+            f"{zodiac_element} {zodiac_animal} {zodiac_emoji} • {age} • {generation}"
+        )
+        embed.add_field(
+            name="Chinese Zodiac • Age • Generation", value=compact_info, inline=False
+        )
+
+        # Chinese Zodiac traits
+        embed.add_field(
+            name=f"{zodiac_animal} Traits", value=animal_traits, inline=False
+        )
+        embed.add_field(
+            name=f"{zodiac_element} Element", value=element_traits, inline=False
+        )
 
         await ctx.send(embed=embed)
 
