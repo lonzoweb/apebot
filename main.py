@@ -18,6 +18,7 @@ import activity
 import time
 import urllib.parse
 import battle
+import torture
 from datetime import timedelta
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -1689,6 +1690,46 @@ async def quick_delete_command(ctx, *, message: str = None):
         await ctx.message.delete()
     except:
         pass  # Silently fail if message is already deleted or bot lacks permissions
+
+
+# torture command
+
+import torture
+
+# Cooldown tracking
+torture_cooldowns = {}
+
+
+@bot.command(name="torture")
+async def torture_command(ctx):
+    """Display a random historical torture method"""
+
+    user_id = ctx.author.id
+    current_time = time.time()
+
+    # Check cooldown (15 seconds)
+    if user_id in torture_cooldowns:
+        time_since_last = current_time - torture_cooldowns[user_id]
+        if time_since_last < 15:
+            return  # Silently ignore
+
+    # Update cooldown
+    torture_cooldowns[user_id] = current_time
+
+    # Get random method
+    method = torture.get_random_torture_method()
+
+    # Create embed
+    embed = discord.Embed(
+        title=f"🩸 Torture Method: {method['name']}",
+        description=method["description"],
+        color=discord.Color.dark_red(),
+    )
+
+    embed.add_field(name="Origin", value=method["origin"], inline=True)
+    embed.add_field(name="Era", value=method["era"], inline=True)
+
+    await ctx.send(embed=embed)
 
 
 @bot.command(name="time")
