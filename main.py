@@ -1693,7 +1693,7 @@ ROLE_ALIASES = {
 }
 
 
-@bot.command(name="gr")
+@bot.command(name="give")
 async def give_role_command(ctx, member: discord.Member = None, role_alias: str = None):
     """Give a role to a user using an alias (Admin only)"""
     # Check if user has administrator permission
@@ -1719,7 +1719,7 @@ async def give_role_command(ctx, member: discord.Member = None, role_alias: str 
 
     # Get the role
     role_id = ROLE_ALIASES[role_alias]
-    role = ctx.guild.roles.get(int(role_id))
+    role = ctx.guild.get_role(int(role_id))
 
     if not role:
         return await ctx.send(
