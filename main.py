@@ -1693,7 +1693,7 @@ ROLE_ALIASES = {
 }
 
 
-@bot.command(name="give")
+@bot.command(name="gr")
 async def give_role_command(ctx, member: discord.Member = None, role_alias: str = None):
     """Give a role to a user using an alias (Admin only)"""
     # Check if user has administrator permission
