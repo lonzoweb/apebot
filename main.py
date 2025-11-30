@@ -1677,6 +1677,83 @@ async def execute_pull(ctx):
     await msg.edit(content=final_msg)
 
 
+# role alias add
+
+# ============================================================
+# ROLE ALIAS COMMAND
+# ============================================================
+
+# Role alias mapping - Replace the IDs with your actual role IDs
+ROLE_ALIASES = {
+    "niggapass": "1168965931918176297",  # Replace with actual role ID
+    "trial": "1444477594698514594",  # Replace with actual role ID
+    "based": "1234567890123456791",  # Replace with actual role ID
+    "elite": "1234567890123456792",  # Replace with actual role ID
+    "vip": "1234567890123456793",  # Replace with actual role ID
+}
+
+
+@bot.command(name="give")
+async def give_role_command(ctx, member: discord.Member = None, role_alias: str = None):
+    """Give a role to a user using an alias (Admin only)"""
+    # Check if user has administrator permission
+    if not ctx.author.guild_permissions.administrator:
+        return await ctx.send("🚫 Peasant Detected")
+
+    # Check if arguments provided
+    if not member or not role_alias:
+        available = ", ".join(f"`{alias}`" for alias in ROLE_ALIASES.keys())
+        return await ctx.send(
+            f"❌ Usage: `.give @user <role_alias>`\nAvailable aliases: {available}"
+        )
+
+    # Normalize the alias
+    role_alias = role_alias.lower()
+
+    # Check if the alias exists
+    if role_alias not in ROLE_ALIASES:
+        available = ", ".join(f"`{alias}`" for alias in ROLE_ALIASES.keys())
+        return await ctx.send(
+            f"❌ Unknown role alias: `{role_alias}`\nAvailable aliases: {available}"
+        )
+
+    # Get the role
+    role_id = ROLE_ALIASES[role_alias]
+    role = ctx.guild.roles.get(int(role_id))
+
+    if not role:
+        return await ctx.send(
+            f"❌ Role not found. Please check the role ID for `{role_alias}` in the configuration."
+        )
+
+    # Check if user already has the role - if so, remove it
+    try:
+        if role in member.roles:
+            await member.remove_roles(role)
+            embed = discord.Embed(
+                title="🗑️ Role Removed",
+                description=f"{member.mention} no longer has the **{role.name}** role.",
+                color=discord.Color.orange(),
+            )
+            embed.set_footer(text=f"Removed by {ctx.author.display_name}")
+            await ctx.send(embed=embed)
+        else:
+            # Add the role
+            await member.add_roles(role)
+            embed = discord.Embed(
+                title="✅ Role Granted",
+                description=f"{member.mention} has been given the **{role.name}** role.",
+                color=discord.Color.green(),
+            )
+            embed.set_footer(text=f"Given by {ctx.author.display_name}")
+            await ctx.send(embed=embed)
+    except discord.Forbidden:
+        await ctx.send("❌ I don't have permission to manage this role.")
+    except Exception as e:
+        logger.error(f"Error managing role: {e}")
+        await ctx.send(f"❌ Error managing role: {type(e).__name__}")
+
+
 # qd quick delete
 
 
