@@ -1687,8 +1687,8 @@ async def execute_pull(ctx):
 ROLE_ALIASES = {
     "niggapass": "1168965931918176297",  # Replace with actual role ID
     "trial": "1444477594698514594",  # Replace with actual role ID
-    "based": "1234567890123456791",  # Replace with actual role ID
-    "elite": "1234567890123456792",  # Replace with actual role ID
+    "masochist": "1167184822129664113",  # Replace with actual role ID
+    "hoe": "1168293630570676354",  # Replace with actual role ID
     "vip": "1234567890123456793",  # Replace with actual role ID
 }
 
