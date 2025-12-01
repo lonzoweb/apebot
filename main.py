@@ -1375,6 +1375,60 @@ async def activity_command(ctx):
     embed.add_field(name="👥 Most Active Users", value=users_text, inline=True)
 
 
+# fixact
+
+
+@bot.command(name="fixactivity")
+async def fix_activity(ctx):
+    """Fix activity tables (Admin only)"""
+    if not ctx.author.guild_permissions.administrator:
+        return await ctx.send("🚫 Peasant Detected")
+
+    try:
+        from database import get_db
+
+        with get_db() as conn:
+            c = conn.cursor()
+
+            # Drop old tables
+            c.execute("DROP TABLE IF EXISTS activity_hourly")
+            c.execute("DROP TABLE IF EXISTS activity_users")
+
+            # Recreate with correct schema
+            c.execute(
+                """
+                CREATE TABLE activity_hourly (
+                    hour TEXT PRIMARY KEY,
+                    count INTEGER,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+
+            c.execute(
+                """
+                CREATE TABLE activity_users (
+                    user_id TEXT PRIMARY KEY,
+                    count INTEGER,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+
+            # Add indexes
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_activity_hourly_count ON activity_hourly(count DESC)"
+            )
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_activity_users_count ON activity_users(count DESC)"
+            )
+
+        await ctx.send("✅ Activity tables fixed and recreated!")
+    except Exception as e:
+        logger.error(f"Error fixing activity: {e}")
+        await ctx.send(f"❌ Error: {e}")
+
+
 # ---- cmds  # '''
 '''
 @bot.command(name="commands")
