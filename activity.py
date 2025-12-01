@@ -1,606 +1,223 @@
 """
-Server Activity Tracker Module
-Tracks message activity over rolling 30-day period
+Lightweight Activity Tracking for Discord Bot
+Batches activity data in memory, writes to DB periodically
+Tracks: Most active hours, Most active users
 """
 
-import discord
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from collections import defaultdict
+from discord.ext import tasks
 
 logger = logging.getLogger(__name__)
-from datetime import datetime, timedelta
-from collections import defaultdict
-from database import get_db
-from database import get_user_timezone
-from zoneinfo import ZoneInfo
 
 # ============================================================
-# DATABASE FUNCTIONS
+# IN-MEMORY ACTIVITY BUFFER (Batched)
 # ============================================================
 
+# Store activity in memory, flush to DB every 5 minutes
+activity_buffer = {
+    "hourly": defaultdict(int),  # {"HH": count, "09": 42, ...}
+    "users": defaultdict(int),  # {"user_id": count, "123456": 127, ...}
+}
 
-def convert_hourly_to_timezone(hourly_data, date_str, timezone_name):
-    """Convert hourly activity dict from UTC to user's timezone"""
-    if not timezone_name or timezone_name == "None":
-        return hourly_data  # No conversion
+BUFFER_SIZE_THRESHOLD = 1000  # Flush when we hit this many events
 
+
+def log_activity_in_memory(user_id: str, hour: str):
+    """Log activity to in-memory buffer (not database)"""
+    activity_buffer["hourly"][hour] += 1
+    activity_buffer["users"][user_id] += 1
+
+    # If buffer gets too big, trigger flush
+    total_events = sum(activity_buffer["hourly"].values())
+    if total_events >= BUFFER_SIZE_THRESHOLD:
+        # Flush will happen on next scheduled task (every 5 min)
+        # Or you could async flush here if needed
+        pass
+
+
+def flush_activity_to_db(db_module):
+    """Write batched activity data to database"""
     try:
-        tz = ZoneInfo(timezone_name)
-    except Exception:
-        return hourly_data
+        from database import get_db
 
-    converted = {hour: 0 for hour in range(24)}
+        with get_db() as conn:
+            c = conn.cursor()
 
-    # Create UTC datetime objects for the given date
-    for hour, count in hourly_data.items():
-        utc_dt = datetime.strptime(f"{date_str} {hour}", "%Y-%m-%d %H")
-        utc_dt = utc_dt.replace(tzinfo=ZoneInfo("UTC"))
+            # Create table if not exists
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS activity_hourly (
+                    hour TEXT PRIMARY KEY,
+                    count INTEGER
+                )
+            """
+            )
 
-        local_dt = utc_dt.astimezone(tz)
-        converted[local_dt.hour] += count
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS activity_users (
+                    user_id TEXT PRIMARY KEY,
+                    count INTEGER
+                )
+            """
+            )
 
-    return converted
+            # Batch insert hourly data
+            for hour, count in activity_buffer["hourly"].items():
+                c.execute(
+                    """
+                    INSERT INTO activity_hourly (hour, count) VALUES (?, ?)
+                    ON CONFLICT(hour) DO UPDATE SET count = count + ?
+                """,
+                    (hour, count, count),
+                )
+
+            # Batch insert user data
+            for user_id, count in activity_buffer["users"].items():
+                c.execute(
+                    """
+                    INSERT INTO activity_users (user_id, count) VALUES (?, ?)
+                    ON CONFLICT(user_id) DO UPDATE SET count = count + ?
+                """,
+                    (user_id, count, count),
+                )
+
+        # Clear buffer after flush
+        activity_buffer["hourly"].clear()
+        activity_buffer["users"].clear()
+        logger.info("✅ Activity data flushed to database")
+
+    except Exception as e:
+        logger.error(f"Error flushing activity: {e}")
+
+
+# ============================================================
+# DATABASE INITIALIZATION
+# ============================================================
 
 
 def init_activity_db():
-    """Initialize activity tracking tables"""
-    with get_db() as conn:
-        c = conn.cursor()
-        # Hourly message counts
-        c.execute(
-            """
-            CREATE TABLE IF NOT EXISTS activity_hourly (
-                date TEXT,
-                hour INTEGER,
-                message_count INTEGER DEFAULT 0,
-                PRIMARY KEY (date, hour)
-            )
-        """
-        )
-        # User activity per day
-        c.execute(
-            """
-            CREATE TABLE IF NOT EXISTS activity_users (
-                date TEXT,
-                user_id TEXT,
-                username TEXT,
-                message_count INTEGER DEFAULT 0,
-                PRIMARY KEY (date, user_id)
-            )
-        """
-        )
+    """Initialize activity tables with indexes"""
+    from database import get_db
 
-
-def log_message_activity(timestamp, user_id, username, user_timezone=None):
-    """Log a message in the activity tracker in the user's timezone."""
-    # Convert to user's timezone if available
-    if user_timezone:
-        try:
-            tz = ZoneInfo(user_timezone)
-            timestamp = timestamp.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
-        except Exception as e:
-            logger.warning(f"Failed to convert timezone for user {user_id}: {e}")
-
-    # Get date and hour in local time
-    date_str = timestamp.strftime("%Y-%m-%d")
-    hour = timestamp.hour
-
-    with get_db() as conn:
-        c = conn.cursor()
-
-        # Hourly count
-        c.execute(
-            """
-            INSERT INTO activity_hourly (date, hour, message_count)
-            VALUES (?, ?, 1)
-            ON CONFLICT(date, hour)
-            DO UPDATE SET message_count = message_count + 1
-        """,
-            (date_str, hour),
-        )
-
-        # User count
-        c.execute(
-            """
-            INSERT INTO activity_users (date, user_id, username, message_count)
-            VALUES (?, ?, ?, 1)
-            ON CONFLICT(date, user_id)
-            DO UPDATE SET message_count = message_count + 1,
-                          username = ?
-        """,
-            (date_str, user_id, username, username),
-        )
-
-
-def cleanup_old_activity():
-    """Remove activity data older than 30 days"""
-    cutoff_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute("DELETE FROM activity_hourly WHERE date < ?", (cutoff_date,))
-        c.execute("DELETE FROM activity_users WHERE date < ?", (cutoff_date,))
-
-
-def get_day_activity(date_str):
-    """Get hourly activity for a specific day"""
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute(
-            """
-            SELECT hour, message_count 
-            FROM activity_hourly 
-            WHERE date = ?
-            ORDER BY hour
-        """,
-            (date_str,),
-        )
-
-        # Create dict with all 24 hours (0 if no data)
-        hourly_data = {hour: 0 for hour in range(24)}
-        for hour, count in c.fetchall():
-            hourly_data[hour] = count
-
-        return hourly_data
-
-
-def get_day_top_users(date_str, limit=5):
-    """Get top users for a specific day"""
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute(
-            """
-            SELECT username, message_count
-            FROM activity_users
-            WHERE date = ?
-            ORDER BY message_count DESC
-            LIMIT ?
-        """,
-            (date_str, limit),
-        )
-        return c.fetchall()
-
-
-def get_month_overview(ctx):
-    """Get daily totals for last 30 days"""
-    timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = (
-        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
-    )
-    now = datetime.now(timezone) if timezone else datetime.now()
-    start_date = now - timedelta(days=30)
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute(
-            """
-            SELECT date, SUM(message_count) as total
-            FROM activity_hourly
-            WHERE date >= ?
-            GROUP BY date
-            ORDER BY date
-        """,
-            (start_date.strftime("%Y-%m-%d"),),
-        )
-
-        return c.fetchall()
-
-
-def get_week_overview(ctx):
-    """Get daily totals for last 7 days"""
-    timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = (
-        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
-    )
-    now = datetime.now(timezone) if timezone else datetime.now()
-    start_date = now - timedelta(days=7)
-
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute(
-            """
-            SELECT date, SUM(message_count) as total
-            FROM activity_hourly
-            WHERE date >= ?
-            GROUP BY date
-            ORDER BY date
-        """,
-            (start_date.strftime("%Y-%m-%d"),),
-        )
-
-        return c.fetchall()
-
-
-# ============================================================
-# VISUALIZATION FUNCTIONS
-# ============================================================
-
-
-def create_bar(value, max_value, width=10):
-    """Create ASCII bar chart"""
-    if max_value == 0:
-        return "░" * width
-
-    filled = int((value / max_value) * width)
-    return "▓" * filled + "░" * (width - filled)
-
-
-from zoneinfo import ZoneInfo
-from datetime import datetime, timedelta
-
-
-def format_day_activity(date_str, hourly_data, top_users, ctx):
-    """Format daily activity as text"""
-    # Get user's timezone
-    timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = ZoneInfo(timezone_name) if timezone_name else None
-
-    # Parse date
-    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-    if timezone:
-        date_obj = date_obj.replace(tzinfo=timezone)
-    day_name = date_obj.strftime("%A, %B %d")
-
-    # Calculate stats
-    total_messages = sum(hourly_data.values())
-    max_hour_count = max(hourly_data.values()) if hourly_data else 0
-    peak_hour = (
-        max(hourly_data.items(), key=lambda x: x[1])[0] if total_messages > 0 else 0
-    )
-
-    # Build output
-    lines = [f"📊 **Activity for {day_name}**", "─" * 40]
-
-    # Hourly breakdown - hours are already in user's timezone from logging
-    for hour in range(24):
-        count = hourly_data[hour]
-        bar = create_bar(count, max_hour_count, 10)
-
-        # Convert 24-hour to 12-hour format
-        hour_12 = hour % 12
-        if hour_12 == 0:
-            hour_12 = 12
-        am_pm = "AM" if hour < 12 else "PM"
-
-        time_str = f"{hour_12:02d}:00 {am_pm}"
-        peak_marker = " 🔥" if hour == peak_hour and count > 0 else ""
-        lines.append(f"`{time_str}` {bar} {count:>4} msgs{peak_marker}")
-
-    lines.append("─" * 40)
-    lines.append(f"**Total:** {total_messages:,} messages")
-
-    if total_messages > 0:
-        peak_12 = peak_hour % 12
-        if peak_12 == 0:
-            peak_12 = 12
-        peak_am_pm = "AM" if peak_hour < 12 else "PM"
-        lines.append(
-            f"**Peak Hour:** {peak_12}:00 {peak_am_pm} ({hourly_data[peak_hour]} msgs)"
-        )
-
-    # Top users
-    if top_users:
-        lines.append("")
-        lines.append("👥 **Top Users:**")
-        for i, (username, count) in enumerate(top_users, 1):
-            percentage = (count / total_messages * 100) if total_messages > 0 else 0
-            lines.append(f"{i}. {username} - {count} msgs ({percentage:.1f}%)")
-
-    return "\n".join(lines)
-
-
-def format_month_overview(daily_data, ctx):
-    """Format monthly overview"""
-    # Get user's timezone
-    timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = ZoneInfo(timezone_name) if timezone_name else None
-
-    # Get today's date in user's timezone
-    now = datetime.now(timezone) if timezone else datetime.now()
-    today_str = now.strftime("%Y-%m-%d")
-
-    if not daily_data:
-        return "📊 **Activity - Last 30 Days**\n\nNo activity data available."
-
-    # Calculate stats
-    total_messages = sum(count for _, count in daily_data)
-    avg_per_day = total_messages / len(daily_data) if daily_data else 0
-    max_day = max(daily_data, key=lambda x: x[1]) if daily_data else (None, 0)
-    max_count = max_day[1] if max_day else 0
-
-    lines = ["📊 **Activity - Last 30 Days**", "─" * 40]
-
-    # Daily breakdown
-    for date_str, count in daily_data:
-        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-        if timezone:
-            date_obj = date_obj.replace(tzinfo=timezone)
-        display_date = date_obj.strftime("%b %d")
-        bar = create_bar(count, max_count, 10)
-
-        today_marker = " (Today)" if date_str == today_str else ""
-        lines.append(f"`{display_date}` {bar} {count:>4} msgs{today_marker}")
-
-    lines.append("─" * 40)
-    lines.append(f"**Total:** {total_messages:,} messages")
-    lines.append(f"**Avg/Day:** {avg_per_day:.0f} msgs")
-
-    if max_day[0]:
-        max_date_obj = datetime.strptime(max_day[0], "%Y-%m-%d")
-        max_date_display = max_date_obj.strftime("%b %d")
-        lines.append(f"**Most Active:** {max_date_display} ({max_day[1]:,} msgs)")
-
-    return "\n".join(lines)
-
-
-def format_week_overview(daily_data, ctx):
-    """Format weekly overview"""
-    # Get user's timezone
-    timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = ZoneInfo(timezone_name) if timezone_name else None
-
-    # Get today's date in user's timezone
-    now = datetime.now(timezone) if timezone else datetime.now()
-    today_str = now.strftime("%Y-%m-%d")
-
-    if not daily_data:
-        return "📊 **Activity - Last 7 Days**\n\nNo activity data available."
-
-    # Calculate stats
-    total_messages = sum(count for _, count in daily_data)
-    avg_per_day = total_messages / len(daily_data) if daily_data else 0
-    max_day = max(daily_data, key=lambda x: x[1]) if daily_data else (None, 0)
-    max_count = max_day[1] if max_day else 0
-
-    lines = ["📊 **Activity - Last 7 Days**", "─" * 40]
-
-    for date_str, count in daily_data:
-        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-        if timezone:
-            date_obj = date_obj.replace(tzinfo=timezone)
-        day_name = date_obj.strftime("%a, %b %d")
-        bar = create_bar(count, max_count, 10)
-
-        today_marker = " (Today)" if date_str == today_str else ""
-        lines.append(f"`{day_name}` {bar} {count:>4} msgs{today_marker}")
-
-    lines.append("─" * 40)
-    lines.append(f"**Total:** {total_messages:,} messages")
-    lines.append(f"**Avg/Day:** {avg_per_day:.0f} msgs")
-
-    if max_day[0]:
-        max_date_obj = datetime.strptime(max_day[0], "%Y-%m-%d")
-        max_date_display = max_date_obj.strftime("%a, %b %d")
-        lines.append(f"**Most Active:** {max_date_display} ({max_day[1]:,} msgs)")
-
-    return "\n".join(lines)
-
-
-# ============================================================
-# DISCORD FUNCTIONS
-# ============================================================
-
-
-async def send_day_activity(ctx, date_str):
-    """Send activity report for a specific day"""
-    # Get hourly data from DB
-    hourly_data = get_day_activity(date_str)
-
-    # Get user's timezone
-    timezone_name, _ = get_user_timezone(ctx.author.id)
-
-    # Convert hourly data to user's timezone
-    hourly_data = convert_hourly_to_timezone(hourly_data, date_str, timezone_name)
-
-    # Get top users
-    top_users = get_day_top_users(date_str, limit=5)
-
-    # Format output
-    output = format_day_activity(date_str, hourly_data, top_users, ctx)
-
-    # Split into chunks if too long
-    chunks = [output[i : i + 1900] for i in range(0, len(output), 1900)]
-
-    # Send as embeds
-    for chunk in chunks:
-        embed = discord.Embed(description=chunk, color=discord.Color.blue())
-        await ctx.send(embed=embed)
-
-
-async def send_month_overview(ctx):
-    """Send monthly overview"""
-    # Get user's timezone
-    timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = (
-        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
-    )
-    now = datetime.now(timezone) if timezone else datetime.now()
-    start_date = now - timedelta(days=30)
-
-    # Pull raw daily totals
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute(
-            """
-            SELECT date, SUM(message_count) as total
-            FROM activity_hourly
-            WHERE date >= ?
-            GROUP BY date
-            ORDER BY date
-            """,
-            (start_date.strftime("%Y-%m-%d"),),
-        )
-        daily_data = c.fetchall()
-
-    output = format_month_overview(daily_data, ctx)
-
-    # Split into chunks if needed
-    chunks = [output[i : i + 1900] for i in range(0, len(output), 1900)]
-    for chunk in chunks:
-        embed = discord.Embed(description=chunk, color=discord.Color.blue())
-        await ctx.send(embed=embed)
-
-
-async def send_week_overview(ctx):
-    """Send weekly overview"""
-    # Get user's timezone
-    timezone_name, _ = get_user_timezone(ctx.author.id)
-    timezone = (
-        ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
-    )
-    now = datetime.now(timezone) if timezone else datetime.now()
-    start_date = now - timedelta(days=7)
-
-    # Pull raw daily totals
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute(
-            """
-            SELECT date, SUM(message_count) as total
-            FROM activity_hourly
-            WHERE date >= ?
-            GROUP BY date
-            ORDER BY date
-            """,
-            (start_date.strftime("%Y-%m-%d"),),
-        )
-        daily_data = c.fetchall()
-
-    # Adjust each day's hourly data for timezone if you want hourly breakdown
-    # Otherwise, daily totals are fine
-    output = format_week_overview(daily_data, ctx)
-
-    # Split into chunks if needed
-    chunks = [output[i : i + 1900] for i in range(0, len(output), 1900)]
-    for chunk in chunks:
-        embed = discord.Embed(description=chunk, color=discord.Color.blue())
-        await ctx.send(embed=embed)
-
-
-# ============================================================
-# HELPER FUNCTIONS
-# ============================================================
-
-
-def get_user_local_date(user_id, date_input=None):
-    """Return the date string (YYYY-MM-DD) in the user's timezone"""
-    timezone_name, _ = get_user_timezone(user_id)
-    tz = ZoneInfo(timezone_name) if timezone_name and timezone_name != "None" else None
-    now = datetime.now(tz) if tz else datetime.now()
-
-    if not date_input or date_input.lower() in ["today", "now"]:
-        local_date = now
-    elif date_input.lower() in ["yesterday", "yday"]:
-        local_date = now - timedelta(days=1)
-    else:
-        # Check for day names
-        day_names = {
-            "monday": 0,
-            "mon": 0,
-            "tuesday": 1,
-            "tue": 1,
-            "tues": 1,
-            "wednesday": 2,
-            "wed": 2,
-            "thursday": 3,
-            "thu": 3,
-            "thur": 3,
-            "thurs": 3,
-            "friday": 4,
-            "fri": 4,
-            "saturday": 5,
-            "sat": 5,
-            "sunday": 6,
-            "sun": 6,
-        }
-        lower = date_input.lower().strip()
-        if lower in day_names:
-            target_weekday = day_names[lower]
-            current_weekday = now.weekday()
-            days_back = (current_weekday - target_weekday) % 7
-            local_date = now - timedelta(days=days_back)
-        else:
-            # MM/DD or YYYY-MM-DD
-            try:
-                if "/" in date_input:
-                    m, d = map(int, date_input.split("/"))
-                    local_date = datetime(now.year, m, d)
-                else:
-                    local_date = datetime.strptime(date_input, "%Y-%m-%d")
-            except Exception:
-                local_date = now
-
-    return local_date.strftime("%Y-%m-%d")
-
-
-def parse_date_input(date_input, user_id=None):
-    """Parse various date formats to YYYY-MM-DD"""
-    # Get user's timezone if provided
-    timezone = None
-    if user_id:
-        timezone_name, _ = get_user_timezone(user_id)
-        if timezone_name and timezone_name != "None":
-            timezone = ZoneInfo(timezone_name)
-
-    today = datetime.now(timezone) if timezone else datetime.now()
-
-    # Handle day names (monday, tuesday, etc.)
-    day_names = {
-        "monday": 0,
-        "mon": 0,
-        "tuesday": 1,
-        "tue": 1,
-        "tues": 1,
-        "wednesday": 2,
-        "wed": 2,
-        "thursday": 3,
-        "thu": 3,
-        "thur": 3,
-        "thurs": 3,
-        "friday": 4,
-        "fri": 4,
-        "saturday": 5,
-        "sat": 5,
-        "sunday": 6,
-        "sun": 6,
-    }
-
-    date_lower = date_input.lower().strip()
-
-    # Check for day names
-    if date_lower in day_names:
-        target_weekday = day_names[date_lower]
-        current_weekday = today.weekday()
-
-        # Find most recent occurrence of that day
-        days_back = (current_weekday - target_weekday) % 7
-        if days_back == 0:
-            days_back = 0  # Today if it matches
-
-        target_date = today - timedelta(days=days_back)
-        return target_date.strftime("%Y-%m-%d")
-
-    # Check for special keywords
-    if date_lower in ["today", "now"]:
-        return today.strftime("%Y-%m-%d")
-
-    if date_lower in ["yesterday", "yday"]:
-        return (today - timedelta(days=1)).strftime("%Y-%m-%d")
-
-    # Try parsing date formats like "11/4", "11-4", "2024-11-04"
     try:
-        # Try MM/DD format
-        if "/" in date_input:
-            parts = date_input.split("/")
-            if len(parts) == 2:
-                month, day = int(parts[0]), int(parts[1])
-                year = today.year
-                target_date = datetime(year, month, day)
-                return target_date.strftime("%Y-%m-%d")
+        with get_db() as conn:
+            c = conn.cursor()
 
-        # Try YYYY-MM-DD format
-        if "-" in date_input and len(date_input) >= 8:
-            target_date = datetime.strptime(date_input, "%Y-%m-%d")
-            return target_date.strftime("%Y-%m-%d")
-    except:
-        pass
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS activity_hourly (
+                    hour TEXT PRIMARY KEY,
+                    count INTEGER,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
 
-    return None
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS activity_users (
+                    user_id TEXT PRIMARY KEY,
+                    count INTEGER,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+
+            # Add indexes
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_activity_hourly_count ON activity_hourly(count DESC)"
+            )
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_activity_users_count ON activity_users(count DESC)"
+            )
+
+        logger.info("✅ Activity tables initialized")
+    except Exception as e:
+        logger.error(f"Error initializing activity DB: {e}")
+
+
+# ============================================================
+# QUERY FUNCTIONS
+# ============================================================
+
+
+def get_most_active_hours(limit=5):
+    """Get top active hours"""
+    from database import get_db
+
+    try:
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute(
+                """
+                SELECT hour, count FROM activity_hourly 
+                ORDER BY count DESC 
+                LIMIT ?
+            """,
+                (limit,),
+            )
+            return c.fetchall()
+    except Exception as e:
+        logger.error(f"Error getting active hours: {e}")
+        return []
+
+
+def get_most_active_users(limit=10):
+    """Get top active users"""
+    from database import get_db
+
+    try:
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute(
+                """
+                SELECT user_id, count FROM activity_users 
+                ORDER BY count DESC 
+                LIMIT ?
+            """,
+                (limit,),
+            )
+            return c.fetchall()
+    except Exception as e:
+        logger.error(f"Error getting active users: {e}")
+        return []
+
+
+def get_total_messages():
+    """Get total messages tracked"""
+    from database import get_db
+
+    try:
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute("SELECT SUM(count) FROM activity_hourly")
+            result = c.fetchone()
+            return result[0] if result[0] else 0
+    except Exception as e:
+        logger.error(f"Error getting total messages: {e}")
+        return 0
+
+
+# ============================================================
+# SETUP BACKGROUND TASK
+# ============================================================
+
+
+def setup_activity_tasks(bot):
+    """Initialize background flushing task"""
+
+    @tasks.loop(minutes=5)
+    async def flush_activity():
+        """Flush buffered activity to database every 5 minutes"""
+        flush_activity_to_db(None)
+
+    @flush_activity.before_loop
+    async def before_flush():
+        await bot.wait_until_ready()
+        logger.info("⏳ Activity flush task started (every 5 minutes)")
+
+    flush_activity.start()

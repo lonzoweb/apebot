@@ -13,6 +13,7 @@ import sqlite3
 import tarot
 import logging
 import ephem
+import activity
 import hierarchy
 import aiohttp
 import time
@@ -56,16 +57,25 @@ bot.aiohttp_session = None
 async def on_ready():
     """Bot startup event"""
 
-    # Initialize persistent aiohttp session if not already done
     if bot.aiohttp_session is None:
         bot.aiohttp_session = aiohttp.ClientSession()
 
+    from api import set_bot_session
+
+    set_bot_session(bot.aiohttp_session)
+
+    if bot.owner_timezone is None:
+        your_user_id = 154814148054745088
+        tz, _ = get_user_timezone(your_user_id)
+        bot.owner_timezone = tz
+
     init_db()
     init_gif_table()
-    activity.init_activity_db()
-    battle.init_battle_db()
+    activity.init_activity_db()  # ← ADD THIS LINE
+
     logger.info(f"✅ Logged in as {bot.user}")
     tasks.setup_tasks(bot)
+    activity.setup_activity_tasks(bot)  # ← ADD THIS LINE
 
 
 # Track bot start time for uptime calculations
@@ -79,16 +89,16 @@ bot_start_time = datetime.now()
 @bot.event
 async def on_message(message):
     """Handle all message events"""
-    # Don't track bot messages
     if message.author.bot:
         await bot.process_commands(message)
         return
 
-    # Log activity with your timezone
-    your_user_id = 154814148054745088
-    timezone_name, _ = get_user_timezone(your_user_id)
+    # Log to in-memory buffer (NOT database!)
+    now = datetime.now(ZoneInfo("America/Los_Angeles"))
+    hour = now.strftime("%H")  # Just the hour (00-23)
+    activity.log_activity_in_memory(str(message.author.id), hour)
 
-    # Track GIFs from messages
+    # Track GIFs
     gif_url = extract_gif_url(message)
     if gif_url:
         try:
@@ -99,7 +109,7 @@ async def on_message(message):
     # Track battle messages
     await battle.on_message_during_battle(message)
 
-    # Process commands (must be at the end!)
+    # Process commands
     await bot.process_commands(message)
 
 
@@ -1314,6 +1324,54 @@ async def weather_command(ctx, *, location: str = None):
 
     except Exception as e:
         await ctx.reply(f"❌ Error: {e}", mention_author=False)
+
+
+# activity cmd
+
+
+@bot.command(name="activity")
+async def activity_command(ctx):
+    """View server activity statistics (Admin only)"""
+    if not ctx.author.guild_permissions.administrator:
+        return await ctx.send("🚫 Peasant Detected")
+
+    # Get stats
+    total_msgs = activity.get_total_messages()
+    top_hours = activity.get_most_active_hours(limit=5)
+    top_users = activity.get_most_active_users(limit=10)
+
+    if not total_msgs:
+        return await ctx.send("📊 No activity data yet.")
+
+    # Format hours
+    hours_text = ""
+    for hour, count in top_hours:
+        hours_text += f"`{hour}:00` - {count} messages\n"
+
+    if not hours_text:
+        hours_text = "No data"
+
+    # Format users
+    users_text = ""
+    medals = ["🥇", "🥈", "🥉"]
+
+    for i, (user_id, count) in enumerate(top_users):
+        medal = medals[i] if i < 3 else f"{i+1}."
+        user = bot.get_user(int(user_id))
+        username = user.display_name if user else f"User#{user_id[:4]}"
+        users_text += f"{medal} {username} - {count} messages\n"
+
+    if not users_text:
+        users_text = "No data"
+
+    # Create embed
+    embed = discord.Embed(title="📊 Activity Statistics", color=discord.Color.blue())
+
+    embed.add_field(name="📈 Total Messages", value=str(total_msgs), inline=False)
+
+    embed.add_field(name="⏰ Most Active Hours", value=hours_text, inline=True)
+
+    embed.add_field(name="👥 Most Active Users", value=users_text, inline=True)
 
 
 # ---- cmds  # '''
