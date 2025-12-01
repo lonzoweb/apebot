@@ -51,6 +51,7 @@ intents.members = True
 
 bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents, help_command=None)
 bot.aiohttp_session = None
+bot.owner_timezone = None
 
 
 @bot.event
@@ -80,6 +81,7 @@ async def on_ready():
 
 # Track bot start time for uptime calculations
 bot_start_time = datetime.now()
+
 
 # ============================================================
 # BOT EVENTS
@@ -1097,6 +1099,10 @@ weather_user_hourly = {}  # Track per-user hourly usage
 async def weather_command(ctx, *, location: str = None):
     """Gets current weather for a location (zip code, city, neighborhood, etc.)"""
 
+    # Ensure session exists
+    if bot.aiohttp_session is None or bot.aiohttp_session.closed:
+        bot.aiohttp_session = aiohttp.ClientSession()
+
     # Check if this is a reply to another user's message
     if ctx.message.reference and not location:
         try:
@@ -1291,7 +1297,10 @@ async def weather_command(ctx, *, location: str = None):
         url = f"https://api.openweathermap.org/data/2.5/weather?q={encoded_location}&appid={API_KEY}&units=metric"
 
     try:
-        # ✅ USE PERSISTENT SESSION INSTEAD
+        # Ensure session exists
+        if bot.aiohttp_session is None or bot.aiohttp_session.closed:
+            bot.aiohttp_session = aiohttp.ClientSession()
+
         async with bot.aiohttp_session.get(url) as response:
             if response.status == 200:
                 data = await response.json()
