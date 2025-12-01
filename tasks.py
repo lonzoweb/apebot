@@ -6,7 +6,6 @@ Background tasks that run on intervals
 import discord
 import random
 import logging
-import activity
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from discord.ext import tasks
@@ -94,12 +93,6 @@ def setup_tasks(bot):
     daily_quote.start()
 
     return daily_quote_of_the_day
-
-    # activity cleanup
-
-    async def cleanup_activity_task():
-        """Clean up activity data older than 30 days (run daily)"""
-        activity.cleanup_old_activity()
 
 
 def get_daily_quote():

@@ -62,6 +62,12 @@ def init_db():
         """
         )
 
+        # Add indexes for better query performance
+        c.execute("CREATE INDEX IF NOT EXISTS idx_quotes_text ON quotes(quote)")
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_timezones_id ON user_timezones(user_id)"
+        )
+
 
 # ============================================================
 # QUOTE FUNCTIONS
@@ -179,10 +185,9 @@ def increment_gif_count(gif_url, user_id):
     """Increment GIF count or add new entry"""
     with get_db() as conn:
         c = conn.cursor()
-        # Delete GIFs older than two weeks
-        c.execute(
-            "DELETE FROM gif_tracker WHERE last_sent_at < datetime('now', '-14 days')"
-        )
+        # *** DELETED: Delete GIFs older than two weeks ***
+        # *** This is now handled by the background task cleanup_old_gifs() ***
+
         c.execute(
             """
             INSERT INTO gif_tracker (gif_url, count, last_sent_by, last_sent_at)

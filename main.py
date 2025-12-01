@@ -14,7 +14,7 @@ import tarot
 import logging
 import ephem
 import hierarchy
-import activity
+import aiohttp
 import time
 import urllib.parse
 import battle
@@ -49,6 +49,26 @@ intents.guilds = True
 intents.members = True
 
 bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents, help_command=None)
+bot.aiohttp_session = None
+
+
+@bot.event
+async def on_ready():
+    """Bot startup event"""
+
+    # Initialize persistent aiohttp session if not already done
+    if bot.aiohttp_session is None:
+        bot.aiohttp_session = aiohttp.ClientSession()
+
+    init_db()
+    init_gif_table()
+    activity.init_activity_db()
+    battle.init_battle_db()
+    logger.info(f"✅ Logged in as {bot.user}")
+    tasks.setup_tasks(bot)
+
+
+# Track bot start time for uptime calculations
 bot_start_time = datetime.now()
 
 # ============================================================
@@ -67,13 +87,6 @@ async def on_message(message):
     # Log activity with your timezone
     your_user_id = 154814148054745088
     timezone_name, _ = get_user_timezone(your_user_id)
-
-    activity.log_message_activity(
-        timestamp=message.created_at,
-        user_id=str(message.author.id),
-        username=message.author.display_name,
-        user_timezone=timezone_name,
-    )
 
     # Track GIFs from messages
     gif_url = extract_gif_url(message)
@@ -123,7 +136,6 @@ async def on_ready():
     """Bot startup event"""
     init_db()
     init_gif_table()
-    activity.init_activity_db()
     battle.init_battle_db()
     logger.info(f"✅ Logged in as {bot.user}")
     tasks.setup_tasks(bot)
@@ -730,12 +742,9 @@ async def gifs_command(ctx):
         medal = medals[i - 1] if i <= 3 else f"{i}."
         shortened = shorten_gif_url(gif_url)
 
-        # Try to get username
-        try:
-            user = await bot.fetch_user(int(last_sent_by))
-            username = user.display_name
-        except:
-            username = "Unknown"
+        # Use cached user lookup instead of fetch_user
+        user = bot.get_user(int(last_sent_by))
+        username = user.display_name if user else f"User#{last_sent_by[:4]}"
 
         description += f"{medal} **{count} sends** - `{shortened}` - @{username}\n"
 
@@ -768,7 +777,7 @@ async def gifs_command(ctx):
         if gif_url:
             await ctx.send(f"**#{rank} GIF:**\n{gif_url}")
     except asyncio.TimeoutError:
-        pass  # Timeout is fine, just ignore
+        pass  # Timeout is fine
 
 
 @bot.command(name="rev")
@@ -1102,7 +1111,7 @@ async def weather_command(ctx, *, location: str = None):
                     )
                     return
         except:
-            pass  # If we can't fetch the message, continue with normal logic
+            pass
 
     # If no location provided and not a reply, try to get user's saved location
     if not location:
@@ -1127,7 +1136,7 @@ async def weather_command(ctx, *, location: str = None):
         if user_id in weather_user_cooldowns:
             time_since_last = current_time - weather_user_cooldowns[user_id]
             if time_since_last < 3:
-                return  # Silently ignore
+                return
 
         # Check per-user hourly limit (30 per hour)
         if user_id not in weather_user_hourly:
@@ -1139,7 +1148,7 @@ async def weather_command(ctx, *, location: str = None):
         ]
 
         if len(weather_user_hourly[user_id]) >= 30:
-            return  # Silently ignore
+            return
 
         # Update usage tracking
         weather_user_cooldowns[user_id] = current_time
@@ -1151,7 +1160,7 @@ async def weather_command(ctx, *, location: str = None):
         await ctx.reply("❌ Weather API key not configured!", mention_author=False)
         return
 
-    # State abbreviations and full names mapped to abbreviations
+    # State abbreviations mapping
     us_state_abbrevs = {
         "alabama": "al",
         "al": "al",
@@ -1260,120 +1269,51 @@ async def weather_command(ctx, *, location: str = None):
 
     # Determine the API URL based on input type
     if location_stripped.isdigit() and len(location_stripped) == 5:
-        # US zip code - use zip endpoint with US country code
         url = f"https://api.openweathermap.org/data/2.5/weather?zip={location_stripped},us&appid={API_KEY}&units=metric"
-
     elif location_parts and location_parts[-1] in us_state_abbrevs:
-        # Last word is a US state - format as "city,state,us"
         state_abbrev = us_state_abbrevs[location_parts[-1]]
         city = " ".join(location_parts[:-1])
         formatted_location = f"{city},{state_abbrev},us"
         encoded_location = urllib.parse.quote(formatted_location)
         url = f"https://api.openweathermap.org/data/2.5/weather?q={encoded_location}&appid={API_KEY}&units=metric"
-
     else:
-        # Default - use location as-is
         encoded_location = urllib.parse.quote(location_stripped)
         url = f"https://api.openweathermap.org/data/2.5/weather?q={encoded_location}&appid={API_KEY}&units=metric"
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                if response.status == 200:
-                    data = await response.json()
+        # ✅ USE PERSISTENT SESSION INSTEAD
+        async with bot.aiohttp_session.get(url) as response:
+            if response.status == 200:
+                data = await response.json()
 
-                    # Extract weather data
-                    location_name = data["name"]
-                    country = data["sys"]["country"]
-                    temp_c = data["main"]["temp"]
-                    temp_f = (temp_c * 9 / 5) + 32
-                    condition = data["weather"][0]["description"].title()
+                # Extract weather data
+                location_name = data["name"]
+                country = data["sys"]["country"]
+                temp_c = data["main"]["temp"]
+                temp_f = (temp_c * 9 / 5) + 32
+                condition = data["weather"][0]["description"].title()
 
-                    # Format output
-                    weather_msg = f"**{location_name}, {country}**\n{condition} • {temp_f:.1f}°F / {temp_c:.1f}°C"
-                    await ctx.send(weather_msg)
+                # Format output
+                weather_msg = f"**{location_name}, {country}**\n{condition} • {temp_f:.1f}°F / {temp_c:.1f}°C"
+                await ctx.send(weather_msg)
 
-                elif response.status == 404:
-                    await ctx.reply(
-                        f"❌ Location '{location}' not found!", mention_author=False
-                    )
-                elif response.status == 401:
-                    await ctx.reply(
-                        "❌ Invalid API key! Check your OpenWeatherMap API key.",
-                        mention_author=False,
-                    )
-                else:
-                    await ctx.reply(
-                        f"❌ Failed to fetch weather data. Status: {response.status}",
-                        mention_author=False,
-                    )
+            elif response.status == 404:
+                await ctx.reply(
+                    f"❌ Location '{location}' not found!", mention_author=False
+                )
+            elif response.status == 401:
+                await ctx.reply(
+                    "❌ Invalid API key! Check your OpenWeatherMap API key.",
+                    mention_author=False,
+                )
+            else:
+                await ctx.reply(
+                    f"❌ Failed to fetch weather data. Status: {response.status}",
+                    mention_author=False,
+                )
 
     except Exception as e:
         await ctx.reply(f"❌ Error: {e}", mention_author=False)
-
-
-# ============================================================
-# ACTIVITY COMMAND
-# ============================================================
-
-
-@bot.command(name="activity")
-async def activity_command(ctx, *, args: str = None):
-    """View server activity statistics (Admin only)"""
-    try:
-        # Admin only check
-        if not ctx.author.guild_permissions.administrator:
-            return await ctx.send(
-                "🚫 Peasant Detected - Activity tracker is for administrators only."
-            )
-
-        # No arguments - show help
-        if args is None:
-            help_text = """
-📊 **Activity Tracker Commands**
-
-**View Specific Day:**
-`.activity today` - Today's hourly activity
-`.activity yesterday` - Yesterday's activity
-`.activity monday` - Most recent Monday
-`.activity 11/4` - Specific date (MM/DD)
-
-**View Overview:**
-`.activity week` - Last 7 days overview
-`.activity month` - Last 30 days overview
-
-**Examples:**
-`.activity friday` - Last Friday's hourly breakdown
-`.activity 11/21` - Nov 21st hourly breakdown
-`.activity week` - Daily totals for last 7 days
-"""
-            embed = discord.Embed(description=help_text, color=discord.Color.blue())
-            await ctx.send(embed=embed)
-            return
-
-        args_lower = args.lower().strip()
-
-        # Check for overview commands
-        if args_lower == "month":
-            await activity.send_month_overview(ctx)
-            return
-
-        if args_lower == "week":
-            await activity.send_week_overview(ctx)
-            return
-
-        # Try to parse as date
-        date_str = activity.parse_date_input(args, ctx.author.id)
-
-        if date_str:
-            await activity.send_day_activity(ctx, date_str)
-        else:
-            await ctx.send(
-                f"❌ Could not parse date '{args}'. Try: `today`, `monday`, `11/4`, or `.activity` for help."
-            )
-    except Exception as e:
-        logger.error(f"Error in activity command: {e}", exc_info=True)
-        await ctx.send(f"❌ An error occurred: {type(e).__name__}")
 
 
 # ---- cmds  # '''
@@ -2178,6 +2118,24 @@ async def globally_block_during_debug(ctx):
 
     return True
 
+
+@bot.event
+async def on_error(event, *args, **kwargs):
+    """Log errors without stopping the bot"""
+    logger.error(f"Error in {event}", exc_info=True)
+    # exc_info=True shows the full traceback
+
+
+# Add a shutdown handler
+import atexit
+
+
+def cleanup_session():
+    if bot.aiohttp_session and not bot.aiohttp_session.closed:
+        asyncio.run(bot.aiohttp_session.close())
+
+
+atexit.register(cleanup_session)
 
 # ============================================================
 # RUN BOT
