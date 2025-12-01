@@ -1344,9 +1344,10 @@ async def activity_command(ctx):
         return await ctx.send("📊 No activity data yet.")
 
     # Format hours
-    hours_text = ""
-    for hour, count in top_hours:
-        hours_text += f"`{hour}:00` - {count} messages\n"
+    hour_int = int(hour)
+    hour_12 = hour_int % 12 or 12
+    am_pm = "AM" if hour_int < 12 else "PM"
+    hours_text += f"`{hour_12}:00 {am_pm}` - {count} messages\n"
 
     if not hours_text:
         hours_text = "No data"
