@@ -1355,10 +1355,10 @@ async def activity_command(ctx):
     # Format hours
     hours_text = ""
     for hour_str, count in top_hours:
-    hour_int = int(hour_str)
-    hour_12 = hour_int % 12 or 12
-    am_pm = "AM" if hour_int < 12 else "PM"
-    hours_text += f"`{hour_12}:00 {am_pm}` - {count} messages\n"
+        hour_int = int(hour_str)
+        hour_12 = hour_int % 12 or 12
+        am_pm = "AM" if hour_int < 12 else "PM"
+        hours_text += f"`{hour_12}:00 {am_pm}` - {count} messages\n"
 
     if not hours_text:
         hours_text = "No data"
