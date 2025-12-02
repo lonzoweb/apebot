@@ -2052,51 +2052,6 @@ async def flush_activity_manual(ctx):
         await ctx.send(f"❌ Error: {e}")
 
 
-@bot.command(name="checkactivitydb")
-async def check_activity_db(ctx):
-    """Check what's actually in the activity database"""
-    if not ctx.author.guild_permissions.administrator:
-        return await ctx.send("🚫 Peasant Detected")
-
-    try:
-        from database import get_db
-
-        with get_db() as conn:
-            c = conn.cursor()
-
-            # Check if tables exist
-            c.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='activity_hourly'"
-            )
-            hourly_exists = c.fetchone()
-
-            c.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='activity_users'"
-            )
-            users_exists = c.fetchone()
-
-            hourly_data = []
-            users_data = []
-
-            if hourly_exists:
-                c.execute("SELECT * FROM activity_hourly")
-                hourly_data = c.fetchall()
-
-            if users_exists:
-                c.execute("SELECT * FROM activity_users")
-                users_data = c.fetchall()
-
-            await ctx.send(
-                f"Tables exist:\n"
-                f"activity_hourly: {bool(hourly_exists)}\n"
-                f"activity_users: {bool(users_exists)}\n\n"
-                f"Hourly data: {hourly_data}\n"
-                f"Users data: {users_data}"
-            )
-    except Exception as e:
-        await ctx.send(f"❌ Error: {e}")
-
-
 @bot.command(name="fixdb")
 async def fix_db(ctx):
     """Reinitialize database with backup (Admin only)"""
