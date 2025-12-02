@@ -33,9 +33,17 @@ async def google_lens_fetch_results(image_url: str, limit: int = 3):
     search_url = "https://serpapi.com/search.json"
     params = {"engine": "google_lens", "url": image_url, "api_key": SERPAPI_KEY}
 
+    session = bot_session
+    if session is None:
+        import aiohttp
+
+        session = aiohttp.ClientSession()
+        should_close = True
+    else:
+        should_close = False
+
     try:
-        # Use the persistent session instead of creating a new one
-        async with bot_session.get(search_url, params=params, timeout=30) as resp:
+        async with session.get(search_url, params=params, timeout=30) as resp:
             if resp.status != 200:
                 error_text = await resp.text()
                 raise RuntimeError(
@@ -46,6 +54,9 @@ async def google_lens_fetch_results(image_url: str, limit: int = 3):
         raise RuntimeError("Request to SerpApi timed out")
     except aiohttp.ClientError as e:
         raise RuntimeError(f"Network error: {e}")
+    finally:
+        if should_close and session:
+            await session.close()
 
     results = []
     visual_matches = data.get("visual_matches", [])
@@ -64,6 +75,51 @@ async def google_lens_fetch_results(image_url: str, limit: int = 3):
     search_page = search_metadata.get("google_lens_url", "")
 
     return {"results": results, "search_page": search_page}
+
+
+async def lookup_location(query):
+    """Lookup timezone and city from location query using OpenCage API"""
+    url = "https://api.opencagedata.com/geocode/v1/json"
+    params = {"q": query, "key": OPENCAGE_KEY}
+
+    session = bot_session
+    if session is None:
+        import aiohttp
+
+        session = aiohttp.ClientSession()
+        should_close = True
+    else:
+        should_close = False
+
+    try:
+        async with session.get(url, params=params, timeout=10) as resp:
+            if resp.status != 200:
+                logger.error(f"OpenCage API returned {resp.status}")
+                return None, None
+            data = await resp.json()
+    except asyncio.TimeoutError:
+        logger.error("OpenCage API timeout")
+        return None, None
+    except Exception as e:
+        logger.error(f"OpenCage API error: {e}")
+        return None, None
+    finally:
+        if should_close and session:
+            await session.close()
+
+    if data.get("results"):
+        first = data["results"][0]
+        timezone_name = first["annotations"]["timezone"]["name"]
+        components = first["components"]
+        city = (
+            components.get("city")
+            or components.get("town")
+            or components.get("village")
+            or components.get("state")
+            or query
+        )
+        return timezone_name, city
+    return None, None
 
 
 # ============================================================
@@ -113,8 +169,18 @@ async def urban_dictionary_lookup(term):
     """Look up a term on Urban Dictionary"""
     url = "https://api.urbandictionary.com/v0/define"
 
+    # Safety check - if bot_session is None, create a temporary one
+    session = bot_session
+    if session is None:
+        import aiohttp
+
+        session = aiohttp.ClientSession()
+        should_close = True
+    else:
+        should_close = False
+
     try:
-        async with bot_session.get(url, params={"term": term}, timeout=10) as resp:
+        async with session.get(url, params={"term": term}, timeout=15) as resp:
             if resp.status != 200:
                 return None
             data = await resp.json()
@@ -125,3 +191,6 @@ async def urban_dictionary_lookup(term):
     except Exception as e:
         logger.error(f"Urban Dictionary API error: {e}")
         return None
+    finally:
+        if should_close and session:
+            await session.close()
