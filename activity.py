@@ -187,6 +187,28 @@ def get_total_messages():
         return 0
 
 
+def cleanup_old_activity(days=30):
+    """Delete activity data older than X days"""
+    from database import get_db
+    from datetime import datetime, timedelta
+
+    try:
+        cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
+
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute(
+                "DELETE FROM activity_hourly WHERE last_updated < ?", (cutoff_date,)
+            )
+            c.execute(
+                "DELETE FROM activity_users WHERE last_updated < ?", (cutoff_date,)
+            )
+
+        logger.info(f"✅ Cleaned up activity data older than {days} days")
+    except Exception as e:
+        logger.error(f"Error cleaning up activity: {e}")
+
+
 # ============================================================
 # SETUP BACKGROUND TASK
 # ============================================================

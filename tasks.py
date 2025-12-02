@@ -25,6 +25,20 @@ daily_quote_of_the_day = None
 def setup_tasks(bot):
     """Initialize and start scheduled tasks"""
 
+    @tasks.loop(hours=24)
+    async def cleanup_activity_daily():
+        """Clean up activity data older than 30 days once per day"""
+        try:
+            activity.cleanup_old_activity(days=30)
+        except Exception as e:
+            logger.error(f"Error in activity cleanup: {e}")
+
+    @cleanup_activity_daily.before_loop
+    async def before_cleanup_activity():
+        await bot.wait_until_ready()
+
+    cleanup_activity_daily.start()
+
     @tasks.loop(minutes=1)
     async def daily_quote():
         """Send daily quotes at scheduled times (10 AM and 6 PM PT)"""
