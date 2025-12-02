@@ -1344,46 +1344,57 @@ async def activity_command(ctx):
     if not ctx.author.guild_permissions.administrator:
         return await ctx.send("🚫 Peasant Detected")
 
-    # Get stats
-    total_msgs = activity.get_total_messages()
-    top_hours = activity.get_most_active_hours(limit=5)
-    top_users = activity.get_most_active_users(limit=10)
+    try:
+        # Get stats
+        total_msgs = activity.get_total_messages()
+        top_hours = activity.get_most_active_hours(limit=5)
+        top_users = activity.get_most_active_users(limit=10)
 
-    if not total_msgs:
-        return await ctx.send("📊 No activity data yet.")
+        if not total_msgs:
+            return await ctx.send("📊 No activity data yet.")
 
-    # Format hours
-    hours_text = ""
-    for hour_str, count in top_hours:
-        hour_int = int(hour_str)
-        hour_12 = hour_int % 12 or 12
-        am_pm = "AM" if hour_int < 12 else "PM"
-        hours_text += f"`{hour_12}:00 {am_pm}` - {count} messages\n"
+        # Format hours (12-hour time)
+        hours_text = ""
+        if top_hours:
+            for hour_str, count in top_hours:
+                hour_int = int(hour_str)
+                hour_12 = hour_int % 12 or 12
+                am_pm = "AM" if hour_int < 12 else "PM"
+                hours_text += f"`{hour_12}:00 {am_pm}` - {count} messages\n"
+        else:
+            hours_text = "No data"
 
-    if not hours_text:
-        hours_text = "No data"
+        # Format users
+        users_text = ""
+        medals = ["🥇", "🥈", "🥉"]
 
-    # Format users
-    users_text = ""
-    medals = ["🥇", "🥈", "🥉"]
+        if top_users:
+            for i, (user_id, count) in enumerate(top_users):
+                medal = medals[i] if i < 3 else f"{i+1}."
+                user = bot.get_user(int(user_id))
+                username = user.display_name if user else f"User#{user_id[:4]}"
+                users_text += f"{medal} {username} - {count} messages\n"
+        else:
+            users_text = "No data"
 
-    for i, (user_id, count) in enumerate(top_users):
-        medal = medals[i] if i < 3 else f"{i+1}."
-        user = bot.get_user(int(user_id))
-        username = user.display_name if user else f"User#{user_id[:4]}"
-        users_text += f"{medal} {username} - {count} messages\n"
+        # Create embed
+        embed = discord.Embed(
+            title="📊 Activity Statistics", color=discord.Color.blue()
+        )
 
-    if not users_text:
-        users_text = "No data"
+        embed.add_field(name="📈 Total Messages", value=str(total_msgs), inline=False)
 
-    # Create embed
-    embed = discord.Embed(title="📊 Activity Statistics", color=discord.Color.blue())
+        embed.add_field(
+            name="⏰ Most Active Hours (LA Time)", value=hours_text, inline=True
+        )
 
-    embed.add_field(name="📈 Total Messages", value=str(total_msgs), inline=False)
+        embed.add_field(name="👥 Most Active Users", value=users_text, inline=True)
 
-    embed.add_field(name="⏰ Most Active Hours", value=hours_text, inline=True)
+        await ctx.send(embed=embed)
 
-    embed.add_field(name="👥 Most Active Users", value=users_text, inline=True)
+    except Exception as e:
+        logger.error(f"Error in activity command: {e}", exc_info=True)
+        await ctx.send(f"❌ Error: {e}")
 
 
 # fixact
