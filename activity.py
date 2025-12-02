@@ -46,25 +46,6 @@ def flush_activity_to_db(db_module):
         with get_db() as conn:
             c = conn.cursor()
 
-            # Create table if not exists
-            c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS activity_hourly (
-                    hour TEXT PRIMARY KEY,
-                    count INTEGER
-                )
-            """
-            )
-
-            c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS activity_users (
-                    user_id TEXT PRIMARY KEY,
-                    count INTEGER
-                )
-            """
-            )
-
             # Batch insert hourly data
             for hour, count in activity_buffer["hourly"].items():
                 c.execute(
@@ -85,13 +66,17 @@ def flush_activity_to_db(db_module):
                     (user_id, count, count),
                 )
 
+            conn.commit()
+
         # Clear buffer after flush
         activity_buffer["hourly"].clear()
         activity_buffer["users"].clear()
-        logger.info("✅ Activity data flushed to database")
+        logger.info(
+            f"✅ Activity data flushed to database - Hourly: {len(activity_buffer['hourly'])} entries, Users: {len(activity_buffer['users'])} entries"
+        )
 
     except Exception as e:
-        logger.error(f"Error flushing activity: {e}")
+        logger.error(f"Error flushing activity: {e}", exc_info=True)
 
 
 # ============================================================
