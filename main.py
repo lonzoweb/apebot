@@ -1967,6 +1967,37 @@ async def db_integrity(ctx):
         await ctx.send(f"❌ Error checking integrity: {e}")
 
 
+@bot.command(name="testactivity")
+async def test_activity(ctx):
+    """Test activity logging manually"""
+    if not ctx.author.guild_permissions.administrator:
+        return await ctx.send("🚫 Peasant Detected")
+
+    from activity import activity_buffer, log_activity_in_memory
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    # Manually log some test activity
+    now = datetime.now(ZoneInfo("America/Los_Angeles"))
+    hour = now.strftime("%H")
+
+    log_activity_in_memory(str(ctx.author.id), hour)
+    log_activity_in_memory(str(ctx.author.id), hour)
+    log_activity_in_memory("999999999", hour)
+
+    # Show buffer
+    total_hourly = sum(activity_buffer["hourly"].values())
+    total_users = sum(activity_buffer["users"].values())
+
+    await ctx.send(
+        f"✅ Added 3 test messages to buffer\n"
+        f"Buffer hourly: {dict(activity_buffer['hourly'])}\n"
+        f"Buffer users: {dict(activity_buffer['users'])}\n"
+        f"Total hourly count: {total_hourly}\n"
+        f"Total user count: {total_users}"
+    )
+
+
 @bot.command(name="showquotes")
 async def show_quotes(ctx):
     """Show sample quotes (Admin only)"""
