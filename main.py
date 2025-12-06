@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 import discord
 from discord.ext import commands
 import ephem  # Assuming this is the PyEphem library
+import urllib.parse
 
 # --- Local Module Imports (REQUIRED for bot functionality) ---
 # Ensure all files are present in your bot's root directory:
