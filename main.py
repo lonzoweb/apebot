@@ -1531,7 +1531,7 @@ async def location_command(ctx, *, args: str = None):
 
 # Tracking for pull command with intermittent reinforcement
 user_pull_usage = {}
-
+user_usage = {}
 
 @bot.command(name="pull")
 async def pull_command(ctx):
