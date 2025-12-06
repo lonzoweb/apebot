@@ -567,6 +567,13 @@ def get_image_path(card_key):
     return os.path.join("images", "rws", f"{card_key}.jpg")
 
 
+def draw_card():  # <--- THIS IS THE MISSING FUNCTION
+    """Draw a random card (no reversals)"""
+    # Assuming RWS_DECK is accessible
+    card_key = random.choice(list(RWS_DECK.keys()))
+    return card_key
+
+
 # --- CORE FUNCTIONS (Non-Blocking I/O) ---
 
 
