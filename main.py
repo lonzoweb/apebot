@@ -565,6 +565,7 @@ async def tarot_card(ctx, action: str = None, deck_name: str = None):
     .tc                    - Draw a random card from current deck
     .tc set <deck_name>    - Set the deck (admin only)
     """
+    # NOTE: user_usage and get_guild_tarot_deck must be defined globally or imported.
 
     # Handle "set" action (admin only)
     if action and action.lower() == "set":
@@ -591,18 +592,33 @@ async def tarot_card(ctx, action: str = None, deck_name: str = None):
         await ctx.send(f"✅ Deck set to **{deck_full_name}**")
         return
 
-    # Normal draw (handle cooldowns and permissions like before)
+    # --- Draw Card Logic ---
+
+    # Get current deck selection
+    current_deck = get_guild_tarot_deck(ctx.guild.id)
+
+    # Define which module and draw function to use
+    if current_deck == "rws":
+        deck_module = rws
+    else:  # Default to tarot (Thoth)
+        deck_module = tarot
+
+    # Function to execute a successful draw (factored out for DRY principle)
+    async def execute_draw():
+        # CRITICAL FIX: Explicitly call the module's draw_card function to get the key
+        card_key = deck_module.draw_card()
+
+        # Pass the drawn card_key to the module's send_tarot_card function
+        await deck_module.send_tarot_card(ctx, card_key=card_key)
+
+    # Handle Cooldowns and Permissions
     user_id = ctx.author.id
     now = time.time()
     today = datetime.utcnow().date()
 
     if ctx.author.guild_permissions.administrator:
-        # Get current deck and call appropriate function
-        current_deck = get_guild_tarot_deck(ctx.guild.id)
-        if current_deck == "rws":
-            await rws.send_tarot_card(ctx)
-        else:
-            await tarot.send_tarot_card(ctx)
+        # Admin: no cooldown or tracking, just execute the draw
+        await execute_draw()
         return
 
     # Initialize/reset user tracking
@@ -619,11 +635,7 @@ async def tarot_card(ctx, action: str = None, deck_name: str = None):
     # First 2 draws: no cooldown
     if user_data["count"] < 2:
         user_data["count"] += 1
-        current_deck = get_guild_tarot_deck(ctx.guild.id)
-        if current_deck == "rws":
-            await rws.send_tarot_card(ctx)
-        else:
-            await tarot.send_tarot_card(ctx)
+        await execute_draw()
         return
 
     # Variable-ratio cooldown after first 2 draws
@@ -645,16 +657,12 @@ async def tarot_card(ctx, action: str = None, deck_name: str = None):
         await ctx.send(random.choice(messages))
         return
 
-    # Successful draw
+    # Successful draw after cooldown
     user_data["last_used"] = now
     user_data["count"] += 1
     user_data["next_cooldown"] = None
 
-    current_deck = get_guild_tarot_deck(ctx.guild.id)
-    if current_deck == "rws":
-        await rws.send_tarot_card(ctx)
-    else:
-        await tarot.send_tarot_card(ctx)
+    await execute_draw()
 
 
 # moon
