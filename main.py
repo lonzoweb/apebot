@@ -7,6 +7,8 @@ Contains all bot commands and event handlers
 import random
 import asyncio
 import os
+import logging
+import colorlog
 import shutil
 import sqlite3
 import logging
@@ -36,13 +38,50 @@ from helpers import *  # WARNING: Using '*' is generally discouraged
 from api import *  # WARNING: Using '*' is generally discouraged
 
 # ============================================================
-# LOGGING CONFIGURATION
+# LOGGING CONFIGURATION (Colorized)
 # ============================================================
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+# Define the format: Level, Logger Name, Message
+# The %(log_color)s tags are what colorlog uses to inject ANSI codes
+log_format = (
+    "%(log_color)s%(levelname)-8s%(reset)s | "
+    "%(log_color)s%(name)-20s%(reset)s | "  # Logger name padded to 20 chars
+    "%(white)s%(message)s"
 )
-logger = logging.getLogger(__name__)
+
+# Define the color mapping for each severity level
+formatter = colorlog.ColoredFormatter(
+    log_format,
+    datefmt=None,  # Use default date format
+    log_colors={
+        "DEBUG": "cyan",
+        "INFO": "green",  # Administrative messages (INFO) are green
+        "WARNING": "yellow",
+        "ERROR": "red",  # Errors are red
+        "CRITICAL": "bold_red,bg_white",
+    },
+    style="%",
+)
+
+# 1. Get the root logger
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+
+# 2. Clear any existing handlers (like the one set by basicConfig)
+if root_logger.hasHandlers():
+    root_logger.handlers.clear()
+
+# 3. Create and add the new color handler
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+root_logger.addHandler(stream_handler)
+
+# Ensure Discord's library logging is not set too low, which would flood logs
+logging.getLogger("discord").setLevel(logging.INFO)
+
+logger = logging.getLogger(
+    __name__
+)  # Your local logger will now use this color configuration
 
 # ============================================================
 # BOT SETUP
