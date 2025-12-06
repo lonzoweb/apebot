@@ -576,7 +576,7 @@ logger = logging.getLogger(__name__)
 def get_image_path(card_key):
     """Get the file path for a card image using platform-independent path joining"""
     # Optimized: Use os.path.join for robustness
-    return os.path.join("images", "tarot", f"{card_key}.png")
+    return os.path.join("images", "tarot", f"{card_key}.jpg")
 
 
 def draw_card():
@@ -612,7 +612,7 @@ async def read_card_image(card_key):
 
         # discord.File reads the disk synchronously upon creation,
         # so we run this in the thread pool.
-        return discord.File(image_path, filename=f"{card_key}.png")
+        return discord.File(image_path, filename=f"{card_key}.jpg")
 
     # Run the blocking operation in the default thread pool executor
     return await loop.run_in_executor(None, blocking_file_op)
@@ -663,7 +663,7 @@ async def send_tarot_card(ctx, card_key=None):
         return
 
     # 2. Add Image Attachment and URL
-    embed.set_image(url=f"attachment://{card_key}.png")
+    embed.set_image(url=f"attachment://{card_key}.jpg")
 
     # 3. Add username in smallest text (skip for admins or specific role) (Original Logic Restored)
     EXEMPT_ROLE_ID = None  # Replace with your role ID / load from config
