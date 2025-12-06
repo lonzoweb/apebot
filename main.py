@@ -5,33 +5,21 @@ Contains all bot commands and event handlers
 
 import discord
 from discord.ext import commands
-import random
-import asyncio
-import os
-import shutil
-import sqlite3
-import tarot
-import rws
+
+# ... (removed duplicate/unnecessary imports for clarity, e.g., asyncio) ...
 import logging
-import ephem
-import activity as tracker
-import hierarchy
 import aiohttp
-import time
-import urllib.parse
-import battle
-import asyncio
-import torture
-from datetime import timedelta
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import battle  # Assuming battle module has its own setup
 
 # Import from other modules
 from config import *
-from database import *
+from database import *  # Contains init_db()
 from helpers import *
 from api import *
-import tasks
+import tasks  # Contains setup_tasks()
+import activity as tracker  # Contains core tracking logic
 
 # ============================================================
 # LOGGING CONFIGURATION
@@ -55,11 +43,15 @@ bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents, help_command=
 bot.aiohttp_session = None
 bot.owner_timezone = None
 
+# Track bot start time for uptime calculations
+bot_start_time = datetime.now()
+
 
 @bot.event
 async def on_ready():
-    """Bot startup event"""
+    """Bot startup event: Performs all setup and initializations."""
 
+    # 1. Setup external services
     if bot.aiohttp_session is None:
         bot.aiohttp_session = aiohttp.ClientSession()
 
@@ -67,22 +59,34 @@ async def on_ready():
 
     set_bot_session(bot.aiohttp_session)
 
+    # 2. Get owner timezone (Assuming this is for a specific user)
     if bot.owner_timezone is None:
         your_user_id = 154814148054745088
         tz, _ = get_user_timezone(your_user_id)
         bot.owner_timezone = tz
 
+    # 3. Initialize ALL Database Tables
+    # init_db must create ALL tables (including activity_hourly/users)
     init_db()
     init_gif_table()
-    activity.init_activity_db()
+    # init_activity_db() is now redundant, removed.
     init_tarot_deck_settings()
-    logger.info(f"✅ Logged in as {bot.user}")
+    battle.init_battle_db()  # Added, assuming this needs explicit call
+
+    # 4. Load Cogs (This loads all commands and event listeners)
+    try:
+        # CRITICAL: Load the Cog file where your command/listener resides
+        await bot.load_extension("activitycog")
+        logger.info("✅ Loaded ActivityCog.")
+    except Exception as e:
+        logger.error(f"❌ Failed to load ActivityCog: {e}", exc_info=True)
+
+    # 5. Setup Background Tasks
+    # The tasks.py file now handles BOTH the daily quote and the 5m flush/24h cleanup.
     tasks.setup_tasks(bot)
-    activity.setup_activity_tasks(bot)
+    # activity.setup_activity_tasks(bot) is now redundant and removed.
 
-
-# Track bot start time for uptime calculations
-bot_start_time = datetime.now()
+    logger.info(f"✅ Logged in as {bot.user}")
 
 
 # ============================================================
@@ -143,16 +147,6 @@ async def globally_block_channels(ctx):
     ALLOWED_CHANNEL_NAMES = ["forum", "forum-livi", "emperor"]
 
     return ctx.channel.name in ALLOWED_CHANNEL_NAMES
-
-
-@bot.event
-async def on_ready():
-    """Bot startup event"""
-    init_db()
-    init_gif_table()
-    battle.init_battle_db()
-    logger.info(f"✅ Logged in as {bot.user}")
-    tasks.setup_tasks(bot)
 
 
 @bot.event
@@ -1373,122 +1367,6 @@ async def weather_command(ctx, *, location: str = None):
 
     except Exception as e:
         await ctx.reply(f"❌ Error: {e}", mention_author=False)
-
-
-# activity cmd
-
-
-@bot.command(name="activity")
-async def activity_command(ctx):
-    """View server activity statistics (Admin only)"""
-    if not ctx.author.guild_permissions.administrator:
-        return await ctx.send("🚫 Peasant Detected")
-
-    try:
-        # Get stats
-        total_msgs = activity.get_total_messages()
-        top_hours = activity.get_most_active_hours(limit=5)
-        top_users = activity.get_most_active_users(limit=10)
-
-        if not total_msgs:
-            return await ctx.send("📊 No activity data yet.")
-
-        # Format hours (12-hour time)
-        hours_text = ""
-        if top_hours:
-            for hour_str, count in top_hours:
-                hour_int = int(hour_str)
-                hour_12 = hour_int % 12 or 12
-                am_pm = "AM" if hour_int < 12 else "PM"
-                hours_text += f"`{hour_12}:00 {am_pm}` - {count} messages\n"
-        else:
-            hours_text = "No data"
-
-        # Format users
-        users_text = ""
-        medals = ["🥇", "🥈", "🥉"]
-
-        if top_users:
-            for i, (user_id, count) in enumerate(top_users):
-                medal = medals[i] if i < 3 else f"{i+1}."
-                user = bot.get_user(int(user_id))
-                username = user.display_name if user else f"User#{user_id[:4]}"
-                users_text += f"{medal} {username} - {count} messages\n"
-        else:
-            users_text = "No data"
-
-        # Create embed
-        embed = discord.Embed(
-            title="📊 Activity Statistics", color=discord.Color.blue()
-        )
-
-        embed.add_field(name="📈 Total Messages", value=str(total_msgs), inline=False)
-
-        embed.add_field(
-            name="⏰ Most Active Hours (LA Time)", value=hours_text, inline=True
-        )
-
-        embed.add_field(name="👥 Most Active Users", value=users_text, inline=True)
-
-        await ctx.send(embed=embed)
-
-    except Exception as e:
-        logger.error(f"Error in activity command: {e}", exc_info=True)
-        await ctx.send(f"❌ Error: {e}")
-
-
-# fixact
-
-
-@bot.command(name="fixactivity")
-async def fix_activity(ctx):
-    """Fix activity tables (Admin only)"""
-    if not ctx.author.guild_permissions.administrator:
-        return await ctx.send("🚫 Peasant Detected")
-
-    try:
-        from database import get_db
-
-        with get_db() as conn:
-            c = conn.cursor()
-
-            # Drop old tables
-            c.execute("DROP TABLE IF EXISTS activity_hourly")
-            c.execute("DROP TABLE IF EXISTS activity_users")
-
-            # Recreate with correct schema
-            c.execute(
-                """
-                CREATE TABLE activity_hourly (
-                    hour TEXT PRIMARY KEY,
-                    count INTEGER,
-                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """
-            )
-
-            c.execute(
-                """
-                CREATE TABLE activity_users (
-                    user_id TEXT PRIMARY KEY,
-                    count INTEGER,
-                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """
-            )
-
-            # Add indexes
-            c.execute(
-                "CREATE INDEX IF NOT EXISTS idx_activity_hourly_count ON activity_hourly(count DESC)"
-            )
-            c.execute(
-                "CREATE INDEX IF NOT EXISTS idx_activity_users_count ON activity_users(count DESC)"
-            )
-
-        await ctx.send("✅ Activity tables fixed and recreated!")
-    except Exception as e:
-        logger.error(f"Error fixing activity: {e}")
-        await ctx.send(f"❌ Error: {e}")
 
 
 # ---- cmds  # '''

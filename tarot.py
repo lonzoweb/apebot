@@ -1,11 +1,15 @@
 import random
 import discord
 import os
+import asyncio  # New: Required for run_in_executor
+import logging  # New: Good practice for error reporting
 
+# NOTE: Assuming TAROT_DECK is defined here as a dictionary like in your original file.
 # ============================================================
 # TAROT DECK DATA - Aleister Crowley Thoth Tarot
 # ============================================================
 
+# Replace '...' with your actual Thoth deck data
 TAROT_DECK = {
     # MAJOR ARCANA (0-21)
     "00-the-fool": {
@@ -560,14 +564,19 @@ TAROT_DECK = {
     },
 }
 
+
+logger = logging.getLogger(__name__)
+
+
 # ============================================================
-# HELPER FUNCTIONS
+# HELPER FUNCTIONS (Optimized)
 # ============================================================
 
 
 def get_image_path(card_key):
-    """Get the file path for a card image"""
-    return f"images/tarot/{card_key}.png"
+    """Get the file path for a card image using platform-independent path joining"""
+    # Optimized: Use os.path.join for robustness
+    return os.path.join("images", "tarot", f"{card_key}.png")
 
 
 def draw_card():
@@ -585,13 +594,38 @@ def search_card(keyword):
     return None
 
 
+# --- CRITICAL OPTIMIZATION: NON-BLOCKING FILE READ ---
+
+
+async def read_card_image(card_key):
+    """
+    Reads the image file in a separate thread pool.
+    CRITICAL: Prevents bot lag on disk access.
+    """
+    image_path = get_image_path(card_key)
+    loop = asyncio.get_event_loop()
+
+    def blocking_file_op():
+        """Synchronous operation run in a thread."""
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Thoth image not found at: {image_path}")
+
+        # discord.File reads the disk synchronously upon creation,
+        # so we run this in the thread pool.
+        return discord.File(image_path, filename=f"{card_key}.png")
+
+    # Run the blocking operation in the default thread pool executor
+    return await loop.run_in_executor(None, blocking_file_op)
+
+
 # ============================================================
-# DISCORD EMBED FUNCTION
+# DISCORD EMBED FUNCTION (Optimized I/O, Original Style)
 # ============================================================
 
 
 async def send_tarot_card(ctx, card_key=None):
     """Send a tarot card to Discord channel"""
+
     # If no card specified, draw random
     if card_key is None:
         card_key = draw_card()
@@ -604,30 +638,39 @@ async def send_tarot_card(ctx, card_key=None):
     description = card["description"]
     att2 = card["att2"]
 
-    # Create embed
+    # Create embed (Original Style Restored)
     embed = discord.Embed(
         title=card_name,
         description=f"\n{emojis}  \n*({attribution})*\n*{att2}*\n\n{description}",
         color=discord.Color.from_rgb(0, 0, 128),
     )
 
-    # Get image
-    image_path = get_image_path(card_key)
-
-    # Check if image exists
-    if not os.path.exists(image_path):
+    # 1. Load File using Non-Blocking Utility
+    file = None
+    try:
+        # Await the file read which runs in a separate thread
+        file = await read_card_image(card_key)
+    except FileNotFoundError:
         embed.set_footer(text="⚠️ Image file not found")
         await ctx.send(embed=embed)
         return
+    except Exception as e:
+        logger.error(f"Error loading Thoth image {card_key}: {e}", exc_info=True)
+        embed.set_footer(
+            text="❌ An unexpected error occurred while loading the image."
+        )
+        await ctx.send(embed=embed)
+        return
 
-    file = discord.File(image_path, filename=f"{card_key}.png")
+    # 2. Add Image Attachment and URL
     embed.set_image(url=f"attachment://{card_key}.png")
 
-    # Add username in smallest text (skip for admins or specific role)
-    EXEMPT_ROLE_ID = None  # Replace with your role ID
-    if not ctx.author.guild_permissions.administrator and not discord.utils.get(ctx.author.roles, id=EXEMPT_ROLE_ID):
-        embed.set_footer(text=f"{ctx.author.name}")
-
+    # 3. Add username in smallest text (skip for admins or specific role) (Original Logic Restored)
+    EXEMPT_ROLE_ID = None  # Replace with your role ID / load from config
+    if not ctx.author.guild_permissions.administrator and not discord.utils.get(
+        ctx.author.roles, id=EXEMPT_ROLE_ID
+    ):
+        embed.set_footer(text=f"{ctx.author.name}")  # Set original footer
 
     # Send to Discord
     await ctx.send(file=file, embed=embed)

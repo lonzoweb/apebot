@@ -5,10 +5,11 @@ Tracks: Most active hours, Most active users
 """
 
 import logging
-from datetime import datetime
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta
 from collections import defaultdict
-from discord.ext import tasks
+
+# NOTE: The database module must define get_db()
+from database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -27,52 +28,63 @@ BUFFER_SIZE_THRESHOLD = 1000  # Flush when we hit this many events
 
 def log_activity_in_memory(user_id: str, hour: str):
     """Log activity to in-memory buffer (not database)"""
+    # NOTE: user_id must be stored as a string
     activity_buffer["hourly"][hour] += 1
     activity_buffer["users"][user_id] += 1
 
-    # If buffer gets too big, trigger flush
+    # Optional: If buffer gets too big, log a warning
     total_events = sum(activity_buffer["hourly"].values())
     if total_events >= BUFFER_SIZE_THRESHOLD:
-        # Flush will happen on next scheduled task (every 5 min)
-        # Or you could async flush here if needed
-        pass
+        logger.debug(
+            f"Activity buffer size ({total_events}) hit threshold. Will flush soon."
+        )
 
 
-def flush_activity_to_db(db_module):
+def flush_activity_to_db():
     """Write batched activity data to database"""
-    try:
-        from database import get_db
+    # Use 'try...finally' to ensure the buffer clears even if one part fails.
 
+    # 1. Capture and clear the data immediately
+    hourly_data = dict(activity_buffer["hourly"])
+    user_data = dict(activity_buffer["users"])
+
+    activity_buffer["hourly"].clear()
+    activity_buffer["users"].clear()
+
+    # 2. Flush to DB
+    try:
         with get_db() as conn:
             c = conn.cursor()
 
             # Batch insert hourly data
-            for hour, count in activity_buffer["hourly"].items():
+            # Update last_updated timestamp to prevent cleanup from deleting recently updated entries
+            for hour, count in hourly_data.items():
                 c.execute(
                     """
-                    INSERT INTO activity_hourly (hour, count) VALUES (?, ?)
-                    ON CONFLICT(hour) DO UPDATE SET count = count + ?
+                    INSERT INTO activity_hourly (hour, count, last_updated) VALUES (?, ?, datetime('now'))
+                    ON CONFLICT(hour) DO UPDATE SET 
+                        count = count + ?,
+                        last_updated = datetime('now')
                 """,
                     (hour, count, count),
                 )
 
             # Batch insert user data
-            for user_id, count in activity_buffer["users"].items():
+            for user_id, count in user_data.items():
                 c.execute(
                     """
-                    INSERT INTO activity_users (user_id, count) VALUES (?, ?)
-                    ON CONFLICT(user_id) DO UPDATE SET count = count + ?
+                    INSERT INTO activity_users (user_id, count, last_updated) VALUES (?, ?, datetime('now'))
+                    ON CONFLICT(user_id) DO UPDATE SET 
+                        count = count + ?,
+                        last_updated = datetime('now')
                 """,
                     (user_id, count, count),
                 )
 
-            conn.commit()
+            # The context manager (get_db) handles conn.commit()
 
-        # Clear buffer after flush
-        activity_buffer["hourly"].clear()
-        activity_buffer["users"].clear()
         logger.info(
-            f"✅ Activity data flushed to database - Hourly: {len(activity_buffer['hourly'])} entries, Users: {len(activity_buffer['users'])} entries"
+            f"✅ Activity data flushed to database - Hourly: {len(hourly_data)} keys, Users: {len(user_data)} keys"
         )
 
     except Exception as e:
@@ -80,60 +92,20 @@ def flush_activity_to_db(db_module):
 
 
 # ============================================================
-# DATABASE INITIALIZATION
+# QUERY & CLEANUP FUNCTIONS (Rely on database.get_db)
 # ============================================================
 
 
-def init_activity_db():
-    """Initialize activity tables with indexes"""
-    from database import get_db
+def init_activity_tables():
+    """Placeholder to call the init_db logic from the database file"""
+    from database import init_db
 
-    try:
-        with get_db() as conn:
-            c = conn.cursor()
-
-            c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS activity_hourly (
-                    hour TEXT PRIMARY KEY,
-                    count INTEGER,
-                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """
-            )
-
-            c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS activity_users (
-                    user_id TEXT PRIMARY KEY,
-                    count INTEGER,
-                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """
-            )
-
-            # Add indexes
-            c.execute(
-                "CREATE INDEX IF NOT EXISTS idx_activity_hourly_count ON activity_hourly(count DESC)"
-            )
-            c.execute(
-                "CREATE INDEX IF NOT EXISTS idx_activity_users_count ON activity_users(count DESC)"
-            )
-
-        logger.info("✅ Activity tables initialized")
-    except Exception as e:
-        logger.error(f"Error initializing activity DB: {e}")
-
-
-# ============================================================
-# QUERY FUNCTIONS
-# ============================================================
+    init_db()
+    logger.info("✅ Activity tables initialized (via database.init_db)")
 
 
 def get_most_active_hours(limit=5):
     """Get top active hours"""
-    from database import get_db
-
     try:
         with get_db() as conn:
             c = conn.cursor()
@@ -153,8 +125,6 @@ def get_most_active_hours(limit=5):
 
 def get_most_active_users(limit=10):
     """Get top active users"""
-    from database import get_db
-
     try:
         with get_db() as conn:
             c = conn.cursor()
@@ -174,78 +144,45 @@ def get_most_active_users(limit=10):
 
 def get_total_messages():
     """Get total messages tracked"""
-    from database import get_db
-
     try:
         with get_db() as conn:
             c = conn.cursor()
             c.execute("SELECT SUM(count) FROM activity_hourly")
             result = c.fetchone()
-            return result[0] if result[0] else 0
+            return result[0] if result and result[0] else 0
     except Exception as e:
         logger.error(f"Error getting total messages: {e}")
         return 0
 
 
-# Functions below are from your original activity_tracker.py,
-# relying on the database.get_db() context manager.
-
-
-def get_most_active_hours(limit=5):
-    """Get top active hours"""
-    # ... implementation using get_db() ...
-
-
-def get_most_active_users(limit=10):
-    """Get top active users"""
-    # ... implementation using get_db() ...
-
-
-def get_total_messages():
-    """Get total messages tracked"""
-    # ... implementation using get_db() ...
-
-
 def cleanup_old_activity(days=30):
     """Delete activity data older than X days"""
-    # ... implementation using get_db() ...
-
-    from database import get_db
-    from datetime import datetime, timedelta
-
     try:
-        cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
+        # Calculate cutoff date in ISO format
+        cutoff_datetime = datetime.now() - timedelta(days=days)
+        cutoff_date = cutoff_datetime.isoformat()
 
         with get_db() as conn:
             c = conn.cursor()
+
+            # The WHERE clause uses the last_updated TIMESTAMP field
             c.execute(
                 "DELETE FROM activity_hourly WHERE last_updated < ?", (cutoff_date,)
             )
+            hourly_rows = c.rowcount
+
             c.execute(
                 "DELETE FROM activity_users WHERE last_updated < ?", (cutoff_date,)
             )
+            user_rows = c.rowcount
 
-        logger.info(f"✅ Cleaned up activity data older than {days} days")
+        logger.info(
+            f"✅ Cleaned up activity data older than {days} days. Deleted {hourly_rows} hourly entries and {user_rows} user entries."
+        )
+
     except Exception as e:
         logger.error(f"Error cleaning up activity: {e}")
 
 
-# ============================================================
-# SETUP BACKGROUND TASK
-# ============================================================
-
-
-def setup_activity_tasks(bot):
-    """Initialize background flushing task"""
-
-    @tasks.loop(minutes=5)
-    async def flush_activity():
-        """Flush buffered activity to database every 5 minutes"""
-        flush_activity_to_db(None)
-
-    @flush_activity.before_loop
-    async def before_flush():
-        await bot.wait_until_ready()
-        logger.info("⏳ Activity flush task started (every 5 minutes)")
-
-    flush_activity.start()
+# Set init_activity_tables as the function to call on startup
+# You must call this from your main bot file or Cog setup.
