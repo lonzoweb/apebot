@@ -160,6 +160,55 @@ def set_user_timezone(user_id, timezone_str, city):
         )
 
 
+# tarot
+
+
+def init_tarot_deck_settings():
+    """Initialize tarot deck settings table"""
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tarot_settings (
+                guild_id TEXT PRIMARY KEY,
+                deck_name TEXT DEFAULT 'thoth'
+            )
+        """
+        )
+
+
+def get_guild_tarot_deck(guild_id):
+    """Get the current tarot deck for a guild"""
+    try:
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute(
+                "SELECT deck_name FROM tarot_settings WHERE guild_id = ?",
+                (str(guild_id),),
+            )
+            result = c.fetchone()
+            return result[0] if result else "thoth"
+    except Exception as e:
+        logger.error(f"Error getting tarot deck: {e}")
+        return "thoth"
+
+
+def set_guild_tarot_deck(guild_id, deck_name):
+    """Set the tarot deck for a guild"""
+    try:
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute(
+                """
+                INSERT INTO tarot_settings (guild_id, deck_name) VALUES (?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET deck_name = ?
+            """,
+                (str(guild_id), deck_name, deck_name),
+            )
+    except Exception as e:
+        logger.error(f"Error setting tarot deck: {e}")
+
+
 # ============================================================
 # GIF TRACKER FUNCTIONS
 # ============================================================

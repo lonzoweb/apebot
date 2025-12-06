@@ -11,6 +11,7 @@ import os
 import shutil
 import sqlite3
 import tarot
+import rws
 import logging
 import ephem
 import activity
@@ -72,11 +73,12 @@ async def on_ready():
 
     init_db()
     init_gif_table()
-    activity.init_activity_db()  # ← ADD THIS LINE
+    activity.init_activity_db()
+    init_tarot_deck_settings()
 
     logger.info(f"✅ Logged in as {bot.user}")
     tasks.setup_tasks(bot)
-    activity.setup_activity_tasks(bot)  # ← ADD THIS LINE
+    activity.setup_activity_tasks(bot)
 
 
 # Track bot start time for uptime calculations
@@ -509,22 +511,52 @@ user_usage = (
 
 
 @bot.command(name="tc")
-async def tarot_card(ctx):
-    """Draw a random tarot card with intermittent reinforcement"""
+async def tarot_card(ctx, action: str = None, deck_name: str = None):
+    """Tarot card command
+
+    Usage:
+    .tc                    - Draw a random card from current deck
+    .tc set <deck_name>    - Set the deck (admin only)
+    """
+
+    # Handle "set" action (admin only)
+    if action and action.lower() == "set":
+        if not ctx.author.guild_permissions.administrator:
+            return await ctx.send("🚫 Only admins can set the deck")
+
+        if not deck_name:
+            return await ctx.send("❌ Please specify a deck name: `thoth` or `rws`")
+
+        deck_name = deck_name.lower()
+
+        if deck_name not in ["thoth", "rws"]:
+            return await ctx.send(
+                f"❌ Unknown deck `{deck_name}`\nAvailable decks: `thoth`, `rws`"
+            )
+
+        set_guild_tarot_deck(ctx.guild.id, deck_name)
+
+        deck_full_name = (
+            "Aleister Crowley Thoth Tarot"
+            if deck_name == "thoth"
+            else "Rider-Waite-Smith Tarot"
+        )
+        await ctx.send(f"✅ Deck set to **{deck_full_name}**")
+        return
+
+    # Normal draw (handle cooldowns and permissions like before)
     user_id = ctx.author.id
     now = time.time()
     today = datetime.utcnow().date()
 
-    # --- Admins bypass everything ---
     if ctx.author.guild_permissions.administrator:
-        await tarot.send_tarot_card(ctx)
+        # Get current deck and call appropriate function
+        current_deck = get_guild_tarot_deck(ctx.guild.id)
+        if current_deck == "rws":
+            await rws.send_tarot_card(ctx)
+        else:
+            await tarot.send_tarot_card(ctx)
         return
-
-    # --- Placeholder for future role bypass ---
-    # bypass_role_name = "Tarot Master"
-    # if any(role.name == bypass_role_name for role in ctx.author.roles):
-    #     await tarot.send_tarot_card(ctx)
-    #     return
 
     # Initialize/reset user tracking
     if user_id not in user_usage or user_usage[user_id]["day"] != today:
@@ -537,14 +569,17 @@ async def tarot_card(ctx):
 
     user_data = user_usage[user_id]
 
-    # --- First 2 draws: no cooldown, immediate ---
+    # First 2 draws: no cooldown
     if user_data["count"] < 2:
         user_data["count"] += 1
-        await tarot.send_tarot_card(ctx)
+        current_deck = get_guild_tarot_deck(ctx.guild.id)
+        if current_deck == "rws":
+            await rws.send_tarot_card(ctx)
+        else:
+            await tarot.send_tarot_card(ctx)
         return
 
-    # --- Variable-ratio cooldown after first 2 draws ---
-    # Generate cooldown if not already set
+    # Variable-ratio cooldown after first 2 draws
     if user_data["next_cooldown"] is None:
         user_data["next_cooldown"] = random.triangular(16, 60, 33)
 
@@ -552,7 +587,6 @@ async def tarot_card(ctx):
     time_since_last = now - user_data["last_used"]
 
     if time_since_last < cooldown:
-        # Ambiguous “recharging” message
         messages = [
             "Rest...",
             "Patience...",
@@ -564,13 +598,19 @@ async def tarot_card(ctx):
         await ctx.send(random.choice(messages))
         return
 
-    # Successful draw: reset cooldown for next attempt
+    # Successful draw
     user_data["last_used"] = now
     user_data["count"] += 1
     user_data["next_cooldown"] = None
 
-    # Always random draw
-    await tarot.send_tarot_card(ctx)
+    current_deck = get_guild_tarot_deck(ctx.guild.id)
+    if current_deck == "rws":
+        await rws.send_tarot_card(ctx)
+    else:
+        await tarot.send_tarot_card(ctx)
+
+
+# moon
 
 
 @bot.command(name="moon")
