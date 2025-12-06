@@ -62,10 +62,38 @@ def init_db():
         """
         )
 
+        # --- NEW: Activity Tables ---
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS activity_hourly (
+                hour TEXT PRIMARY KEY,
+                count INTEGER,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """
+        )
+
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS activity_users (
+                user_id TEXT PRIMARY KEY,
+                count INTEGER,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """
+        )
+
         # Add indexes for better query performance
         c.execute("CREATE INDEX IF NOT EXISTS idx_quotes_text ON quotes(quote)")
         c.execute(
             "CREATE INDEX IF NOT EXISTS idx_user_timezones_id ON user_timezones(user_id)"
+        )
+        # --- NEW: Activity Indexes ---
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_activity_hourly_count ON activity_hourly(count DESC)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_activity_users_count ON activity_users(count DESC)"
         )
 
 

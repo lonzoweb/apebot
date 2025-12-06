@@ -187,8 +187,29 @@ def get_total_messages():
         return 0
 
 
+# Functions below are from your original activity_tracker.py,
+# relying on the database.get_db() context manager.
+
+
+def get_most_active_hours(limit=5):
+    """Get top active hours"""
+    # ... implementation using get_db() ...
+
+
+def get_most_active_users(limit=10):
+    """Get top active users"""
+    # ... implementation using get_db() ...
+
+
+def get_total_messages():
+    """Get total messages tracked"""
+    # ... implementation using get_db() ...
+
+
 def cleanup_old_activity(days=30):
     """Delete activity data older than X days"""
+    # ... implementation using get_db() ...
+
     from database import get_db
     from datetime import datetime, timedelta
 

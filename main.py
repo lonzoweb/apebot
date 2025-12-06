@@ -14,12 +14,13 @@ import tarot
 import rws
 import logging
 import ephem
-import activity
+import activity as tracker
 import hierarchy
 import aiohttp
 import time
 import urllib.parse
 import battle
+import asyncio
 import torture
 from datetime import timedelta
 from datetime import datetime
