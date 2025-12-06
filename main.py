@@ -521,7 +521,7 @@ async def tarot_card(ctx, action: str = None, deck_name: str = None):
     # Handle "set" action (admin only)
     if action and action.lower() == "set":
         if not ctx.author.guild_permissions.administrator:
-            return await ctx.send("🚫 Only admins can set the deck")
+            return await ctx.send("🚫 Peasant Detected")
 
         if not deck_name:
             return await ctx.send("❌ Please specify a deck name: `thoth` or `rws`")
@@ -1954,22 +1954,6 @@ async def time_command(ctx, member: discord.Member = None):
     except Exception as e:
         logger.error(f"Error getting time: {e}")
         await ctx.send(f"❌ Error getting time: {e}")
-
-
-# temporary tarot table
-
-
-@bot.command(name="inittarot")
-async def init_tarot(ctx):
-    """Initialize tarot settings table (Admin only)"""
-    if not ctx.author.guild_permissions.administrator:
-        return await ctx.send("🚫 Peasant Detected")
-
-    try:
-        init_tarot_deck_settings()
-        await ctx.send("✅ Tarot settings table created!")
-    except Exception as e:
-        await ctx.send(f"❌ Error: {e}")
 
 
 # ============================================================
