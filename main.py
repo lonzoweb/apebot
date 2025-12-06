@@ -19,7 +19,7 @@ from database import *  # Contains init_db()
 from helpers import *
 from api import *
 import tasks  # Contains setup_tasks()
-import activity as tracker  # Contains core tracking logic
+import activity  # Contains core tracking logic
 
 # ============================================================
 # LOGGING CONFIGURATION
