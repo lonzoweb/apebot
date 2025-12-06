@@ -75,7 +75,6 @@ async def on_ready():
     init_gif_table()
     activity.init_activity_db()
     init_tarot_deck_settings()
-
     logger.info(f"✅ Logged in as {bot.user}")
     tasks.setup_tasks(bot)
     activity.setup_activity_tasks(bot)
@@ -1955,6 +1954,22 @@ async def time_command(ctx, member: discord.Member = None):
     except Exception as e:
         logger.error(f"Error getting time: {e}")
         await ctx.send(f"❌ Error getting time: {e}")
+
+
+# temporary tarot table
+
+
+@bot.command(name="inittarot")
+async def init_tarot(ctx):
+    """Initialize tarot settings table (Admin only)"""
+    if not ctx.author.guild_permissions.administrator:
+        return await ctx.send("🚫 Peasant Detected")
+
+    try:
+        init_tarot_deck_settings()
+        await ctx.send("✅ Tarot settings table created!")
+    except Exception as e:
+        await ctx.send(f"❌ Error: {e}")
 
 
 # ============================================================
