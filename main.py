@@ -548,15 +548,6 @@ async def eightball_command(ctx, *, question: str = None):
     )
 
 
-import random, time
-from datetime import datetime
-
-# In-memory tracking
-user_usage = (
-    {}
-)  # {'day': date, 'count': int, 'last_used': timestamp, 'next_cooldown': float}
-
-
 @bot.command(name="tc")
 async def tarot_card(ctx, action: str = None, deck_name: str = None):
     """Tarot card command
@@ -565,10 +556,10 @@ async def tarot_card(ctx, action: str = None, deck_name: str = None):
     .tc                    - Draw a random card from current deck
     .tc set <deck_name>    - Set the deck (admin only)
     """
-    # NOTE: user_usage and get_guild_tarot_deck must be defined globally or imported.
 
     # Handle "set" action (admin only)
     if action and action.lower() == "set":
+        # ... (Set logic remains exactly the same) ...
         if not ctx.author.guild_permissions.administrator:
             return await ctx.send("🚫 Peasant Detected")
 
@@ -594,18 +585,21 @@ async def tarot_card(ctx, action: str = None, deck_name: str = None):
 
     # --- Draw Card Logic ---
 
-    # Get current deck selection
-    current_deck = get_guild_tarot_deck(ctx.guild.id)
+    # 1. Get current deck selection and sanitize
+    deck_setting = get_guild_tarot_deck(ctx.guild.id)
+
+    # CRITICAL FIX: Ensure the deck name is lowercase and default to 'thoth' if None/invalid
+    deck_name_clean = str(deck_setting).lower().strip() if deck_setting else "thoth"
 
     # Define which module and draw function to use
-    if current_deck == "rws":
+    if deck_name_clean == "rws":
         deck_module = rws
-    else:  # Default to tarot (Thoth)
+    else:  # This handles "thoth", or any unexpected value
         deck_module = tarot
 
-    # Function to execute a successful draw (factored out for DRY principle)
+    # Function to execute a successful draw (DRY principle)
     async def execute_draw():
-        # CRITICAL FIX: Explicitly call the module's draw_card function to get the key
+        # Call the module's draw_card function
         card_key = deck_module.draw_card()
 
         # Pass the drawn card_key to the module's send_tarot_card function
