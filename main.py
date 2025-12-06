@@ -3,23 +3,37 @@ Discord Bot Main File
 Contains all bot commands and event handlers
 """
 
-import discord
-from discord.ext import commands
-
-# ... (removed duplicate/unnecessary imports for clarity, e.g., asyncio) ...
+# --- Standard Library Imports ---
+import random
+import asyncio
+import os
+import shutil
+import sqlite3
 import logging
-import aiohttp
+import time
+from datetime import timedelta
 from datetime import datetime
 from zoneinfo import ZoneInfo
-import battle  # Assuming battle module has its own setup
 
-# Import from other modules
-from config import *
-from database import *  # Contains init_db()
-from helpers import *
-from api import *
-import tasks  # Contains setup_tasks()
-import activity  # Contains core tracking logic
+# --- Third-Party Imports ---
+import discord
+from discord.ext import commands
+import ephem  # Assuming this is the PyEphem library
+
+# --- Local Module Imports (REQUIRED for bot functionality) ---
+# Ensure all files are present in your bot's root directory:
+import rws  # <--- FIX: Added to resolve NameError: name 'rws' is not defined
+import tarot
+import hierarchy
+import activity  # Used for logging/tracker functions
+import battle
+import tasks
+
+# --- Local Module Imports (From other modules) ---
+from config import *  # WARNING: Using '*' is generally discouraged
+from database import *  # WARNING: Using '*' is generally discouraged
+from helpers import *  # WARNING: Using '*' is generally discouraged
+from api import *  # WARNING: Using '*' is generally discouraged
 
 # ============================================================
 # LOGGING CONFIGURATION
