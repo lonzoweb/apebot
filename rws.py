@@ -558,7 +558,7 @@ RWS_DECK = {
 
 def get_image_path(card_key):
     """Get the file path for a card image"""
-    return f"images/rws/{card_key}.png"
+    return f"images/rws/{card_key}.jpg"
 
 
 def draw_card():
@@ -608,8 +608,8 @@ async def send_tarot_card(ctx, card_key=None):
         await ctx.send(embed=embed)
         return
 
-    file = discord.File(image_path, filename=f"{card_key}.png")
-    embed.set_image(url=f"attachment://{card_key}.png")
+    file = discord.File(image_path, filename=f"{card_key}.jpg")
+    embed.set_image(url=f"attachment://{card_key}.jpg")
 
     # Send to Discord
     await ctx.send(file=file, embed=embed)
