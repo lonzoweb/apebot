@@ -31,6 +31,7 @@ import hierarchy
 import activity  # Used for logging/tracker functions
 import battle
 import tasks
+import economy
 
 # --- Local Module Imports (From other modules) ---
 from config import *  # WARNING: Using '*' is generally discouraged
@@ -1531,8 +1532,10 @@ async def location_command(ctx, *, args: str = None):
 # Slot machine slots
 
 # Tracking for pull command with intermittent reinforcement
+# Assuming these global dictionaries are defined earlier in main.py
 user_pull_usage = {}
 user_usage = {}
+
 
 @bot.command(name="pull")
 async def pull_command(ctx):
@@ -1609,14 +1612,12 @@ async def execute_pull(ctx):
     }
 
     # Weighted symbol pool for random generation
-    # (common appear far more often than medium/rare)
     weighted_pool = symbols["common"] * 10 + symbols["medium"] * 4 + symbols["rare"] * 1
 
     # Send initial spinning message
     msg = await ctx.send("🎲 | 🎲 | 🎲")
 
     # --- Smooth Slow-Down Animation ---
-    # Speeds go from fast → medium → slow → stop
     delays = [0.12, 0.15, 0.18, 0.22, 0.28, 0.33]
 
     for d in delays:
@@ -1628,12 +1629,7 @@ async def execute_pull(ctx):
     #                  FINAL RESULT LOGIC
     # ============================================================
     #
-    # 🎯 Distribution target (engagement curve):
-    # • 54% Dead spins
-    # • 15% Small wins (2 matches)
-    # • 22.5% Near misses (almost wins)
-    # • 7.5% Medium wins (3 matching common/medium)
-    # • 1% Big win (3 matching rare symbols)
+    # Odds maintained as per request, rewards added below.
     #
     # ============================================================
 
@@ -1653,9 +1649,7 @@ async def execute_pull(ctx):
     # --- SMALL WIN (15%) ---
     elif roll < 0.235:
         symbol = random.choice(weighted_pool)
-        # choose 2 matching, 1 random non-matching
         other = random.choice([s for s in weighted_pool if s != symbol])
-        # randomize position
         pattern = random.choice(
             [[symbol, symbol, other], [symbol, other, symbol], [other, symbol, symbol]]
         )
@@ -1665,7 +1659,6 @@ async def execute_pull(ctx):
     elif roll < 0.46:
         symbol = random.choice(weighted_pool)
         near = random.choice([s for s in weighted_pool if s != symbol])
-        # 2 symbols in a row, 3rd just off
         pattern = random.choice([[symbol, symbol, near], [near, symbol, symbol]])
         result = pattern
 
@@ -1674,29 +1667,34 @@ async def execute_pull(ctx):
         result = random.sample(weighted_pool, 3)
 
     # ============================================================
-    #                     MESSAGE OUTPUT
+    #                     MESSAGE OUTPUT & REWARD
     # ============================================================
 
     r1, r2, r3 = result
+    winnings = 0
 
     # 3 Match - check if rare or common/medium
     if r1 == r2 == r3:
         if r1 in symbols["rare"]:
-            # Big win (1%)
+            # Big win (1%) - JACKPOT
+            winnings = 100
             final_msg = f"{r1} | {r2} | {r3}\n**JACKPOT!** {r1}\n{ctx.author.mention}"
         else:
             # Medium win (7.5%)
+            winnings = 20
             medium_msgs = ["**Hit!**", "**Score!**", "**Got em!**", "**Connect!**"]
             final_msg = f"{r1} | {r2} | {r3}\n{random.choice(medium_msgs)} {r1}\n{ctx.author.mention}"
 
     # 2 Match - small win (15%)
     elif r1 == r2 or r2 == r3 or r1 == r3:
+        winnings = 5
         winning_symbol = r1 if r1 == r2 else (r2 if r2 == r3 else r1)
         small_msgs = ["Push.", "Match.", "Pair.", "Almost."]
         final_msg = f"{r1} | {r2} | {r3}\n{random.choice(small_msgs)} {winning_symbol}\n{ctx.author.mention}"
 
     # No match (dead spin or near-miss)
     else:
+        winnings = 0
         insults = [
             "Pathetic.",
             "Trash.",
@@ -1721,6 +1719,19 @@ async def execute_pull(ctx):
         final_msg = (
             f"{r1} | {r2} | {r3}\n{random.choice(insults)}\n{ctx.author.mention}"
         )
+
+    # --- Award Winnings & Format Message ---
+    if winnings > 0:
+        # Run database update asynchronously to avoid blocking the bot
+        await ctx.bot.loop.run_in_executor(
+            None, update_balance, ctx.author.id, winnings
+        )
+
+        # Get the formatted currency string from the economy module
+        formatted_winnings = economy.format_balance(winnings)
+
+        # Append the reward message
+        final_msg += f"\n\n✨ **You received {formatted_winnings}!**"
 
     await asyncio.sleep(0.3)
     await msg.edit(content=final_msg)
@@ -1816,6 +1827,55 @@ async def quick_delete_command(ctx, *, message: str = None):
         await ctx.message.delete()
     except:
         pass  # Silently fail if message is already deleted or bot lacks permissions
+
+
+# --- main.py ---
+
+# ... (Existing commands like @bot.command(name="tc")) ...
+
+
+# ============================================================
+# ECONOMY COMMANDS
+# ============================================================
+
+
+@bot.command(name="balance", aliases=["bal", "tokens"])
+async def balance_command(ctx, member: discord.Member = None):
+    """
+    Shows your current token balance.
+    Admins can check another user's balance: .balance @user
+    """
+    # Only allow non-admins to check another user's balance if it's themselves.
+    if (
+        member
+        and member.id != ctx.author.id
+        and not ctx.author.guild_permissions.administrator
+    ):
+        return await ctx.send(
+            "🚫 You can only check your own balance or an admin can check others."
+        )
+
+    await economy.handle_balance_command(ctx, member)
+
+
+@bot.command(name="send")
+async def send_command(ctx, member: discord.Member, amount: int):
+    """Transfer tokens to another user. Usage: .send @user <amount>"""
+    await economy.handle_send_command(ctx, member, amount)
+
+
+@bot.command(name="baladd")
+@commands.has_permissions(administrator=True)
+async def adminadd_command(ctx, member: discord.Member, amount: int):
+    """[ADMIN] Manually add tokens to a user. Usage: .baladd @user <amount>"""
+    await economy.handle_admin_modify_command(ctx, member, amount, operation="add")
+
+
+@bot.command(name="balremove")
+@commands.has_permissions(administrator=True)
+async def adminremove_command(ctx, member: discord.Member, amount: int):
+    """[ADMIN] Manually remove tokens from a user. Usage: .balremove @user <amount>"""
+    await economy.handle_admin_modify_command(ctx, member, amount, operation="remove")
 
 
 # torture command

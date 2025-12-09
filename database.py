@@ -18,18 +18,23 @@ logger = logging.getLogger(__name__)
 @contextmanager
 def get_db():
     """Context manager for safe database connections"""
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)  # Add timeout
-    conn.execute("PRAGMA journal_mode=WAL")  # Enable WAL mode for better concurrency
+    # Use DB_FILE from config.py
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    # Enable WAL mode for better concurrency
+    conn.execute("PRAGMA journal_mode=WAL")
     try:
         yield conn
         conn.commit()
     except sqlite3.IntegrityError as e:
-        # Don't rollback on duplicate key errors
-        logger.warning(f"Database integrity error (expected for duplicates): {e}")
-        conn.commit()  # Commit what we can
+        # Commit if possible, but log integrity errors
+        logger.warning(
+            f"Database integrity error (likely expected unique constraint): {e}"
+        )
+        conn.commit()
     except Exception as e:
+        # Rollback on all other errors
         conn.rollback()
-        logger.error(f"Database error: {e}")
+        logger.error(f"Database error: {e}", exc_info=True)
         raise
     finally:
         conn.close()
@@ -42,63 +47,170 @@ def get_db():
 
 def init_db():
     """Initialize database tables"""
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute(
-            """
-            CREATE TABLE IF NOT EXISTS quotes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                quote TEXT UNIQUE
-            )
-        """
-        )
-        c.execute(
-            """
-            CREATE TABLE IF NOT EXISTS user_timezones (
-                user_id TEXT PRIMARY KEY,
-                timezone TEXT,
-                city TEXT
-            )
-        """
-        )
+    try:
+        with get_db() as conn:
+            c = conn.cursor()
 
-        # --- NEW: Activity Tables ---
-        c.execute(
+            # Quotes Table
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS quotes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    quote TEXT UNIQUE
+                )
             """
-            CREATE TABLE IF NOT EXISTS activity_hourly (
-                hour TEXT PRIMARY KEY,
-                count INTEGER,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """
-        )
-
-        c.execute(
+            # User Timezones Table
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_timezones (
+                    user_id TEXT PRIMARY KEY,
+                    timezone TEXT,
+                    city TEXT
+                )
             """
-            CREATE TABLE IF NOT EXISTS activity_users (
-                user_id TEXT PRIMARY KEY,
-                count INTEGER,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """
-        )
+            # Activity Hourly Table
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS activity_hourly (
+                    hour TEXT PRIMARY KEY,
+                    count INTEGER,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+            # Activity Users Table
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS activity_users (
+                    user_id TEXT PRIMARY KEY,
+                    count INTEGER,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+            # Tarot Settings Table
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS tarot_settings (
+                    guild_id TEXT PRIMARY KEY,
+                    deck_name TEXT DEFAULT 'thoth'
+                )
+            """
+            )
+            # GIF Tracker Table
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS gif_tracker (
+                    gif_url TEXT PRIMARY KEY,
+                    count INTEGER DEFAULT 1,
+                    last_sent_by TEXT,
+                    last_sent_at TIMESTAMP
+                )
+            """
+            )
 
-        # Add indexes for better query performance
-        c.execute("CREATE INDEX IF NOT EXISTS idx_quotes_text ON quotes(quote)")
-        c.execute(
-            "CREATE INDEX IF NOT EXISTS idx_user_timezones_id ON user_timezones(user_id)"
-        )
-        # --- NEW: Activity Indexes ---
-        c.execute(
-            "CREATE INDEX IF NOT EXISTS idx_activity_hourly_count ON activity_hourly(count DESC)"
-        )
-        c.execute(
-            "CREATE INDEX IF NOT EXISTS idx_activity_users_count ON activity_users(count DESC)"
-        )
+            # 💰 NEW: Economy/Balances Table
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS balances (
+                    user_id TEXT PRIMARY KEY,
+                    balance INTEGER DEFAULT 0
+                )
+            """
+            )
+
+            # Add indexes for better query performance
+            c.execute("CREATE INDEX IF NOT EXISTS idx_quotes_text ON quotes(quote)")
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_user_timezones_id ON user_timezones(user_id)"
+            )
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_activity_hourly_count ON activity_hourly(count DESC)"
+            )
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_activity_users_count ON activity_users(count DESC)"
+            )
+        logger.info("✅ Database tables initialized (including balances).")
+    except Exception as e:
+        logger.error(f"Error initializing database: {e}", exc_info=True)
 
 
 # ============================================================
-# QUOTE FUNCTIONS
+# ECONOMY FUNCTIONS (NEW)
+# ============================================================
+
+
+def get_balance(user_id: int) -> int:
+    """Retrieves a user's current token balance."""
+    user_id_str = str(user_id)
+    with get_db() as conn:
+        c = conn.cursor()
+        # Find the balance, default to 0 if the user is not found
+        c.execute("SELECT balance FROM balances WHERE user_id = ?", (user_id_str,))
+        result = c.fetchone()
+        return result[0] if result else 0
+
+
+def update_balance(user_id: int, amount: int):
+    """
+    Adds (or subtracts) a token amount to a user's balance.
+    Use a negative amount to subtract (e.g., -100).
+    """
+    user_id_str = str(user_id)
+    sql = """
+        INSERT INTO balances (user_id, balance) VALUES (?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET balance = balance + ?
+    """
+    # Parameters for the ON CONFLICT clause are (user_id, initial_balance, amount_to_add)
+    # Since we are adding, initial_balance is the amount itself if the row is new.
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute(sql, (user_id_str, amount, amount))
+
+
+def transfer_tokens(sender_id: int, recipient_id: int, amount: int) -> bool:
+    """Atomically transfers tokens between two users."""
+    if amount <= 0:
+        return False
+
+    sender_id_str = str(sender_id)
+    recipient_id_str = str(recipient_id)
+
+    # Use a single connection/transaction for atomicity
+    with get_db() as conn:
+        c = conn.cursor()
+
+        # 1. Check sender balance
+        c.execute("SELECT balance FROM balances WHERE user_id = ?", (sender_id_str,))
+        sender_balance = c.fetchone()
+
+        # If user has no row, balance is 0. If existing balance < amount, fail.
+        if (sender_balance is None) or (sender_balance[0] < amount):
+            return False  # Insufficient funds
+
+        # 2. Debit sender
+        c.execute(
+            "UPDATE balances SET balance = balance - ? WHERE user_id = ?",
+            (amount, sender_id_str),
+        )
+
+        # 3. Credit recipient (ON CONFLICT ensures a row is created if recipient is new)
+        c.execute(
+            """
+            INSERT INTO balances (user_id, balance) VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET balance = balance + ?
+        """,
+            (recipient_id_str, amount, amount),
+        )
+
+        # The transaction is committed automatically by the get_db context manager
+        return True  # Success
+
+
+# ============================================================
+# QUOTE FUNCTIONS (EXISTING)
 # ============================================================
 
 
@@ -157,7 +269,7 @@ def delete_quote_by_id(quote_id):
 
 
 # ============================================================
-# TIMEZONE FUNCTIONS
+# TIMEZONE FUNCTIONS (EXISTING)
 # ============================================================
 
 
@@ -188,7 +300,9 @@ def set_user_timezone(user_id, timezone_str, city):
         )
 
 
-# tarot
+# ============================================================
+# TAROT FUNCTIONS (EXISTING)
+# ============================================================
 
 
 def init_tarot_deck_settings():
@@ -238,7 +352,7 @@ def set_guild_tarot_deck(guild_id, deck_name):
 
 
 # ============================================================
-# GIF TRACKER FUNCTIONS
+# GIF TRACKER FUNCTIONS (EXISTING)
 # ============================================================
 
 
@@ -262,8 +376,6 @@ def increment_gif_count(gif_url, user_id):
     """Increment GIF count or add new entry"""
     with get_db() as conn:
         c = conn.cursor()
-        # *** DELETED: Delete GIFs older than two weeks ***
-        # *** This is now handled by the background task cleanup_old_gifs() ***
 
         c.execute(
             """
