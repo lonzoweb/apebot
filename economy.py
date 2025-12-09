@@ -39,9 +39,9 @@ async def handle_balance_command(ctx, member: discord.Member = None):
     balance = await ctx.bot.loop.run_in_executor(None, get_balance, target.id)
 
     if target == ctx.author:
-        message = f"🪙 {ctx.author.mention}, your current balance is **{format_balance(balance)}**."
+        message = f"{ctx.author.mention}, your current balance is **{format_balance(balance)}**."
     else:
-        message = f"📊 **{target.display_name}**'s current balance is **{format_balance(balance)}**."
+        message = f"**{target.display_name}**'s current balance is **{format_balance(balance)}**."
 
     await ctx.send(message)
 
@@ -50,11 +50,11 @@ async def handle_send_command(ctx, member: discord.Member, amount: int):
     """Handles the .send @user <amount> command."""
 
     if member.bot:
-        return await ctx.send("🤖 You cannot send tokens to a bot.")
+        return await ctx.send("You cannot send tokens to a bot.")
     if member.id == ctx.author.id:
-        return await ctx.send("🛑 You cannot send tokens to yourself.")
+        return await ctx.send("You cannot send tokens to yourself.")
     if amount <= 0:
-        return await ctx.send("❌ Amount must be positive.")
+        return await ctx.send("Amount must be positive.")
 
     sender_id = ctx.author.id
     recipient_id = member.id

@@ -1141,6 +1141,9 @@ last_used = {}
 async def kek_command(ctx):
     """Sends a specific sticker 6 times (1 min cooldown for non-admins)"""
 
+    # Reward amount
+    REWARD_AMOUNT = 3
+
     # Check if user is admin
     is_admin = ctx.author.guild_permissions.administrator
 
@@ -1149,10 +1152,12 @@ async def kek_command(ctx):
         current_time = time.time()
         cooldown_duration = 60  # 1 minute in seconds
 
+        # Assuming the global dictionary name is 'last_used' and it tracks cooldowns by command name
         if "key" in last_used:
             time_since_last_use = current_time - last_used["key"]
             if time_since_last_use < cooldown_duration:
-                return  # Silently ignore the command
+                # Command is on cooldown, silently ignore
+                return
 
     # Replace with your actual sticker ID
     STICKER_ID = (
@@ -1167,6 +1172,14 @@ async def kek_command(ctx):
 
         for _ in range(6):
             await ctx.send(stickers=[sticker])
+
+        # --- NEW: Grant Token Reward (SILENTLY) ---
+        # 1. Update balance asynchronously
+        await ctx.bot.loop.run_in_executor(
+            None, update_balance, ctx.author.id, REWARD_AMOUNT
+        )
+
+        # 2. Reward message removed per request.
 
         # Only update cooldown after successful execution for non-admins
         if not is_admin:
@@ -1731,7 +1744,7 @@ async def execute_pull(ctx):
         formatted_winnings = economy.format_balance(winnings)
 
         # Append the reward message
-        final_msg += f"\n\n✨ **You received {formatted_winnings}!**"
+        final_msg += f"\n\nYou received {formatted_winnings}!"
 
     await asyncio.sleep(0.3)
     await msg.edit(content=final_msg)
