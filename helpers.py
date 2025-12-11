@@ -7,6 +7,14 @@ import ephem
 import discord
 from config import AUTHORIZED_ROLES
 
+
+# --- Cooldown Bypass Check ---
+async def is_not_admin(ctx):
+    """Returns True if the user is NOT an administrator (applies cooldown)."""
+    # This uses the check built into discord.py to check for administrator permission
+    return not ctx.author.guild_permissions.administrator
+
+
 # ============================================================
 # PERMISSION HELPERS
 # ============================================================

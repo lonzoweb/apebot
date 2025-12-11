@@ -22,6 +22,7 @@ import discord
 from discord.ext import commands
 import ephem  # Assuming this is the PyEphem library
 import urllib.parse
+import crypto_api
 
 # --- Local Module Imports (REQUIRED for bot functionality) ---
 # Ensure all files are present in your bot's root directory:
@@ -32,6 +33,7 @@ import activity  # Used for logging/tracker functions
 import battle
 import tasks
 import economy
+import crypto_api
 
 # --- Local Module Imports (From other modules) ---
 from config import *  # WARNING: Using '*' is generally discouraged
@@ -1192,6 +1194,78 @@ async def kek_command(ctx):
         )
     except discord.HTTPException as e:
         await ctx.reply(f"❌ Failed to send sticker: {e}", mention_author=False)
+
+
+def format_price(price: float) -> str:
+    # ... (function body)
+    if price is None:
+        return "N/A"
+
+    if price >= 100:
+        return f"${price:,.2f}"
+    elif price >= 1:
+        return f"${price:.4f}"
+    else:
+        return f"${price:.6f}"
+
+
+def format_change(change: float) -> str:
+    # ... (function body)
+    if change is None:
+        return "N/A"
+
+    sign = "+" if change >= 0 else ""
+    emoji = "🟢" if change >= 0 else "🔴"
+
+    return f"{emoji} {sign}{change:.2f}%"
+
+
+@bot.command(name="crypto", aliases=["btc", "eth"])
+@commands.check(is_not_admin)  # Only apply the cooldown if the user is NOT an admin
+@commands.cooldown(1, 10, commands.BucketType.user)  # 1 use per 10 seconds per user
+async def crypto_command(ctx):
+    """Displays real-time prices for the top 5 cryptocurrencies."""
+
+    # Send initial loading message
+    loading_msg = await ctx.send("🌐 Fetching real-time crypto prices... ⏳")
+
+    # Execute the synchronous API call in a separate thread
+    crypto_data = await ctx.bot.loop.run_in_executor(
+        None, crypto_api.fetch_crypto_prices, 5
+    )
+
+    if not crypto_data:
+        await loading_msg.edit(
+            content="❌ Could not retrieve crypto prices. The API may be down or experiencing issues."
+        )
+        return
+
+    # --- Build Output Embed ---
+
+    embed = discord.Embed(
+        title="📈 Top 5 Cryptocurrencies (USD)",
+        description="Data provided by CoinGecko.",
+        color=discord.Color.from_rgb(255, 165, 0),
+        timestamp=datetime.datetime.now(datetime.timezone.utc),
+    )
+
+    embed.set_footer(
+        text=f"Requested by {ctx.author.display_name} | User ID: {ctx.author.id}"
+    )
+
+    for i, coin in enumerate(crypto_data, 1):
+        price_str = format_price(coin["price"])
+        change_str = format_change(coin["change_24h"])
+
+        name_field = f"{i}. {coin['name']} (`{coin['symbol']}`)"
+        value_field = f"**Price:** {price_str}\n**24H Change:** {change_str}"
+
+        embed.add_field(name=name_field, value=value_field, inline=True)
+
+    if len(crypto_data) % 3 == 2:
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
+
+    await loading_msg.edit(content=None, embed=embed)
 
 
 # Add this at the top with your other dictionaries
