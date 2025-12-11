@@ -1221,7 +1221,6 @@ def format_change(change: float) -> str:
 
 
 @bot.command(name="crypto", aliases=["btc", "eth"])
-@commands.check(is_not_admin)  # Only apply the cooldown if the user is NOT an admin
 @commands.cooldown(1, 10, commands.BucketType.user)  # 1 use per 10 seconds per user
 async def crypto_command(ctx):
     """Displays real-time prices for the top 5 cryptocurrencies."""
