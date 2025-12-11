@@ -13,8 +13,7 @@ import shutil
 import sqlite3
 import logging
 import time
-from datetime import timedelta
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 # --- Third-Party Imports ---
@@ -1245,7 +1244,7 @@ async def crypto_command(ctx):
         title="📈 Top 5 Cryptocurrencies (USD)",
         description="Data provided by CoinGecko.",
         color=discord.Color.from_rgb(255, 165, 0),
-        timestamp=datetime.datetime.now(datetime.timezone.utc),
+        timestamp=datetime.now(timezone.utc),
     )
 
     embed.set_footer(
