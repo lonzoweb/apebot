@@ -1929,8 +1929,8 @@ async def pink_command(ctx, member: discord.Member):
         # --- Threshold NOT Reached: Report Status ---
         needed = VOTE_THRESHOLD - vote_count
         await ctx.send(
-            f"✅ **Vote tallied!** {member.display_name} now has **{vote_count}/{VOTE_THRESHOLD}** active pink votes. "
-            f"Only **{needed} more** needed in the next 48 hours!"
+            f"{member.display_name} now has **{vote_count}/{VOTE_THRESHOLD}** pink votes."
+            f"**{needed} more** needed to pink name this fool"
         )
 
 
