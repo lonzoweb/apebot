@@ -136,8 +136,9 @@ async def on_ready():
     await bot.loop.run_in_executor(None, battle.init_battle_db)
 
     # NEW: Initialize Pink Vote and Role Tables
-    # Ensure this function exists and is imported from database.py
-    await bot.loop.run_in_executor(None, database.create_pink_tables)
+    # CALLING DIRECTLY because of 'from database import *'
+    await bot.loop.run_in_executor(None, create_pink_tables)
+    # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
     # 4. Load Cogs (This loads all commands and event listeners)
     try:
