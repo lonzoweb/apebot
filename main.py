@@ -127,18 +127,16 @@ async def on_ready():
         bot.owner_timezone = tz
 
     # 3. Initialize ALL Database Tables
-    # IMPORTANT: Use bot.loop.run_in_executor for synchronous/blocking DB calls
+    # CRITICAL CLEANUP: All general table creation is now handled by the single init_db call.
+    # The removed functions were causing NameErrors because they were deleted from database.py.
 
-    # Generic table initialization
+    # Unified table initialization (Quotes, Pink, GIF, Tarot, Balances, etc.)
     await bot.loop.run_in_executor(None, init_db)
-    await bot.loop.run_in_executor(None, init_gif_table)
-    await bot.loop.run_in_executor(None, init_tarot_deck_settings)
+
+    # Keep the battle tables separate only if they are not inside init_db
     await bot.loop.run_in_executor(None, battle.init_battle_db)
 
-    # NEW: Initialize Pink Vote and Role Tables
-    # CALLING DIRECTLY because of 'from database import *'
-    await bot.loop.run_in_executor(None, create_pink_tables)
-    # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    # Removed: init_gif_table, init_tarot_deck_settings, create_pink_tables
 
     # 4. Load Cogs (This loads all commands and event listeners)
     try:
