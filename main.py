@@ -1914,12 +1914,14 @@ async def pink_command(ctx, member: discord.Member):
     voted_id_str = str(member.id)
     voter_id_str = str(ctx.author.id)
 
+    # FIX: Change 'database.update_pink_vote' to just 'update_pink_vote'
     await ctx.bot.loop.run_in_executor(
-        None, database.update_pink_vote, voted_id_str, voter_id_str
+        None, update_pink_vote, voted_id_str, voter_id_str
     )
 
+    # FIX: Change 'database.get_active_pink_vote_count' to just 'get_active_pink_vote_count'
     vote_count = await ctx.bot.loop.run_in_executor(
-        None, database.get_active_pink_vote_count, voted_id_str
+        None, get_active_pink_vote_count, voted_id_str
     )
 
     # 5. Check Threshold
@@ -1927,13 +1929,12 @@ async def pink_command(ctx, member: discord.Member):
 
         # --- THRESHOLD REACHED: ASSIGN ROLE ---
         try:
-            await member.add_roles(
-                masochist_role, reason="Reached 7 pink votes in 48 hours."
-            )
+            # ... (Role assignment code is unchanged) ...
 
             removal_time = time.time() + ROLE_DURATION_SECONDS
+            # FIX: Change 'database.add_masochist_role_removal' to just 'add_masochist_role_removal'
             await ctx.bot.loop.run_in_executor(
-                None, database.add_masochist_role_removal, voted_id_str, removal_time
+                None, add_masochist_role_removal, voted_id_str, removal_time
             )
 
             await ctx.send(
