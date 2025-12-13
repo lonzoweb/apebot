@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 # --- Third-Party Imports ---
 import discord
 from discord.ext import commands
+from discord.ext import tasks
 import ephem  # Assuming this is the PyEphem library
 import urllib.parse
 import crypto_api
@@ -95,6 +96,10 @@ intents.message_content = True
 intents.guilds = True
 intents.members = True
 
+MASOCHIST_ROLE_ID = 1167184822129664113
+VOTE_THRESHOLD = 7
+ROLE_DURATION_SECONDS = 48 * 3600  # 2 days
+
 bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents, help_command=None)
 bot.aiohttp_session = None
 bot.owner_timezone = None
@@ -122,12 +127,17 @@ async def on_ready():
         bot.owner_timezone = tz
 
     # 3. Initialize ALL Database Tables
-    # init_db must create ALL tables (including activity_hourly/users)
-    init_db()
-    init_gif_table()
-    # init_activity_db() is now redundant, removed.
-    init_tarot_deck_settings()
-    battle.init_battle_db()  # Added, assuming this needs explicit call
+    # IMPORTANT: Use bot.loop.run_in_executor for synchronous/blocking DB calls
+
+    # Generic table initialization
+    await bot.loop.run_in_executor(None, init_db)
+    await bot.loop.run_in_executor(None, init_gif_table)
+    await bot.loop.run_in_executor(None, init_tarot_deck_settings)
+    await bot.loop.run_in_executor(None, battle.init_battle_db)
+
+    # NEW: Initialize Pink Vote and Role Tables
+    # Ensure this function exists and is imported from database.py
+    await bot.loop.run_in_executor(None, database.create_pink_tables)
 
     # 4. Load Cogs (This loads all commands and event listeners)
     try:
@@ -137,10 +147,20 @@ async def on_ready():
     except Exception as e:
         logger.error(f"❌ Failed to load ActivityCog: {e}", exc_info=True)
 
-    # 5. Setup Background Tasks
-    # The tasks.py file now handles BOTH the daily quote and the 5m flush/24h cleanup.
-    tasks.setup_tasks(bot)
-    # activity.setup_activity_tasks(bot) is now redundant and removed.
+    # 5. Setup Background Tasks (Needs Guild ID for role management)
+
+    # Determine the main guild ID. Assuming the bot is primarily in one server.
+    if not bot.guilds:
+        logger.error("Bot is not in any guilds! Cannot start tasks.")
+        main_guild_id = None
+    else:
+        # Use the ID of the first guild the bot is connected to
+        main_guild_id = bot.guilds[0].id
+
+    if main_guild_id:
+        # Pass the bot and the main guild ID to the task setup function
+        tasks.setup_tasks(bot, main_guild_id)
+        logger.info(f"✅ Background tasks started for Guild ID: {main_guild_id}")
 
     logger.info(f"✅ Logged in as {bot.user}")
 
@@ -1820,6 +1840,85 @@ async def execute_pull(ctx):
 
     await asyncio.sleep(0.3)
     await msg.edit(content=final_msg)
+
+
+@bot.command(name="pink")
+async def pink_command(ctx, member: discord.Member):
+    """Votes to assign the Masochist role to a user. Requires 7 votes in 48h."""
+
+    # 1. Self-vote and Bot-vote check
+    if member.id == ctx.author.id:
+        return await ctx.reply(
+            "❌ You can't vote for yourself... unless you're into that?",
+            mention_author=False,
+        )
+    if member.bot:
+        return await ctx.reply(
+            "❌ Bots are immune to this torture.", mention_author=False
+        )
+
+    # 2. Check if target already has the role (to prevent spamming successful role assignments)
+    masochist_role = ctx.guild.get_role(MASOCHIST_ROLE_ID)
+    if masochist_role and masochist_role in member.roles:
+        return await ctx.reply(
+            f"❌ {member.display_name} already has the {masochist_role.name} role.",
+            mention_author=False,
+        )
+
+    # 3. Add vote and check count (Asynchronous database operation)
+    voted_id_str = str(member.id)
+    voter_id_str = str(ctx.author.id)
+
+    await ctx.bot.loop.run_in_executor(
+        None, database.update_pink_vote, voted_id_str, voter_id_str
+    )
+
+    vote_count = await ctx.bot.loop.run_in_executor(
+        None, database.get_active_pink_vote_count, voted_id_str
+    )
+
+    # 4. Check Threshold
+    if vote_count >= VOTE_THRESHOLD:
+
+        # --- THRESHOLD REACHED: ASSIGN ROLE ---
+        if masochist_role:
+            try:
+                # Add role
+                await member.add_roles(
+                    masochist_role, reason="Reached 7 pink votes in 48 hours."
+                )
+
+                # Schedule removal (Asynchronous database operation)
+                removal_time = time.time() + ROLE_DURATION_SECONDS
+                await ctx.bot.loop.run_in_executor(
+                    None,
+                    database.add_masochist_role_removal,
+                    voted_id_str,
+                    removal_time,
+                )
+
+                # Announce success
+                await ctx.send(
+                    f"🎉 **PAYMENT DUE!** {member.mention} has reached **{VOTE_THRESHOLD} pink votes** in 48 hours and has been assigned the **{masochist_role.name}** role for 2 days!"
+                )
+
+            except discord.Forbidden:
+                await ctx.send(
+                    f"❌ Failed to assign role: Bot does not have permissions or the role is too high."
+                )
+
+        else:
+            await ctx.send(
+                f"❌ Error: The configured role ID ({MASOCHIST_ROLE_ID}) was not found on this server."
+            )
+
+    else:
+        # --- Threshold NOT Reached: Report Status ---
+        needed = VOTE_THRESHOLD - vote_count
+        await ctx.send(
+            f"✅ **Vote tallied!** {member.display_name} now has **{vote_count}/{VOTE_THRESHOLD}** active pink votes. "
+            f"Only **{needed} more** needed in the next 48 hours!"
+        )
 
 
 # role alias add

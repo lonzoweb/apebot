@@ -6,13 +6,21 @@ Background tasks that run on intervals
 import discord
 import random
 import logging
-import asyncio  # New import for run_in_executor logic
+import asyncio
+import time  # Added for time.time() checks in the removal loop
 from datetime import datetime
-import activity as activity_tracker
 from zoneinfo import ZoneInfo
 from discord.ext import tasks
-from config import CHANNEL_ID, TEST_CHANNEL_ID
-from database import load_quotes_from_db
+
+# Assuming these are imported from your config or defined globally:
+from config import CHANNEL_ID, TEST_CHANNEL_ID  # Assuming config imports
+
+# Assuming these constants are available:
+YOUR_GUILD_ID = 1167166210610298910  # <<< REPLACE THIS
+MASOCHIST_ROLE_ID = 1167184822129664113  # Your confirmed role ID
+
+import activity as activity_tracker
+import database  # Required for role removal database calls
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +32,11 @@ daily_quote_of_the_day = None
 # ============================================================
 
 
-def setup_tasks(bot):
-    """Initialize and start scheduled tasks"""
+def setup_tasks(bot, guild_id: int):
+    """
+    Initialize and start scheduled tasks.
+    The main guild ID is now passed in to ensure the role removal works correctly.
+    """
 
     # --- 1. Daily Activity Cleanup Task (24 hours) ---
 
@@ -61,7 +72,6 @@ def setup_tasks(bot):
     @flush_activity_frequent.before_loop
     async def before_flush_activity():
         await bot.wait_until_ready()
-        # Log message updated to reflect 30-minute loop
         logger.info("⏳ Activity flush task started (every 30 minutes)")
 
     flush_activity_frequent.start()
@@ -73,10 +83,10 @@ def setup_tasks(bot):
         """Send daily quotes at scheduled times (10 AM and 6 PM PT)"""
         global daily_quote_of_the_day
 
-        # Get guild (your server)
-        guild = bot.guilds[0] if bot.guilds else None
+        # Get guild using the ID passed to setup_tasks
+        guild = bot.get_guild(guild_id)
         if not guild:
-            logger.warning("Bot not in any guilds")
+            logger.warning("Bot not in the main guild for quote tasks.")
             return
 
         # Find channels by name (NOTE: Fetching by ID is faster if available)
@@ -99,7 +109,9 @@ def setup_tasks(bot):
             if now_pt.hour == 10 and daily_quote_of_the_day is None:
 
                 # CRITICAL FIX: Run blocking quote loading in a separate thread
-                quotes = await bot.loop.run_in_executor(None, load_quotes_from_db)
+                quotes = await bot.loop.run_in_executor(
+                    None, database.load_quotes_from_db
+                )  # Corrected function call
 
                 if quotes:
                     daily_quote_of_the_day = random.choice(quotes)
@@ -131,7 +143,7 @@ def setup_tasks(bot):
                 daily_quote_of_the_day = None
 
         except Exception as e:
-            logger.error(f"Error in daily_quote task: {e}")
+            logger.error(f"Error in daily_quote task: {e}", exc_info=True)
 
     @daily_quote.before_loop
     async def before_daily_quote():
@@ -139,9 +151,83 @@ def setup_tasks(bot):
         await bot.wait_until_ready()
         logger.info("⏳ Daily quote task started (hourly check)")
 
-    # Start the task
     daily_quote.start()
 
+    # --- 4. Role Removal Task (Every 5 minutes) ---
+
+    @tasks.loop(minutes=5.0)
+    async def role_removal_loop():
+        """Checks the database for users whose Masochist role should be removed."""
+
+        guild = bot.get_guild(guild_id)  # Use the ID passed to setup_tasks
+        if not guild:
+            logger.warning(f"Role Removal Loop: Guild ID {guild_id} not found.")
+            return
+
+        masochist_role = guild.get_role(MASOCHIST_ROLE_ID)
+        if not masochist_role:
+            logger.error(f"Role Removal Loop: Role ID {MASOCHIST_ROLE_ID} not found.")
+            return
+
+        try:
+            # 1. Get users whose removal time has passed (Asynchronous database operation)
+            users_to_remove_ids = await bot.loop.run_in_executor(
+                None, database.get_pending_role_removals
+            )
+
+            if not users_to_remove_ids:
+                return
+
+            # 2. Process Removals
+            for user_id_str in users_to_remove_ids:
+                user_id = int(user_id_str)
+                member = guild.get_member(user_id)
+
+                if member and masochist_role in member.roles:
+                    try:
+                        # Remove the role from the member
+                        await member.remove_roles(
+                            masochist_role,
+                            reason="48 hour Masochist role duration expired.",
+                        )
+                        logger.info(
+                            f"Removed Masochist role from {member.display_name} ({user_id})"
+                        )
+
+                        # Optional: Send a DM
+                        try:
+                            await member.send(
+                                f"Your **{masochist_role.name}** role has expired after 2 days!"
+                            )
+                        except discord.Forbidden:
+                            pass
+
+                    except discord.Forbidden:
+                        logger.warning(
+                            f"Failed to remove role from {user_id}: Bot lacks permissions."
+                        )
+
+                    except Exception as e:
+                        logger.error(
+                            f"Error removing role for {user_id}: {e}", exc_info=True
+                        )
+
+                # 3. Cleanup: Remove the record from the database regardless of role removal success
+                await bot.loop.run_in_executor(
+                    None, database.remove_masochist_role_record, user_id_str
+                )
+
+        except Exception as e:
+            logger.error(f"Error in role_removal_loop: {e}", exc_info=True)
+
+    @role_removal_loop.before_loop
+    async def before_role_removal_loop():
+        await bot.wait_until_ready()
+        logger.info("⏳ Role removal task started (every 5 minutes)")
+
+    role_removal_loop.start()
+
+    # --- End of setup_tasks ---
     return daily_quote_of_the_day
 
 
