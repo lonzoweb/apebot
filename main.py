@@ -1846,7 +1846,7 @@ async def execute_pull(ctx):
 async def pink_command(ctx, member: discord.Member):
     """Votes to assign the Masochist role to a user. Requires 7 votes in 48h."""
 
-    # 1. Self-vote and Bot-vote check
+    # 1. Basic Checks
     if member.id == ctx.author.id:
         return await ctx.reply(
             "❌ You can't vote for yourself... unless you're into that?",
@@ -1857,15 +1857,39 @@ async def pink_command(ctx, member: discord.Member):
             "❌ Bots are immune to this torture.", mention_author=False
         )
 
-    # 2. Check if target already has the role (to prevent spamming successful role assignments)
+    # Get the target role object
     masochist_role = ctx.guild.get_role(MASOCHIST_ROLE_ID)
-    if masochist_role and masochist_role in member.roles:
+    if not masochist_role:
+        return await ctx.send(
+            f"❌ Error: The configured role ID ({MASOCHIST_ROLE_ID}) was not found on this server."
+        )
+
+    # 2. BOT PERMISSION AND HIERARCHY CHECKS (CRITICAL)
+    bot_member = ctx.guild.me  # The bot's member object in the guild
+
+    # 2a. Check for 'manage_roles' permission
+    if not bot_member.guild_permissions.manage_roles:
+        return await ctx.send(
+            "🛑 **SETUP ERROR:** I do not have the **`Manage Roles`** permission. "
+            "I cannot assign or remove the Masochist role until this is fixed."
+        )
+
+    # 2b. Check role hierarchy
+    if bot_member.top_role.position <= masochist_role.position:
+        return await ctx.send(
+            f"🛑 **HIERARCHY ERROR:** My highest role (`{bot_member.top_role.name}`) is not positioned above "
+            f"the target role (`{masochist_role.name}`). "
+            "Please move my role higher than the Masochist role in the server settings."
+        )
+
+    # 3. Check if target already has the role
+    if masochist_role in member.roles:
         return await ctx.reply(
             f"❌ {member.display_name} already has the {masochist_role.name} role.",
             mention_author=False,
         )
 
-    # 3. Add vote and check count (Asynchronous database operation)
+    # 4. Add vote and check count (Asynchronous database operation)
     voted_id_str = str(member.id)
     voter_id_str = str(ctx.author.id)
 
@@ -1877,39 +1901,27 @@ async def pink_command(ctx, member: discord.Member):
         None, database.get_active_pink_vote_count, voted_id_str
     )
 
-    # 4. Check Threshold
+    # 5. Check Threshold
     if vote_count >= VOTE_THRESHOLD:
 
         # --- THRESHOLD REACHED: ASSIGN ROLE ---
-        if masochist_role:
-            try:
-                # Add role
-                await member.add_roles(
-                    masochist_role, reason="Reached 7 pink votes in 48 hours."
-                )
+        try:
+            await member.add_roles(
+                masochist_role, reason="Reached 7 pink votes in 48 hours."
+            )
 
-                # Schedule removal (Asynchronous database operation)
-                removal_time = time.time() + ROLE_DURATION_SECONDS
-                await ctx.bot.loop.run_in_executor(
-                    None,
-                    database.add_masochist_role_removal,
-                    voted_id_str,
-                    removal_time,
-                )
+            removal_time = time.time() + ROLE_DURATION_SECONDS
+            await ctx.bot.loop.run_in_executor(
+                None, database.add_masochist_role_removal, voted_id_str, removal_time
+            )
 
-                # Announce success
-                await ctx.send(
-                    f"🎉 **PAYMENT DUE!** {member.mention} has reached **{VOTE_THRESHOLD} pink votes** in 48 hours and has been assigned the **{masochist_role.name}** role for 2 days!"
-                )
-
-            except discord.Forbidden:
-                await ctx.send(
-                    f"❌ Failed to assign role: Bot does not have permissions or the role is too high."
-                )
-
-        else:
             await ctx.send(
-                f"❌ Error: The configured role ID ({MASOCHIST_ROLE_ID}) was not found on this server."
+                f"🎉 **PAYMENT DUE!** {member.mention} has reached **{VOTE_THRESHOLD} pink votes** in 48 hours and has been assigned the **{masochist_role.name}** role for 2 days!"
+            )
+
+        except discord.Forbidden:
+            await ctx.send(
+                "❌ Internal Error: Failed to assign role due to unexpected permissions issue."
             )
 
     else:
@@ -1919,6 +1931,26 @@ async def pink_command(ctx, member: discord.Member):
             f"✅ **Vote tallied!** {member.display_name} now has **{vote_count}/{VOTE_THRESHOLD}** active pink votes. "
             f"Only **{needed} more** needed in the next 48 hours!"
         )
+
+
+# --- Error Handler for .pink Command (The fix for the MissingRequiredArgument error) ---
+
+
+@pink_command.error
+async def pink_command_error(ctx, error):
+    if isinstance(error, commands.MissingRequiredArgument):
+        # Notify the user they forgot to mention a member
+        await ctx.send(
+            f"❌ Please mention a user to vote for, {ctx.author.mention}. Usage: `.pink @UserMention`"
+        )
+    elif isinstance(error, commands.BadArgument):
+        # If the user mentioned a user who is not in the server
+        await ctx.send(
+            f"❌ I could not find that user in the server. Please try again with a proper mention."
+        )
+    else:
+        # Re-raise all other errors (like CommandOnCooldown, Forbidden, etc.)
+        raise error
 
 
 # role alias add
