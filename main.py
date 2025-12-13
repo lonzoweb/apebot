@@ -1939,24 +1939,25 @@ async def pink_command(ctx, member: discord.Member):
 
 @pink_command.error
 async def pink_command_error(ctx, error):
+    # Check for the specific error that happens when the user forgets the argument
     if isinstance(error, commands.MissingRequiredArgument):
-        # Notify the user they forgot to mention a member
+        # Send the helpful message
         await ctx.send(
-            f"❌ Need a user to vote for, {ctx.author.mention}. Usage: `.pink @user`"
+            f"❌ Please mention a user to vote for, {ctx.author.mention}. Usage: `.pink @UserMention`"
         )
-        # Error is handled, STOP processing.
+        # CRITICAL: Return immediately to prevent the error from being re-logged globally.
         return
 
+    # Check for the error that happens when the user mentions something invalid
     elif isinstance(error, commands.BadArgument):
-        # If the user mentioned a user who is not in the server
         await ctx.send(
             f"❌ I could not find that user in the server. Please try again with a proper mention."
         )
-        # Error is handled, STOP processing.
+        # Error handled.
         return
 
+    # If it's any other error (e.g., Forbidden, Cooldown), raise it normally for logging.
     else:
-        # Only raise genuine, unhandled errors for logging.
         raise error
 
 
