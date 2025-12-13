@@ -1942,13 +1942,20 @@ async def pink_command_error(ctx, error):
         await ctx.send(
             f"❌ Please mention a user to vote for, {ctx.author.mention}. Usage: `.pink @UserMention`"
         )
+        # 🟢 CRITICAL: DO NOT raise the error, the function exits and the error is considered handled.
+        return # <-- Add an explicit return here
+
     elif isinstance(error, commands.BadArgument):
-        # If the user mentioned a user who is not in the server
-        await ctx.send(
+         # If the user mentioned a user who is not in the server
+         await ctx.send(
             f"❌ I could not find that user in the server. Please try again with a proper mention."
         )
+        # 🟢 CRITICAL: DO NOT raise the error, the function exits and the error is considered handled.
+        return # <-- Add an explicit return here
+        
     else:
-        # Re-raise all other errors (like CommandOnCooldown, Forbidden, etc.)
+        # 🔴 ONLY raise other errors (like CommandOnCooldown, Forbidden, etc.)
+        # This allows the global on_command_error or default logging for genuine, unhandled errors.
         raise error
 
 
