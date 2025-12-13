@@ -5,28 +5,30 @@ Handles all SQLite operations
 
 import sqlite3
 import logging
+import time  # NEW: Required for pink vote timestamping
 from contextlib import contextmanager
-from config import DB_FILE
+from config import DB_FILE  # Assumes DB_FILE is defined here
 
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# DATABASE CONTEXT MANAGER
+# DATABASE CONTEXT MANAGER (Core Connection Logic)
 # ============================================================
 
 
 @contextmanager
 def get_db():
-    """Context manager for safe database connections"""
+    """Context manager for safe database connections and transactions."""
     # Use DB_FILE from config.py
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
-    # Enable WAL mode for better concurrency
+    # Use check_same_thread=False for safety when run via bot.loop.run_in_executor
+    conn = sqlite3.connect(DB_FILE, timeout=10.0, check_same_thread=False)
+    # Enable WAL mode for better concurrency (important for lightweight multi-threaded usage)
     conn.execute("PRAGMA journal_mode=WAL")
     try:
         yield conn
         conn.commit()
     except sqlite3.IntegrityError as e:
-        # Commit if possible, but log integrity errors
+        # Commit if possible, but log integrity errors (e.g., expected ON CONFLICT)
         logger.warning(
             f"Database integrity error (likely expected unique constraint): {e}"
         )
@@ -41,12 +43,15 @@ def get_db():
 
 
 # ============================================================
-# DATABASE INITIALIZATION
+# DATABASE INITIALIZATION (Unified)
 # ============================================================
 
 
 def init_db():
-    """Initialize database tables"""
+    """
+    Initialize ALL database tables.
+    (Quotes, Timezones, Activity, Balances, Tarot, GIF Tracker, Pink Votes, Masochist Roles)
+    """
     try:
         with get_db() as conn:
             c = conn.cursor()
@@ -110,13 +115,32 @@ def init_db():
                 )
             """
             )
-
-            # 💰 NEW: Economy/Balances Table
+            # 💰 Balances Table
             c.execute(
                 """
                 CREATE TABLE IF NOT EXISTS balances (
                     user_id TEXT PRIMARY KEY,
                     balance INTEGER DEFAULT 0
+                )
+            """
+            )
+            # 💖 NEW: Pink Votes Table
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS pink_votes (
+                    voted_id TEXT NOT NULL,
+                    voter_id TEXT NOT NULL,
+                    timestamp REAL NOT NULL, 
+                    PRIMARY KEY (voted_id, voter_id)
+                )
+            """
+            )
+            # 💖 NEW: Masochist Roles Table
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS masochist_roles (
+                    user_id TEXT PRIMARY KEY,
+                    removal_time REAL NOT NULL
                 )
             """
             )
@@ -132,131 +156,88 @@ def init_db():
             c.execute(
                 "CREATE INDEX IF NOT EXISTS idx_activity_users_count ON activity_users(count DESC)"
             )
-        logger.info("✅ Database tables initialized (including balances).")
+        logger.info("✅ Database tables initialized (all modules unified).")
     except Exception as e:
         logger.error(f"Error initializing database: {e}", exc_info=True)
 
 
-# --- Pink Vote Table Creation ---
-def create_pink_tables():
-    conn = get_db_connection()
-    c = conn.cursor()
-
-    # Stores each individual vote (Lazy Expiration by timestamp)
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS pink_votes (
-            voted_id TEXT NOT NULL,
-            voter_id TEXT NOT NULL,
-            timestamp REAL NOT NULL, 
-            PRIMARY KEY (voted_id, voter_id)
-        )
-    """
-    )
-
-    # Stores users who currently have the role and when it needs to be removed
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS masochist_roles (
-            user_id TEXT PRIMARY KEY,
-            removal_time REAL NOT NULL
-        )
-    """
-    )
-
-    conn.commit()
-    conn.close()
-
-
-# IMPORTANT: Call this new function in your main setup_db function!
-# def setup_db():
-#     create_balance_table()
-#     create_pink_tables() # <--- MAKE SURE THIS IS ADDED!
-#     ...
-
-# --- NEW: Pink Vote Management Functions ---
+# ============================================================
+# PINK VOTE MANAGEMENT FUNCTIONS (FIXED)
+# ============================================================
+# NOTE: Removed the now redundant create_pink_tables() function.
 
 
 def update_pink_vote(voted_id: str, voter_id: str):
     """Inserts a new vote, updating the timestamp if the vote already exists."""
-    conn = get_db_connection()
-    c = conn.cursor()
     now = time.time()
+    with get_db() as conn:
+        c = conn.cursor()
 
-    # SQLite UPSERT (INSERT OR REPLACE)
-    c.execute(
-        """
-        INSERT OR REPLACE INTO pink_votes (voted_id, voter_id, timestamp) 
-        VALUES (?, ?, ?)
-    """,
-        (voted_id, voter_id, now),
-    )
-
-    conn.commit()
-    conn.close()
+        # SQLite UPSERT (INSERT OR REPLACE)
+        c.execute(
+            """
+            INSERT OR REPLACE INTO pink_votes (voted_id, voter_id, timestamp) 
+            VALUES (?, ?, ?)
+        """,
+            (voted_id, voter_id, now),
+        )
 
 
 def get_active_pink_vote_count(voted_id: str) -> int:
     """Counts votes cast within the last 48 hours (LIGHTWEIGHT strategy)."""
-    conn = get_db_connection()
-    c = conn.cursor()
+    with get_db() as conn:
+        c = conn.cursor()
 
-    # 48 hours in seconds = 48 * 3600 = 172800
-    expiration_time = time.time() - 172800
+        # 48 hours in seconds = 48 * 3600 = 172800
+        expiration_time = time.time() - 172800
 
-    c.execute(
-        """
-        SELECT COUNT(voter_id) FROM pink_votes 
-        WHERE voted_id = ? AND timestamp > ?
-    """,
-        (voted_id, expiration_time),
-    )
+        c.execute(
+            """
+            SELECT COUNT(voter_id) FROM pink_votes 
+            WHERE voted_id = ? AND timestamp > ?
+        """,
+            (voted_id, expiration_time),
+        )
 
-    count = c.fetchone()[0]
-    conn.close()
-    return count
+        count = c.fetchone()[0]
+        return count
 
 
 def add_masochist_role_removal(user_id: str, removal_time: float):
     """Adds or updates a user for scheduled role removal."""
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute(
-        """
-        INSERT OR REPLACE INTO masochist_roles (user_id, removal_time)
-        VALUES (?, ?)
-    """,
-        (user_id, removal_time),
-    )
-    conn.commit()
-    conn.close()
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute(
+            """
+            INSERT OR REPLACE INTO masochist_roles (user_id, removal_time)
+            VALUES (?, ?)
+        """,
+            (user_id, removal_time),
+        )
 
 
 def get_pending_role_removals() -> list:
     """Retrieves all users whose role removal time is past (for cleanup loop)."""
-    conn = get_db_connection()
-    c = conn.cursor()
-    now = time.time()
+    with get_db() as conn:
+        c = conn.cursor()
+        now = time.time()
 
-    # Select all users whose removal time has passed
-    c.execute("SELECT user_id FROM masochist_roles WHERE removal_time <= ?", (now,))
+        # Select all users whose removal time has passed
+        c.execute("SELECT user_id FROM masochist_roles WHERE removal_time <= ?", (now,))
 
-    users_to_remove = [row[0] for row in c.fetchall()]
-    conn.close()
-    return users_to_remove
+        users_to_remove = [row[0] for row in c.fetchall()]
+        return users_to_remove
 
 
 def remove_masochist_role_record(user_id: str):
     """Deletes the record after role removal is successful."""
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("DELETE FROM masochist_roles WHERE user_id = ?", (user_id,))
-    conn.commit()
-    conn.close()
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM masochist_roles WHERE user_id = ?", (user_id,))
 
 
 # ============================================================
-# ECONOMY FUNCTIONS (NEW)
+# ECONOMY FUNCTIONS (EXISTING)
 # ============================================================
 
 
@@ -265,7 +246,6 @@ def get_balance(user_id: int) -> int:
     user_id_str = str(user_id)
     with get_db() as conn:
         c = conn.cursor()
-        # Find the balance, default to 0 if the user is not found
         c.execute("SELECT balance FROM balances WHERE user_id = ?", (user_id_str,))
         result = c.fetchone()
         return result[0] if result else 0
@@ -281,8 +261,6 @@ def update_balance(user_id: int, amount: int):
         INSERT INTO balances (user_id, balance) VALUES (?, ?)
         ON CONFLICT(user_id) DO UPDATE SET balance = balance + ?
     """
-    # Parameters for the ON CONFLICT clause are (user_id, initial_balance, amount_to_add)
-    # Since we are adding, initial_balance is the amount itself if the row is new.
     with get_db() as conn:
         c = conn.cursor()
         c.execute(sql, (user_id_str, amount, amount))
@@ -304,7 +282,6 @@ def transfer_tokens(sender_id: int, recipient_id: int, amount: int) -> bool:
         c.execute("SELECT balance FROM balances WHERE user_id = ?", (sender_id_str,))
         sender_balance = c.fetchone()
 
-        # If user has no row, balance is 0. If existing balance < amount, fail.
         if (sender_balance is None) or (sender_balance[0] < amount):
             return False  # Insufficient funds
 
@@ -323,7 +300,6 @@ def transfer_tokens(sender_id: int, recipient_id: int, amount: int) -> bool:
             (recipient_id_str, amount, amount),
         )
 
-        # The transaction is committed automatically by the get_db context manager
         return True  # Success
 
 
@@ -350,7 +326,6 @@ def add_quote_to_db(quote):
         with get_db() as conn:
             c = conn.cursor()
             c.execute("INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (quote,))
-            # Check if it was actually inserted
             if c.rowcount == 0:
                 logger.warning(f"Quote already exists (skipped): {quote[:50]}...")
     except Exception as e:
@@ -423,20 +398,6 @@ def set_user_timezone(user_id, timezone_str, city):
 # ============================================================
 
 
-def init_tarot_deck_settings():
-    """Initialize tarot deck settings table"""
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tarot_settings (
-                guild_id TEXT PRIMARY KEY,
-                deck_name TEXT DEFAULT 'thoth'
-            )
-        """
-        )
-
-
 def get_guild_tarot_deck(guild_id):
     """Get the current tarot deck for a guild"""
     try:
@@ -472,22 +433,6 @@ def set_guild_tarot_deck(guild_id, deck_name):
 # ============================================================
 # GIF TRACKER FUNCTIONS (EXISTING)
 # ============================================================
-
-
-def init_gif_table():
-    """Initialize GIF tracker table"""
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute(
-            """
-            CREATE TABLE IF NOT EXISTS gif_tracker (
-                gif_url TEXT PRIMARY KEY,
-                count INTEGER DEFAULT 1,
-                last_sent_by TEXT,
-                last_sent_at TIMESTAMP
-            )
-        """
-        )
 
 
 def increment_gif_count(gif_url, user_id):
