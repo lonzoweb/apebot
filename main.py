@@ -1927,12 +1927,14 @@ async def pink_command(ctx, member: discord.Member):
         # --- Threshold NOT Reached: Report Status ---
         needed = VOTE_THRESHOLD - vote_count
         await ctx.send(
-            f"{member.display_name} now has **{vote_count}/{VOTE_THRESHOLD}** pink votes."
+            f"{member.display_name} now has **{vote_count}/{VOTE_THRESHOLD}** pink votes. "
             f"**{needed} more** needed to pink name this fool"
         )
 
 
-# --- Error Handler for .pink Command (The fix for the MissingRequiredArgument error) ---
+# =========================================================
+# COMMAND ERROR HANDLER (ESSENTIAL FOR PRE-EXECUTION ERRORS)
+# =========================================================
 
 
 @pink_command.error
@@ -1940,25 +1942,25 @@ async def pink_command_error(ctx, error):
     if isinstance(error, commands.MissingRequiredArgument):
         # Notify the user they forgot to mention a member
         await ctx.send(
-            f"❌ Please mention a user to vote for, {ctx.author.mention}. Usage: `.pink @UserMention`"
+            f"❌ Need a user to vote for, {ctx.author.mention}. Usage: `.pink @user`"
         )
-        # Error is handled, stop processing.
-        return 
+        # Error is handled, STOP processing.
+        return
 
     elif isinstance(error, commands.BadArgument):
-         # If the user mentioned a user who is not in the server
-         await ctx.send(
+        # If the user mentioned a user who is not in the server
+        await ctx.send(
             f"❌ I could not find that user in the server. Please try again with a proper mention."
         )
-        # Error is handled, stop processing.
-        return 
-        
+        # Error is handled, STOP processing.
+        return
+
     else:
-        # Only raise genuine, unhandled errors.
+        # Only raise genuine, unhandled errors for logging.
         raise error
 
 
-# role alias add
+# role ias add
 
 # ============================================================
 # ROLE ALIAS COMMAND
