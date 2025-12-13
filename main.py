@@ -227,15 +227,37 @@ async def globally_block_channels(ctx):
 @bot.event
 async def on_command_error(ctx, error):
     """Global error handler for commands"""
+
+    # 1. Check if the command has a specific, local error handler defined.
+    # This prevents the global handler from logging errors that were already caught
+    # (like MissingRequiredArgument in your .pink command).
+    if hasattr(ctx.command, "on_error"):
+        return
+
+    # 2. Handle ignored or specific user-facing errors
+
+    # Silently ignore cooldown errors
     if isinstance(error, commands.CommandOnCooldown):
-        pass  # Silently ignore cooldown errors
+        # If you want to notify the user, change this line:
+        # await ctx.reply(f"Slow down! This command is on cooldown. Try again in {error.retry_after:.1f}s.")
+        return
+
+    # Ignore unknown commands
+    elif isinstance(error, commands.CommandNotFound):
+        return
+
+    # 3. Handle specific permission errors
     elif isinstance(error, commands.MissingPermissions):
         await ctx.send("🚫 You don't have permission to use this command.")
-    elif isinstance(error, commands.CommandNotFound):
-        pass  # Ignore unknown commands
+
+    # 4. Handle all other UNHANDLED errors
     else:
-        logger.error(f"Command error: {error}")
-        await ctx.send(f"❌ An error occurred: {type(error).__name__}")
+        # Log the full traceback for critical errors
+        logger.error(
+            f"UNHANDLED COMMAND ERROR in {ctx.command}: {error}", exc_info=True
+        )
+        # Send a generic message to the user
+        await ctx.send(f"❌ An unexpected error occurred: `{type(error).__name__}`")
 
 
 # ============================================================
