@@ -1929,14 +1929,18 @@ async def pink_command(ctx, member: discord.Member):
 
         # --- THRESHOLD REACHED: ASSIGN ROLE ---
         try:
-            # ... (Role assignment code is unchanged) ...
+            # 1. CRITICAL: ASSIGN THE ROLE HERE! (The missing line)
+            await member.add_roles(
+                masochist_role, reason="Reached 7 pink votes in 48 hours."
+            )
 
+            # 2. DATABASE: Log the role for removal later.
             removal_time = time.time() + ROLE_DURATION_SECONDS
-            # FIX: Change 'database.add_masochist_role_removal' to just 'add_masochist_role_removal'
             await ctx.bot.loop.run_in_executor(
                 None, add_masochist_role_removal, voted_id_str, removal_time
             )
 
+            # 3. SUCCESS MESSAGE
             await ctx.send(
                 f"🎉 **PAYMENT DUE!** {member.mention} has reached **{VOTE_THRESHOLD} pink votes** in 48 hours and has been assigned the **{masochist_role.name}** role for 2 days!"
             )
