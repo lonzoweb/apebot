@@ -21,7 +21,7 @@ ITEM_REGISTRY = {
         "cost": 300,
         "duration_sec": 600,  # 10 mins
         "type": "curse",
-        "feedback": "🎀 Awww~",
+        "feedback": "🎀 Dawww~",
     },
     "saturn_uwu": {
         "cost": 350,
@@ -37,7 +37,7 @@ ITEM_REGISTRY = {
     "kush_pack": {
         "cost": 60,
         "type": "fun",
-        "feedback": "Sparking up the legendary Apeiron Kush pack. The vibes are immaculate.",
+        "feedback": "Sparking Apeiron Kush Pack. Shields active.",
     },
 }
 

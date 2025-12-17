@@ -2597,7 +2597,7 @@ async def use_command(ctx, item_input: str, target: discord.Member = None):
             None, database.remove_item_from_inventory, ctx.author.id, official_name
         )
         await ctx.send(
-            f"🧿 **CURSE APPLIED!** {item_info['feedback']}\nTarget: {target.mention}"
+            f"👹 **HEX APPLIED!** {item_info['feedback']}\nTarget: {target.mention}"
         )
 
     # ==========================================
