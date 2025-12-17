@@ -32,6 +32,7 @@ import hierarchy
 import activity  # Used for logging/tracker functions
 import battle
 import tasks
+import database
 import economy
 import items
 from items import ITEM_REGISTRY, ITEM_ALIASES, aggressive_uwu, extract_gif_url
