@@ -2515,80 +2515,92 @@ async def inventory_command(ctx):
 
 @bot.command(name="use")
 @commands.cooldown(1, 5, commands.BucketType.user)
-async def use_command(ctx, item_input: str, target: discord.Member):
-    """Uses a shop item on a target user."""
+async def use_command(ctx, item_input: str, *, target: discord.Member = None):
+    """
+    Uses an item.
+    Usage: .use "kush pack" @user  OR  .use muzzle @user
+    """
+    # 1. Check if target was provided
+    if target is None:
+        return await ctx.send(
+            "❌ You need to mention a user to use this on! Example: `.use muzzle @user`"
+        )
 
-    # 1. IDENTIFY THE ITEM
+    # 2. Clean up item input (removes quotes if user used them)
+    item_input = item_input.strip('"').strip("'")
+
+    # 3. Identify the item
     official_name = ITEM_ALIASES.get(item_input.lower())
     item_info = ITEM_REGISTRY.get(official_name)
 
     if not official_name or not item_info:
-        return await ctx.send(f"❌ '{item_input}' is not a valid item.")
+        return await ctx.send(
+            f"❌ '{item_input}' is not a valid item. Check `.inv` for your items."
+        )
 
-    # 2. OWNER CHECKS
-    inventory = await bot.loop.run_in_executor(None, get_user_inventory, ctx.author.id)
+    # 4. OWNER CHECKS
+    inventory = await bot.loop.run_in_executor(
+        None, database.get_user_inventory, ctx.author.id
+    )
     if inventory.get(official_name, 0) <= 0:
         return await ctx.send(
             f"❌ You don't have any **{official_name.replace('_', ' ').title()}**s!"
         )
 
-    # 3. TARGET CHECKS (Admins are immune)
+    # 5. TARGET CHECKS (Admins are immune)
     if target.guild_permissions.administrator or target.bot:
-        return await ctx.send(f"❌ {target.display_name} is immune.")
+        return await ctx.send(f"❌ {target.display_name} overpowers you.")
 
-    # 4. ITEM LOGIC
+    # 6. ITEM LOGIC
     item_type = item_info.get("type")
 
-    # --- DEFENSIVE ITEMS (Echo Ward) ---
+    # --- DEFENSIVE ITEMS ---
     if item_type == "defense":
         return await ctx.send(
-            "🛡️ This item is passive! It will trigger automatically when someone tries to hex you."
+            "🛡️ This item is passive! It will trigger automatically when someone tries to curse you."
         )
 
-    # --- CURSE ITEMS (Muzzle, UwU, Saturn) ---
+    # --- CURSE ITEMS ---
     if item_type == "curse":
-        # Check if target is already cursed (One active curse per target)
         existing_effect = await bot.loop.run_in_executor(
-            None, get_active_effect, target.id
+            None, database.get_active_effect, target.id
         )
         if existing_effect:
             return await ctx.send(
-                f"❌ {target.display_name} is already suffering from an active curse."
+                f"❌ {target.display_name} is already suffering from an active hex."
             )
 
-        # CHECK FOR ECHO WARD DEFENSE
-        target_inv = await bot.loop.run_in_executor(None, get_user_inventory, target.id)
+        # Check for target's Echo Ward
+        target_inv = await bot.loop.run_in_executor(
+            None, database.get_user_inventory, target.id
+        )
         if target_inv.get("echo_ward", 0) > 0:
-            # Consume the target's ward and the user's curse
             await bot.loop.run_in_executor(
-                None, remove_item_from_inventory, target.id, "echo_ward"
+                None, database.remove_item_from_inventory, target.id, "echo_ward"
             )
             await bot.loop.run_in_executor(
-                None, remove_item_from_inventory, ctx.author.id, official_name
+                None, database.remove_item_from_inventory, ctx.author.id, official_name
             )
-
             return await ctx.send(
-                f"🛡️ **ECHO WARD TRIGGERED!** {target.mention}'s ward shattered, "
-                f"blocking {ctx.author.mention}'s hex! Both items were consumed."
+                f"🛡️ **WARD TRIGGERED!** {target.mention}'s Echo Ward blocked {ctx.author.mention}'s curse!"
             )
 
-        # APPLY THE CURSE
+        # Apply Curse
         duration = item_info.get("duration_sec", 600)
         await bot.loop.run_in_executor(
-            None, add_active_effect, target.id, official_name, duration
+            None, database.add_active_effect, target.id, official_name, duration
         )
         await bot.loop.run_in_executor(
-            None, remove_item_from_inventory, ctx.author.id, official_name
+            None, database.remove_item_from_inventory, ctx.author.id, official_name
         )
-
         await ctx.send(
             f"🧿 **CURSE APPLIED!** {item_info['feedback']}\nTarget: {target.mention}"
         )
 
-    # --- FUN CONSUMABLES (Kush Pack) ---
+    # --- FUN ITEMS ---
     elif item_type == "fun":
         await bot.loop.run_in_executor(
-            None, remove_item_from_inventory, ctx.author.id, official_name
+            None, database.remove_item_from_inventory, ctx.author.id, official_name
         )
         await ctx.send(f"🌿 {ctx.author.mention}: {item_info['feedback']}")
 
