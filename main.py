@@ -2443,8 +2443,8 @@ async def buy_command(ctx, item_name: str = None):
     # CASE 1: USER TYPES JUST '.buy'
     if item_name is None:
         embed = discord.Embed(
-            title="🧿 The Apeiron Astral Shop",
-            description="Spend your tokens and enjoy the effects.",
+            title="Apeiron Shop",
+            description="Spend your tokens and observe the effects.",
             color=discord.Color.purple(),
         )
 

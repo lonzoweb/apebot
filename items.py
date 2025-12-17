@@ -27,7 +27,7 @@ ITEM_REGISTRY = {
         "cost": 350,
         "duration_sec": 600,  # 10 mins
         "type": "curse",
-        "feedback": "🧿 Saturn Uwu upon you, cursed baby-talk. Use pwease!",
+        "feedback": "🧿 Saturn Uwu upon you, cursed baby-talk.",
     },
     "echo_ward": {
         "cost": 400,
@@ -37,7 +37,7 @@ ITEM_REGISTRY = {
     "kush_pack": {
         "cost": 60,
         "type": "fun",
-        "feedback": "🌿 You sparked up a fat one. The vibes are immaculate.",
+        "feedback": "Sparking up the legendary Apeiron Kush pack. The vibes are immaculate.",
     },
 }
 
