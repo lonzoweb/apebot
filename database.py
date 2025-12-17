@@ -5,7 +5,7 @@ Handles all SQLite operations
 
 import sqlite3
 import logging
-import time  # NEW: Required for pink vote timestamping
+import time
 from contextlib import contextmanager
 from config import DB_FILE  # Assumes DB_FILE is defined here
 
@@ -19,22 +19,17 @@ logger = logging.getLogger(__name__)
 @contextmanager
 def get_db():
     """Context manager for safe database connections and transactions."""
-    # Use DB_FILE from config.py
-    # Use check_same_thread=False for safety when run via bot.loop.run_in_executor
     conn = sqlite3.connect(DB_FILE, timeout=10.0, check_same_thread=False)
-    # Enable WAL mode for better concurrency (important for lightweight multi-threaded usage)
     conn.execute("PRAGMA journal_mode=WAL")
     try:
         yield conn
         conn.commit()
     except sqlite3.IntegrityError as e:
-        # Commit if possible, but log integrity errors (e.g., expected ON CONFLICT)
         logger.warning(
             f"Database integrity error (likely expected unique constraint): {e}"
         )
         conn.commit()
     except Exception as e:
-        # Rollback on all other errors
         conn.rollback()
         logger.error(f"Database error: {e}", exc_info=True)
         raise
@@ -50,7 +45,7 @@ def get_db():
 def init_db():
     """
     Initialize ALL database tables.
-    (Quotes, Timezones, Activity, Balances, Tarot, GIF Tracker, Pink Votes, Masochist Roles)
+    (Quotes, Timezones, Activity, Balances, Tarot, GIF Tracker, Pink Votes, Inventory, Effects)
     """
     try:
         with get_db() as conn:
@@ -58,249 +53,270 @@ def init_db():
 
             # Quotes Table
             c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS quotes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    quote TEXT UNIQUE
-                )
-            """
+                "CREATE TABLE IF NOT EXISTS quotes (id INTEGER PRIMARY KEY AUTOINCREMENT, quote TEXT UNIQUE)"
             )
+
             # User Timezones Table
             c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS user_timezones (
-                    user_id TEXT PRIMARY KEY,
-                    timezone TEXT,
-                    city TEXT
-                )
-            """
+                "CREATE TABLE IF NOT EXISTS user_timezones (user_id TEXT PRIMARY KEY, timezone TEXT, city TEXT)"
             )
-            # Activity Hourly Table
+
+            # Activity Tables
             c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS activity_hourly (
-                    hour TEXT PRIMARY KEY,
-                    count INTEGER,
-                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """
+                "CREATE TABLE IF NOT EXISTS activity_hourly (hour TEXT PRIMARY KEY, count INTEGER, last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
             )
-            # Activity Users Table
             c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS activity_users (
-                    user_id TEXT PRIMARY KEY,
-                    count INTEGER,
-                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """
+                "CREATE TABLE IF NOT EXISTS activity_users (user_id TEXT PRIMARY KEY, count INTEGER, last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
             )
-            # Tarot Settings Table
+
+            # Tarot Settings
             c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS tarot_settings (
-                    guild_id TEXT PRIMARY KEY,
-                    deck_name TEXT DEFAULT 'thoth'
-                )
-            """
+                "CREATE TABLE IF NOT EXISTS tarot_settings (guild_id TEXT PRIMARY KEY, deck_name TEXT DEFAULT 'thoth')"
             )
-            # GIF Tracker Table
+
+            # GIF Tracker
             c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS gif_tracker (
-                    gif_url TEXT PRIMARY KEY,
-                    count INTEGER DEFAULT 1,
-                    last_sent_by TEXT,
-                    last_sent_at TIMESTAMP
-                )
-            """
+                "CREATE TABLE IF NOT EXISTS gif_tracker (gif_url TEXT PRIMARY KEY, count INTEGER DEFAULT 1, last_sent_by TEXT, last_sent_at TIMESTAMP)"
             )
+
             # 💰 Balances Table
             c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS balances (
-                    user_id TEXT PRIMARY KEY,
-                    balance INTEGER DEFAULT 0
-                )
-            """
+                "CREATE TABLE IF NOT EXISTS balances (user_id TEXT PRIMARY KEY, balance INTEGER DEFAULT 0)"
             )
-            # 💖 NEW: Pink Votes Table
+
+            # 💖 Pink Votes & Roles
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS pink_votes (voted_id TEXT NOT NULL, voter_id TEXT NOT NULL, timestamp REAL NOT NULL, PRIMARY KEY (voted_id, voter_id))"
+            )
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS masochist_roles (user_id TEXT PRIMARY KEY, removal_time REAL NOT NULL)"
+            )
+
+            # 📦 NEW: User Inventory Table
             c.execute(
                 """
-                CREATE TABLE IF NOT EXISTS pink_votes (
-                    voted_id TEXT NOT NULL,
-                    voter_id TEXT NOT NULL,
-                    timestamp REAL NOT NULL, 
-                    PRIMARY KEY (voted_id, voter_id)
-                )
-            """
-            )
-            # 💖 NEW: Masochist Roles Table
-            c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS masochist_roles (
-                    user_id TEXT PRIMARY KEY,
-                    removal_time REAL NOT NULL
+                CREATE TABLE IF NOT EXISTS user_inventory (
+                    user_id TEXT NOT NULL,
+                    item_name TEXT NOT NULL,
+                    quantity INTEGER DEFAULT 0,
+                    PRIMARY KEY (user_id, item_name)
                 )
             """
             )
 
-            # Add indexes for better query performance
+            # 🧿 NEW: Active Effects Table (Curse/Mute)
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS active_effects (
+                    target_id TEXT PRIMARY KEY,
+                    effect_name TEXT NOT NULL,
+                    expiration_time REAL NOT NULL
+                )
+            """
+            )
+
+            # Add indexes
             c.execute("CREATE INDEX IF NOT EXISTS idx_quotes_text ON quotes(quote)")
             c.execute(
                 "CREATE INDEX IF NOT EXISTS idx_user_timezones_id ON user_timezones(user_id)"
             )
             c.execute(
-                "CREATE INDEX IF NOT EXISTS idx_activity_hourly_count ON activity_hourly(count DESC)"
-            )
-            c.execute(
                 "CREATE INDEX IF NOT EXISTS idx_activity_users_count ON activity_users(count DESC)"
             )
+
         logger.info("✅ Database tables initialized (all modules unified).")
     except Exception as e:
         logger.error(f"Error initializing database: {e}", exc_info=True)
 
 
 # ============================================================
-# PINK VOTE MANAGEMENT FUNCTIONS (FIXED)
+# PINK VOTE MANAGEMENT
 # ============================================================
-# NOTE: Removed the now redundant create_pink_tables() function.
 
 
 def update_pink_vote(voted_id: str, voter_id: str):
-    """Inserts a new vote, updating the timestamp if the vote already exists."""
     now = time.time()
     with get_db() as conn:
-        c = conn.cursor()
-
-        # SQLite UPSERT (INSERT OR REPLACE)
-        c.execute(
-            """
-            INSERT OR REPLACE INTO pink_votes (voted_id, voter_id, timestamp) 
-            VALUES (?, ?, ?)
-        """,
+        conn.execute(
+            "INSERT OR REPLACE INTO pink_votes (voted_id, voter_id, timestamp) VALUES (?, ?, ?)",
             (voted_id, voter_id, now),
         )
 
 
 def get_active_pink_vote_count(voted_id: str) -> int:
-    """Counts votes cast within the last 48 hours (LIGHTWEIGHT strategy)."""
     with get_db() as conn:
-        c = conn.cursor()
-
-        # 48 hours in seconds = 48 * 3600 = 172800
         expiration_time = time.time() - 172800
-
-        c.execute(
-            """
-            SELECT COUNT(voter_id) FROM pink_votes 
-            WHERE voted_id = ? AND timestamp > ?
-        """,
+        c = conn.execute(
+            "SELECT COUNT(voter_id) FROM pink_votes WHERE voted_id = ? AND timestamp > ?",
             (voted_id, expiration_time),
         )
-
-        count = c.fetchone()[0]
-        return count
+        return c.fetchone()[0]
 
 
 def add_masochist_role_removal(user_id: str, removal_time: float):
-    """Adds or updates a user for scheduled role removal."""
     with get_db() as conn:
-        c = conn.cursor()
-        c.execute(
-            """
-            INSERT OR REPLACE INTO masochist_roles (user_id, removal_time)
-            VALUES (?, ?)
-        """,
+        conn.execute(
+            "INSERT OR REPLACE INTO masochist_roles (user_id, removal_time) VALUES (?, ?)",
             (user_id, removal_time),
         )
 
 
 def get_pending_role_removals() -> list:
-    """Retrieves all users whose role removal time is past (for cleanup loop)."""
     with get_db() as conn:
-        c = conn.cursor()
         now = time.time()
-
-        # Select all users whose removal time has passed
-        c.execute("SELECT user_id FROM masochist_roles WHERE removal_time <= ?", (now,))
-
-        users_to_remove = [row[0] for row in c.fetchall()]
-        return users_to_remove
+        c = conn.execute(
+            "SELECT user_id FROM masochist_roles WHERE removal_time <= ?", (now,)
+        )
+        return [row[0] for row in c.fetchall()]
 
 
 def remove_masochist_role_record(user_id: str):
-    """Deletes the record after role removal is successful."""
     with get_db() as conn:
-        c = conn.cursor()
-        c.execute("DELETE FROM masochist_roles WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM masochist_roles WHERE user_id = ?", (user_id,))
 
 
 # ============================================================
-# ECONOMY FUNCTIONS (EXISTING)
+# ECONOMY & INVENTORY FUNCTIONS
 # ============================================================
 
 
 def get_balance(user_id: int) -> int:
-    """Retrieves a user's current token balance."""
     user_id_str = str(user_id)
     with get_db() as conn:
-        c = conn.cursor()
-        c.execute("SELECT balance FROM balances WHERE user_id = ?", (user_id_str,))
+        c = conn.execute(
+            "SELECT balance FROM balances WHERE user_id = ?", (user_id_str,)
+        )
         result = c.fetchone()
         return result[0] if result else 0
 
 
 def update_balance(user_id: int, amount: int):
-    """
-    Adds (or subtracts) a token amount to a user's balance.
-    Use a negative amount to subtract (e.g., -100).
-    """
     user_id_str = str(user_id)
-    sql = """
-        INSERT INTO balances (user_id, balance) VALUES (?, ?)
-        ON CONFLICT(user_id) DO UPDATE SET balance = balance + ?
-    """
     with get_db() as conn:
-        c = conn.cursor()
-        c.execute(sql, (user_id_str, amount, amount))
+        conn.execute(
+            """
+            INSERT INTO balances (user_id, balance) VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET balance = balance + ?
+        """,
+            (user_id_str, amount, amount),
+        )
 
 
 def transfer_tokens(sender_id: int, recipient_id: int, amount: int) -> bool:
-    """Atomically transfers tokens between two users."""
     if amount <= 0:
         return False
-
-    sender_id_str = str(sender_id)
-    recipient_id_str = str(recipient_id)
-
-    # Use a single connection/transaction for atomicity
+    sender_id_str, recipient_id_str = str(sender_id), str(recipient_id)
     with get_db() as conn:
-        c = conn.cursor()
-
-        # 1. Check sender balance
-        c.execute("SELECT balance FROM balances WHERE user_id = ?", (sender_id_str,))
-        sender_balance = c.fetchone()
-
-        if (sender_balance is None) or (sender_balance[0] < amount):
-            return False  # Insufficient funds
-
-        # 2. Debit sender
-        c.execute(
+        c = conn.execute(
+            "SELECT balance FROM balances WHERE user_id = ?", (sender_id_str,)
+        )
+        row = c.fetchone()
+        if not row or row[0] < amount:
+            return False
+        conn.execute(
             "UPDATE balances SET balance = balance - ? WHERE user_id = ?",
             (amount, sender_id_str),
         )
-
-        # 3. Credit recipient (ON CONFLICT ensures a row is created if recipient is new)
-        c.execute(
+        conn.execute(
             """
             INSERT INTO balances (user_id, balance) VALUES (?, ?)
             ON CONFLICT(user_id) DO UPDATE SET balance = balance + ?
         """,
             (recipient_id_str, amount, amount),
         )
+        return True
 
-        return True  # Success
+
+def atomic_purchase(user_id: int, item_name: str, cost: int) -> bool:
+    """Handles token deduction and item addition in ONE transaction."""
+    user_id_str = str(user_id)
+    with get_db() as conn:
+        c = conn.execute(
+            "SELECT balance FROM balances WHERE user_id = ?", (user_id_str,)
+        )
+        row = c.fetchone()
+        if not row or row[0] < cost:
+            return False
+
+        # Deduct balance
+        conn.execute(
+            "UPDATE balances SET balance = balance - ? WHERE user_id = ?",
+            (cost, user_id_str),
+        )
+        # Add to inventory
+        conn.execute(
+            """
+            INSERT INTO user_inventory (user_id, item_name, quantity) VALUES (?, ?, 1)
+            ON CONFLICT(user_id, item_name) DO UPDATE SET quantity = quantity + 1
+        """,
+            (user_id_str, item_name),
+        )
+        return True
+
+
+def get_user_inventory(user_id: int) -> dict:
+    """Retrieves all items and quantities for a user."""
+    user_id_str = str(user_id)
+    with get_db() as conn:
+        c = conn.execute(
+            "SELECT item_name, quantity FROM user_inventory WHERE user_id = ? AND quantity > 0",
+            (user_id_str,),
+        )
+        return {row[0]: row[1] for row in c.fetchall()}
+
+
+def remove_item_from_inventory(user_id: int, item_name: str) -> bool:
+    """Consumes 1 item from user inventory. Returns True if successful."""
+    user_id_str = str(user_id)
+    with get_db() as conn:
+        c = conn.execute(
+            "UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_name = ? AND quantity > 0",
+            (user_id_str, item_name),
+        )
+        return c.rowcount > 0
+
+
+# ============================================================
+# ACTIVE EFFECT MANAGEMENT
+# ============================================================
+
+
+def add_active_effect(target_id: int, effect_name: str, duration_sec: float):
+    """Applies a curse. PRIMARY KEY on target_id enforces one curse at a time."""
+    target_id_str = str(target_id)
+    expiration = time.time() + duration_sec
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO active_effects (target_id, effect_name, expiration_time) VALUES (?, ?, ?)",
+            (target_id_str, effect_name, expiration),
+        )
+
+
+def get_active_effect(target_id: int) -> tuple:
+    """Returns (effect_name, expiration_time) or None."""
+    target_id_str = str(target_id)
+    with get_db() as conn:
+        c = conn.execute(
+            "SELECT effect_name, expiration_time FROM active_effects WHERE target_id = ?",
+            (target_id_str,),
+        )
+        return c.fetchone()
+
+
+def remove_active_effect(target_id: int):
+    target_id_str = str(target_id)
+    with get_db() as conn:
+        conn.execute("DELETE FROM active_effects WHERE target_id = ?", (target_id_str,))
+
+
+def get_all_expired_effects() -> list:
+    """Gets list of target_ids whose curses have expired."""
+    with get_db() as conn:
+        now = time.time()
+        c = conn.execute(
+            "SELECT target_id FROM active_effects WHERE expiration_time <= ?", (now,)
+        )
+        return [row[0] for row in c.fetchall()]
 
 
 # ============================================================
@@ -492,3 +508,15 @@ def get_gif_by_rank(rank):
     except Exception as e:
         logger.error(f"Error getting GIF by rank: {e}")
         return None
+
+
+def cleanup_old_data():
+    """Removes expired votes and old activity to save disk space on Railway."""
+    with get_db() as conn:
+        now = time.time()
+        # Remove pink votes older than 48 hours
+        conn.execute("DELETE FROM pink_votes WHERE timestamp <= ?", (now - 172800,))
+        # Remove activity logs older than 30 days (optional)
+        conn.execute(
+            "DELETE FROM activity_hourly WHERE last_updated < datetime('now', '-30 days')"
+        )

@@ -169,16 +169,85 @@ async def on_ready():
 # ============================================================
 
 
+async def get_or_create_webhook(channel):
+    """Reuses existing webhook or creates one to mirror cursed users."""
+    if not isinstance(channel, discord.TextChannel):
+        return None
+    try:
+        webhooks = await channel.webhooks()
+        for wh in webhooks:
+            if wh.name == "EconomyBotProxy":
+                return wh
+        return await channel.create_webhook(name="EconomyBotProxy")
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return None
+
+
 @bot.event
 async def on_message(message):
-    """Handle all message events"""
+    """Handle all message events with Curse Enforcement"""
     if message.author.bot:
+        # We process commands for other bots if needed, but usually just return
         await bot.process_commands(message)
         return
 
-    # Log to in-memory buffer (NOT database!)
+    # ============================================================
+    # 🧿 CURSE ENFORCEMENT SECTION
+    # ============================================================
+    # Check if user has an active Muzzle or UwU effect
+    effect_data = await bot.loop.run_in_executor(
+        None, get_active_effect, message.author.id
+    )
+
+    if effect_data:
+        effect_name, expiration_time = effect_data
+
+        # If expired, remove from DB and let message through
+        if time.time() > expiration_time:
+            await bot.loop.run_in_executor(
+                None, remove_active_effect, message.author.id
+            )
+        else:
+            # --- MUZZLE EFFECT ---
+            if effect_name == "muzzle":
+                try:
+                    await message.delete()
+                except discord.Forbidden:
+                    pass
+                return  # Block further processing
+
+            # --- UWU / SATURN EFFECTS ---
+            elif effect_name in ["uwu", "saturn_uwu"]:
+                is_saturn = effect_name == "saturn_uwu"
+                transformed_text = aggressive_uwu(message.content, saturn=is_saturn)
+
+                try:
+                    await message.delete()
+                    webhook = await get_or_create_webhook(message.channel)
+                    if webhook:
+                        await webhook.send(
+                            content=transformed_text,
+                            username=message.author.display_name,
+                            avatar_url=message.author.display_avatar.url,
+                            allowed_mentions=discord.AllowedMentions.none(),
+                        )
+                    else:
+                        await message.channel.send(
+                            f"**{message.author.display_name}**: {transformed_text}"
+                        )
+                except Exception as e:
+                    logger.error(f"Error in UwU mirroring: {e}")
+
+                return  # Block activity tracking and commands while cursed
+
+    # ============================================================
+    # 📊 NORMAL PROCESSING SECTION (Non-Cursed)
+    # ============================================================
+
+    # Log to in-memory buffer
     now = datetime.now(ZoneInfo("America/Los_Angeles"))
-    hour = now.strftime("%H")  # Just the hour (00-23)
+    hour = now.strftime("%H")
     activity.log_activity_in_memory(str(message.author.id), hour)
 
     # Track GIFs
@@ -2359,6 +2428,167 @@ async def fix_db(ctx):
     except Exception as e:
         logger.error(f"Error fixing DB: {e}")
         await ctx.send(f"❌ Error: {e}")
+
+
+# shop
+
+
+@bot.command(name="buy")
+@commands.cooldown(1, 5, commands.BucketType.user)  # 5s cooldown to prevent spam
+async def buy_command(ctx, item_name: str = None):
+    """View the shop menu (via DM) or purchase an item."""
+
+    # CASE 1: USER TYPES JUST '.buy'
+    if item_name is None:
+        embed = discord.Embed(
+            title="🧿 The Apeiron Astral Shop",
+            description="Spend your tokens and enjoy the effects.",
+            color=discord.Color.purple(),
+        )
+
+        for item, data in ITEM_REGISTRY.items():
+            price = f"{data['cost']} 💎"
+            # feedback contains the flavor text/description
+            embed.add_field(
+                name=f"{item.replace('_', ' ').title()} — {price}",
+                value=f"*{data.get('feedback', 'No description.')}*",
+                inline=False,
+            )
+
+        try:
+            await ctx.author.send(embed=embed)
+            await ctx.send(f"Menu sent to DMs {ctx.author.mention}")
+        except discord.Forbidden:
+            await ctx.send(f"❌ {ctx.author.mention}, Please open your DMs.")
+        return
+
+    # CASE 2: USER TYPES '.buy <item>'
+    official_name = ITEM_ALIASES.get(item_name.lower())
+    if not official_name:
+        return await ctx.send(
+            f"❌ '{item_name}' not available. Type `.buy` to see the menu."
+        )
+
+    item_data = ITEM_REGISTRY[official_name]
+    cost = item_data["cost"]
+
+    # Use the atomic purchase function from database.py
+    success = await bot.loop.run_in_executor(
+        None, atomic_purchase, ctx.author.id, official_name, cost
+    )
+
+    if success:
+        await ctx.send(
+            f"✅ **{ctx.author.display_name}** bought a **{official_name.replace('_', ' ').title()}** for {cost} 💎!"
+        )
+    else:
+        # If it fails, it's almost always insufficient funds
+        balance = await bot.loop.run_in_executor(None, get_balance, ctx.author.id)
+        await ctx.send(f"❌ Declined. You need {cost} 💎 but only have {balance} 💎.")
+
+
+@bot.command(name="inventory", aliases=["inv"])
+@commands.cooldown(1, 10, commands.BucketType.user)  # 10s cooldown
+async def inventory_command(ctx):
+    """DMs the user their current items."""
+    # Get inventory dict: {'item_name': quantity}
+    inventory = await bot.loop.run_in_executor(None, get_user_inventory, ctx.author.id)
+
+    if not inventory:
+        return await ctx.send(f"{ctx.author.mention}, your inventory is empty.")
+
+    msg = "🎒 **Your Inventory:**\n"
+    for item, qty in inventory.items():
+        msg += f"• **{item.replace('_', ' ').title()}**: x{qty}\n"
+
+    try:
+        await ctx.author.send(msg)
+        await ctx.send(f"Inventory sent to DMs {ctx.author.mention}")
+    except discord.Forbidden:
+        # Fallback to chat if DMs are closed
+        await ctx.send(
+            f"⚠️ {ctx.author.mention}, your DMs are closed. Here is your inventory:\n{msg}"
+        )
+
+
+@bot.command(name="use")
+@commands.cooldown(1, 5, commands.BucketType.user)
+async def use_command(ctx, item_input: str, target: discord.Member):
+    """Uses a shop item on a target user."""
+
+    # 1. IDENTIFY THE ITEM
+    official_name = ITEM_ALIASES.get(item_input.lower())
+    item_info = ITEM_REGISTRY.get(official_name)
+
+    if not official_name or not item_info:
+        return await ctx.send(f"❌ '{item_input}' is not a valid item.")
+
+    # 2. OWNER CHECKS
+    inventory = await bot.loop.run_in_executor(None, get_user_inventory, ctx.author.id)
+    if inventory.get(official_name, 0) <= 0:
+        return await ctx.send(
+            f"❌ You don't have any **{official_name.replace('_', ' ').title()}**s!"
+        )
+
+    # 3. TARGET CHECKS (Admins are immune)
+    if target.guild_permissions.administrator or target.bot:
+        return await ctx.send(f"❌ {target.display_name} is immune.")
+
+    # 4. ITEM LOGIC
+    item_type = item_info.get("type")
+
+    # --- DEFENSIVE ITEMS (Echo Ward) ---
+    if item_type == "defense":
+        return await ctx.send(
+            "🛡️ This item is passive! It will trigger automatically when someone tries to hex you."
+        )
+
+    # --- CURSE ITEMS (Muzzle, UwU, Saturn) ---
+    if item_type == "curse":
+        # Check if target is already cursed (One active curse per target)
+        existing_effect = await bot.loop.run_in_executor(
+            None, get_active_effect, target.id
+        )
+        if existing_effect:
+            return await ctx.send(
+                f"❌ {target.display_name} is already suffering from an active curse."
+            )
+
+        # CHECK FOR ECHO WARD DEFENSE
+        target_inv = await bot.loop.run_in_executor(None, get_user_inventory, target.id)
+        if target_inv.get("echo_ward", 0) > 0:
+            # Consume the target's ward and the user's curse
+            await bot.loop.run_in_executor(
+                None, remove_item_from_inventory, target.id, "echo_ward"
+            )
+            await bot.loop.run_in_executor(
+                None, remove_item_from_inventory, ctx.author.id, official_name
+            )
+
+            return await ctx.send(
+                f"🛡️ **ECHO WARD TRIGGERED!** {target.mention}'s ward shattered, "
+                f"blocking {ctx.author.mention}'s hex! Both items were consumed."
+            )
+
+        # APPLY THE CURSE
+        duration = item_info.get("duration_sec", 600)
+        await bot.loop.run_in_executor(
+            None, add_active_effect, target.id, official_name, duration
+        )
+        await bot.loop.run_in_executor(
+            None, remove_item_from_inventory, ctx.author.id, official_name
+        )
+
+        await ctx.send(
+            f"🧿 **CURSE APPLIED!** {item_info['feedback']}\nTarget: {target.mention}"
+        )
+
+    # --- FUN CONSUMABLES (Kush Pack) ---
+    elif item_type == "fun":
+        await bot.loop.run_in_executor(
+            None, remove_item_from_inventory, ctx.author.id, official_name
+        )
+        await ctx.send(f"🌿 {ctx.author.mention}: {item_info['feedback']}")
 
 
 @bot.command(name="mergequotes")
