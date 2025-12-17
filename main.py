@@ -2516,30 +2516,20 @@ async def inventory_command(ctx):
 
 @bot.command(name="use")
 @commands.cooldown(1, 5, commands.BucketType.user)
-async def use_command(ctx, item_input: str, *, target: discord.Member = None):
+async def use_command(ctx, item_input: str, target: discord.Member = None):
     """
     Uses an item.
-    Usage: .use "kush pack" @user  OR  .use muzzle @user
+    Usage: .use muzzle @user (Curses) OR .use kush (Consumables)
     """
-    # 1. Check if target was provided
-    if target is None:
-        return await ctx.send(
-            "❌ You need to mention a user to use this on! Example: `.use muzzle @user`"
-        )
-
-    # 2. Clean up item input (removes quotes if user used them)
+    # 1. Identify the item
     item_input = item_input.strip('"').strip("'")
-
-    # 3. Identify the item
     official_name = ITEM_ALIASES.get(item_input.lower())
     item_info = ITEM_REGISTRY.get(official_name)
 
     if not official_name or not item_info:
-        return await ctx.send(
-            f"❌ '{item_input}' is not a valid item. Check `.inv` for your items."
-        )
+        return await ctx.send(f"❌ '{item_input}' is not a valid item.")
 
-    # 4. OWNER CHECKS
+    # 2. Check Ownership
     inventory = await bot.loop.run_in_executor(
         None, database.get_user_inventory, ctx.author.id
     )
@@ -2548,27 +2538,39 @@ async def use_command(ctx, item_input: str, *, target: discord.Member = None):
             f"❌ You don't have any **{official_name.replace('_', ' ').title()}**s!"
         )
 
-    # 5. TARGET CHECKS (Admins are immune)
-    if target.guild_permissions.administrator or target.bot:
-        return await ctx.send(f"❌ {target.display_name} overpowers you.")
-
-    # 6. ITEM LOGIC
     item_type = item_info.get("type")
 
-    # --- DEFENSIVE ITEMS ---
-    if item_type == "defense":
-        return await ctx.send(
-            "🛡️ This item is passive! It will trigger automatically when someone tries to curse you."
+    # ==========================================
+    # LOGIC FOR CONSUMABLES (Self-Use)
+    # ==========================================
+    if item_type == "fun":
+        await bot.loop.run_in_executor(
+            None, database.remove_item_from_inventory, ctx.author.id, official_name
         )
+        return await ctx.send(f"🌿 {ctx.author.mention}: {item_info['feedback']}")
 
-    # --- CURSE ITEMS ---
+    # ==========================================
+    # LOGIC FOR CURSES (Target-Use)
+    # ==========================================
     if item_type == "curse":
+        if target is None:
+            return await ctx.send(
+                f"❌ You must mention someone to use **{official_name}** on! Example: `.use {official_name} @user`"
+            )
+
+        # Admin/Bot Immunity
+        if target.guild_permissions.administrator or target.bot:
+            return await ctx.send(
+                f"❌ {target.display_name} is immune to your nonsense."
+            )
+
+        # Already Cursed?
         existing_effect = await bot.loop.run_in_executor(
             None, database.get_active_effect, target.id
         )
         if existing_effect:
             return await ctx.send(
-                f"❌ {target.display_name} is already suffering from an active hex."
+                f"❌ {target.display_name} is already suffering from an active curse."
             )
 
         # Check for target's Echo Ward
@@ -2586,7 +2588,7 @@ async def use_command(ctx, item_input: str, *, target: discord.Member = None):
                 f"🛡️ **WARD TRIGGERED!** {target.mention}'s Echo Ward blocked {ctx.author.mention}'s curse!"
             )
 
-        # Apply Curse
+        # Apply the Curse
         duration = item_info.get("duration_sec", 600)
         await bot.loop.run_in_executor(
             None, database.add_active_effect, target.id, official_name, duration
@@ -2598,12 +2600,13 @@ async def use_command(ctx, item_input: str, *, target: discord.Member = None):
             f"🧿 **CURSE APPLIED!** {item_info['feedback']}\nTarget: {target.mention}"
         )
 
-    # --- FUN ITEMS ---
-    elif item_type == "fun":
-        await bot.loop.run_in_executor(
-            None, database.remove_item_from_inventory, ctx.author.id, official_name
+    # ==========================================
+    # LOGIC FOR DEFENSE
+    # ==========================================
+    elif item_type == "defense":
+        await ctx.send(
+            "🛡️ This item is passive! It stays in your inventory and blocks the next curse automatically."
         )
-        await ctx.send(f"🌿 {ctx.author.mention}: {item_info['feedback']}")
 
 
 @bot.command(name="mergequotes")
