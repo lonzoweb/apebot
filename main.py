@@ -35,7 +35,7 @@ import tasks
 import database
 import economy
 import items
-from items import ITEM_REGISTRY, ITEM_ALIASES, aggressive_uwu, extract_gif_url
+from items import ITEM_REGISTRY, ITEM_ALIASES, aggressive_uwu
 import crypto_api
 
 # --- Local Module Imports (From other modules) ---
