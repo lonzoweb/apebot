@@ -221,14 +221,23 @@ async def on_message(message):
                 return  # Block further processing
 
             # --- UWU / SATURN EFFECTS ---
-            elif effect_name in ["uwu", "saturn_uwu"]:
-                is_saturn = effect_name == "saturn_uwu"
-                transformed_text = aggressive_uwu(message.content, saturn=is_saturn)
+            # --- Replacement for the 'elif effect_name in ["uwu", "saturn_uwu"]:' block in on_message ---
+
+            # --- UWU EFFECT (Standardized) ---
+            elif effect_name == "uwu":  # Only check for 'uwu'
+
+                # CRITICAL FIX: aggressive_uwu is imported from items.py and called without 'saturn' arg
+                transformed_text = aggressive_uwu(message.content)
 
                 try:
+                    # DELETE ORIGINAL MESSAGE
                     await message.delete()
+
+                    # NOTE: Assuming get_or_create_webhook is defined globally
                     webhook = await get_or_create_webhook(message.channel)
+
                     if webhook:
+                        # SEND VIA WEBHOOK (Preferred)
                         await webhook.send(
                             content=transformed_text,
                             username=message.author.display_name,
@@ -236,13 +245,19 @@ async def on_message(message):
                             allowed_mentions=discord.AllowedMentions.none(),
                         )
                     else:
+                        # FALLBACK TO DIRECT BOT SEND
                         await message.channel.send(
                             f"**{message.author.display_name}**: {transformed_text}"
                         )
-                except Exception as e:
-                    logger.error(f"Error in UwU mirroring: {e}")
 
-                return  # Block activity tracking and commands while cursed
+                except discord.Forbidden:
+                    await message.channel.send(
+                        f"**ERROR: Bot lacks permission to delete original message.** Sending: **{message.author.display_name}**: {transformed_text}"
+                    )
+                except Exception as e:
+                    logger.error(f"Error in UwU mirroring or webhook: {e}")
+
+                return  # Block further processing
 
     # ============================================================
     # 📊 NORMAL PROCESSING SECTION (Non-Cursed)
