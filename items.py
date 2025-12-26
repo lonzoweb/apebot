@@ -53,16 +53,22 @@ ITEM_ALIASES = {
 # ============================================================
 # TRANSFORMATION LOGIC
 # ============================================================
-]
 
-# The list of approved internal interactive actions remains the same, but 'tail' is fixed.
-# NOTE: interactive_actions list is used for internal inserts, not final slop
 
 # NOTE: The list of unreadable/unwanted final slop is manually curated here
 CLEAN_FINAL_SLOP = [
-    " (✿◡‿◡)", " UwU", " owo", " :3", " ^-^", " *blushes*",
-    " hehehe", " *teehee*", " *snuggles*", " *pats head*",
+    " (✿◡‿◡)",
+    " UwU",
+    " owo",
+    " :3",
+    " ^-^",
+    " *blushes*",
+    " hehehe",
+    " *teehee*",
+    " *snuggles*",
+    " *pats head*",
 ]
+
 
 def aggressive_uwu(text: str) -> str:
     """
@@ -74,13 +80,13 @@ def aggressive_uwu(text: str) -> str:
 
     # 1. LINK/MEDIA PURGE (New step: Remove all URLs and Discord formatting)
     # Target: URLs, Discord mentions (<@...>), Discord emotes (<:name:id>), and channel links (<#...>)
-    
+
     # Remove URLs (simplified regex)
-    text = re.sub(r'https?://[^\s]+', '', text) 
-    
+    text = re.sub(r"https?://[^\s]+", "", text)
+
     # Remove Discord formatting (emotes, mentions, channel links - simplified regex)
-    text = re.sub(r'<a?:[^:]+:\d+>|@\w+|#\w+|@&[0-9]+|<#[0-9]+>', '', text)
-    
+    text = re.sub(r"<a?:[^:]+:\d+>|@\w+|#\w+|@&[0-9]+|<#[0-9]+>", "", text)
+
     # 2. Standardize and Lowercase
     text = text.lower()
 
@@ -101,15 +107,15 @@ def aggressive_uwu(text: str) -> str:
         " **\*pouts\***",
         " **\*pwease\***",
         " **\*sniffles\***",
-        " **\*wags tail\***", # Corrected from 'taiw'
+        " **\*wags tail\***",  # Corrected from 'taiw'
     ]
-    
+
     # Define cleaner suffixes
-    clean_suffixes = ["-ie", "-wie", "-y", "-wy", "s-sama"] # Removed -kun, -chan
+    clean_suffixes = ["-ie", "-wie", "-y", "-wy", "s-sama"]  # Removed -kun, -chan
 
     # Controlled insertion chance: 15% chance to insert an action between words
     for i, word in enumerate(words):
-        
+
         # Apply stuttering logic (unchanged)
         if (
             len(word) > 4
