@@ -64,75 +64,80 @@ ITEM_ALIASES = {
 # ============================================================
 
 
-def aggressive_uwu(text: str, saturn: bool = False) -> str:
+def aggressive_uwu(text: str) -> str:
     """
-    Transforms text into obnoxious, embarrassing baby-talk.
-    saturn=True adds extra cursed variations like 'v' -> 'b' and 'pwease'.
+    Transforms text into a readable, high-quality UWU style with integrated interactive actions.
     """
     if not text:
         return "..."
 
-    # 1. Fundamental Swaps
-    text = text.replace("L", "W").replace("R", "W").replace("l", "w").replace("r", "w")
-    text = text.replace("th", "fw").replace("TH", "FW")
+    # 1. Standardize and Lowercase
+    text = text.lower()
 
-    # 2. Aggressive Word-Start Stuttering
+    # 2. Fundamental UWU Swaps (L/R -> W, Th -> Fw/Tw)
+    text = text.replace("l", "w").replace("r", "w")
+    text = text.replace("th", "fw").replace("the", "da").replace("to", "two")
+
+    # 3. Aggressive but Controlled Stuttering (25% chance)
     words = text.split()
     transformed_words = []
 
-    for word in words:
-        # Don't stutter very short words or mentions
+    # Define interactive insertions
+    interactive_actions = [
+        " *bweops your nose*",
+        " *kisses your cheek*",
+        " *leaks*",
+        " *giggles*",
+        " *pouts*",
+        " *pwease*",
+        " *sniffles*",
+        " *wags taiw*",
+    ]
+
+    # Controlled insertion chance: 15% chance to insert an action between words
+    for i, word in enumerate(words):
+
+        # Apply stuttering logic (unchanged)
         if (
-            len(word) > 3
-            and not word.startswith(("<", "@", "http"))
-            and random.random() < 0.4
+            len(word) > 4
+            and not word.startswith(("<", "@", "http", "da", "two"))
+            and random.random() < 0.25
         ):
-            stutter = f"{word[0]}-{word[0]}-"
+            stutter = f"{word[0]}-"
             word = stutter + word
 
-        # 3. Obnoxious Suffixes (15% chance per word)
-        if random.random() < 0.15:
-            word += random.choice(["-w-wuv", "ie-wie", "y-wy", "-kun", "-chan"])
+        # Apply clean suffixes logic (unchanged)
+        if random.random() < 0.10:
+            word = word.rstrip("s") + random.choice(["-kun", "-chan", "-sama"])
 
         transformed_words.append(word)
 
+        # 4. Insert Interactive Action (After 3-5 words, 15% chance)
+        if (i % random.randint(3, 5) == 0 and i > 0) and random.random() < 0.15:
+            transformed_words.append(random.choice(interactive_actions))
+
     text = " ".join(transformed_words)
 
-    # 4. Saturn's Cursed Logic (Aggressive Baby-talk)
-    if saturn:
-        text = text.lower()  # Saturn speak is always lowercase
-        text = text.replace("v", "b").replace("V", "B")
-        text = text.replace("na", "nya").replace("no", "nyo")
+    # 5. Final Polish and Emoji
+    if text:
+        # Capitalize the first letter for readability
+        text = text[0].upper() + text[1:]
 
-        # Aggressive insertions
-        interjections = [
-            " *nuzzles u*",
-            " *paws at ur chest*",
-            " *sniffles*",
-            " UNGGGHHH",
-            " PWEASE",
-            " *wags taiw*",
-        ]
-        if random.random() < 0.3:
-            text += random.choice(interjections)
-
-    # 5. Emoji Slop (Always append one)
-    slop = [
+    final_slop = [
         " (✿◡‿◡)",
-        " (人◕ω◕)",
-        " (｡♥‿♥｡)",
         " UwU",
-        " >w<",
         " owo",
         " rawr x3",
         " :3",
         " ^-^",
         " *blushes*",
         " *sweats*",
+        " hehehe",
+        " *teehee*",
     ]
-    text += random.choice(slop)
 
-    return text
+    # Remove any internal leading/trailing whitespace and append final slop
+    return text.strip() + random.choice(final_slop)
 
 
 # ============================================================
