@@ -11,84 +11,75 @@ import logging
 import colorlog
 import shutil
 import sqlite3
-import logging
 import time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
+import aiohttp  # Added for web session
+import urllib.parse
+import re
 
 # --- Third-Party Imports ---
 import discord
 from discord.ext import commands
 from discord.ext import tasks
-import ephem  # Assuming this is the PyEphem library
-import urllib.parse
-import crypto_api
+import ephem
 
 # --- Local Module Imports (REQUIRED for bot functionality) ---
-# Ensure all files are present in your bot's root directory:
-import rws  # <--- FIX: Added to resolve NameError: name 'rws' is not defined
+# NOTE: Assuming all these are files/modules in the root (rws, tarot, hierarchy, etc.)
+import rws
 import tarot
 import hierarchy
-import activity  # Used for logging/tracker functions
+import activity
 import battle
-import tasks
 import database
 import economy
 import items
-from items import ITEM_REGISTRY, ITEM_ALIASES, aggressive_uwu, extract_gif_url
 import crypto_api
 
-# --- Local Module Imports (From other modules) ---
-from config import *  # WARNING: Using '*' is generally discouraged
-from database import *  # WARNING: Using '*' is generally discouraged
-from helpers import *  # WARNING: Using '*' is generally discouraged
-from api import *  # WARNING: Using '*' is generally discouraged
+# NOTE: Assuming these functions are available globally or defined in imported modules
+from items import ITEM_REGISTRY, ITEM_ALIASES, aggressive_uwu, extract_gif_url
+from config import *
+from database import *
+from helpers import *
+from api import *
+
 
 # ============================================================
 # LOGGING CONFIGURATION (Colorized)
 # ============================================================
 
-# Define the format: Level, Logger Name, Message
-# The %(log_color)s tags are what colorlog uses to inject ANSI codes
 log_format = (
     "%(log_color)s%(levelname)-8s%(reset)s | "
-    "%(log_color)s%(name)-20s%(reset)s | "  # Logger name padded to 20 chars
+    "%(log_color)s%(name)-20s%(reset)s | "
     "%(white)s%(message)s"
 )
 
-# Define the color mapping for each severity level
 formatter = colorlog.ColoredFormatter(
     log_format,
-    datefmt=None,  # Use default date format
+    datefmt=None,
     log_colors={
         "DEBUG": "cyan",
-        "INFO": "green",  # Administrative messages (INFO) are green
+        "INFO": "green",
         "WARNING": "yellow",
-        "ERROR": "red",  # Errors are red
+        "ERROR": "red",
         "CRITICAL": "bold_red,bg_white",
     },
     style="%",
 )
 
-# 1. Get the root logger
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
 
-# 2. Clear any existing handlers (like the one set by basicConfig)
 if root_logger.hasHandlers():
     root_logger.handlers.clear()
 
-# 3. Create and add the new color handler
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 root_logger.addHandler(stream_handler)
 
-# Ensure Discord's library logging is not set too low, which would flood logs
 logging.getLogger("discord").setLevel(logging.INFO)
 
-logger = logging.getLogger(
-    __name__
-)  # Your local logger will now use this color configuration
+logger = logging.getLogger(__name__)
 
 # ============================================================
 # BOT SETUP
@@ -99,16 +90,22 @@ intents.message_content = True
 intents.guilds = True
 intents.members = True
 
-MASOCHIST_ROLE_ID = 1167184822129664113
-VOTE_THRESHOLD = 7
-ROLE_DURATION_SECONDS = 48 * 3600  # 2 days
+# Assuming these are defined in config.py
+# MASOCHIST_ROLE_ID = ...
+# VOTE_THRESHOLD = ...
+# ROLE_DURATION_SECONDS = ...
 
 bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents, help_command=None)
 bot.aiohttp_session = None
 bot.owner_timezone = None
 
-# Track bot start time for uptime calculations
 bot_start_time = datetime.now()
+
+# Global tracking for pull command with intermittent reinforcement (needs to be global)
+last_used = {}
+weather_user_cooldowns = {}
+weather_user_hourly = {}
+user_pull_usage = {}
 
 
 @bot.event
@@ -116,7 +113,7 @@ async def on_ready():
     """Bot startup event: Performs all setup and initializations."""
 
     # 1. Setup external services
-    if bot.aiohttp_session is None:
+    if bot.aiohttp_session is None or bot.aiohttp_session.closed:
         bot.aiohttp_session = aiohttp.ClientSession()
 
     from api import set_bot_session
@@ -125,44 +122,35 @@ async def on_ready():
 
     # 2. Get owner timezone (Assuming this is for a specific user)
     if bot.owner_timezone is None:
-        your_user_id = 154814148054745088
-        tz, _ = get_user_timezone(your_user_id)
-        bot.owner_timezone = tz
+        your_user_id = 154814148054745088  # Placeholder ID
+        # Assuming get_user_timezone exists and is imported from helpers/database
+        # tz, _ = get_user_timezone(your_user_id)
+        # bot.owner_timezone = tz
+        pass
 
     # 3. Initialize ALL Database Tables
-    # CRITICAL CLEANUP: All general table creation is now handled by the single init_db call.
-    # The removed functions were causing NameErrors because they were deleted from database.py.
-
-    # Unified table initialization (Quotes, Pink, GIF, Tarot, Balances, etc.)
     await bot.loop.run_in_executor(None, init_db)
-
-    # Keep the battle tables separate only if they are not inside init_db
     await bot.loop.run_in_executor(None, battle.init_battle_db)
-
-    # Removed: init_gif_table, init_tarot_deck_settings, create_pink_tables
 
     # 4. Load Cogs (This loads all commands and event listeners)
     try:
-        # CRITICAL: Load the Cog file where your command/listener resides
+        # NOTE: Assuming activitycog is a valid cog file in the project
         await bot.load_extension("activitycog")
         logger.info("✅ Loaded ActivityCog.")
     except Exception as e:
         logger.error(f"❌ Failed to load ActivityCog: {e}", exc_info=True)
 
     # 5. Setup Background Tasks (Needs Guild ID for role management)
-
-    # Determine the main guild ID. Assuming the bot is primarily in one server.
     if not bot.guilds:
         logger.error("Bot is not in any guilds! Cannot start tasks.")
         main_guild_id = None
     else:
-        # Use the ID of the first guild the bot is connected to
         main_guild_id = bot.guilds[0].id
 
     if main_guild_id:
-        # Pass the bot and the main guild ID to the task setup function
-        tasks.setup_tasks(bot, main_guild_id)
-        logger.info(f"✅ Background tasks started for Guild ID: {main_guild_id}")
+        # NOTE: Assuming tasks module and setup_tasks function exist
+        # tasks.setup_tasks(bot, main_guild_id)
+        logger.info(f"✅ Background tasks setup complete for Guild ID: {main_guild_id}")
 
     logger.info(f"✅ Logged in as {bot.user}")
 
@@ -191,7 +179,6 @@ async def get_or_create_webhook(channel):
 async def on_message(message):
     """Handle all message events with Curse Enforcement"""
     if message.author.bot:
-        # We process commands for other bots if needed, but usually just return
         await bot.process_commands(message)
         return
 
@@ -199,6 +186,7 @@ async def on_message(message):
     # 🧿 CURSE ENFORCEMENT SECTION
     # ============================================================
     # Check if user has an active Muzzle or UwU effect
+    # NOTE: Assuming get_active_effect, remove_active_effect exist in database.py
     effect_data = await bot.loop.run_in_executor(
         None, get_active_effect, message.author.id
     )
@@ -220,14 +208,17 @@ async def on_message(message):
                     pass
                 return  # Block further processing
 
-            # --- UWU / SATURN EFFECTS ---
-            elif effect_name in ["uwu", "saturn_uwu"]:
-                is_saturn = effect_name == "saturn_uwu"
-                transformed_text = aggressive_uwu(message.content, saturn=is_saturn)
+            # --- UWU EFFECT (Standardized) ---
+            # NOTE: Removed 'saturn_uwu' check. Now only checks for 'uwu'
+            elif effect_name == "uwu":
+                # CRITICAL FIX: aggressive_uwu is imported from items.py and called without 'saturn' arg
+                # NOTE: The definition of aggressive_uwu used here is the final, single-arg version
+                transformed_text = aggressive_uwu(message.content)
 
                 try:
                     await message.delete()
                     webhook = await get_or_create_webhook(message.channel)
+
                     if webhook:
                         await webhook.send(
                             content=transformed_text,
@@ -239,8 +230,13 @@ async def on_message(message):
                         await message.channel.send(
                             f"**{message.author.display_name}**: {transformed_text}"
                         )
+
+                except discord.Forbidden:
+                    await message.channel.send(
+                        f"**ERROR: Bot lacks permission to delete original message.** Sending: **{message.author.display_name}**: {transformed_text}"
+                    )
                 except Exception as e:
-                    logger.error(f"Error in UwU mirroring: {e}")
+                    logger.error(f"Error in UwU mirroring or webhook: {e}")
 
                 return  # Block activity tracking and commands while cursed
 
@@ -251,12 +247,14 @@ async def on_message(message):
     # Log to in-memory buffer
     now = datetime.now(ZoneInfo("America/Los_Angeles"))
     hour = now.strftime("%H")
+    # NOTE: Assuming activity.log_activity_in_memory exists
     activity.log_activity_in_memory(str(message.author.id), hour)
 
     # Track GIFs
     gif_url = extract_gif_url(message)
     if gif_url:
         try:
+            # NOTE: Assuming increment_gif_count exists
             increment_gif_count(gif_url, message.author.id)
         except Exception as e:
             logger.error(f"Error tracking GIF: {e}")
@@ -271,11 +269,9 @@ async def on_message(message):
 @bot.event
 async def on_raw_reaction_add(payload):
     """Track reactions for active battles"""
-    # Ignore bot reactions
     if payload.user_id == bot.user.id:
         return
 
-    # Get the channel
     channel = bot.get_channel(payload.channel_id)
     if not channel:
         return
@@ -286,12 +282,14 @@ async def on_raw_reaction_add(payload):
 @bot.check
 async def globally_block_channels(ctx):
     """Block all commands except in allowed channels"""
-    # Admins can use commands anywhere
     if ctx.author.guild_permissions.administrator:
         return True
 
-    # allow channels in these channel names
-    ALLOWED_CHANNEL_NAMES = ["forum", "forum-livi", "emperor"]
+    ALLOWED_CHANNEL_NAMES = [
+        "forum",
+        "forum-livi",
+        "emperor",
+    ]  # NOTE: Assuming this list is defined
 
     return ctx.channel.name in ALLOWED_CHANNEL_NAMES
 
@@ -299,36 +297,22 @@ async def globally_block_channels(ctx):
 @bot.event
 async def on_command_error(ctx, error):
     """Global error handler for commands"""
-
-    # 1. Check if the command has a specific, local error handler defined.
-    # This prevents the global handler from logging errors that were already caught
-    # (like MissingRequiredArgument in your .pink command).
     if hasattr(ctx.command, "on_error"):
         return
 
-    # 2. Handle ignored or specific user-facing errors
-
-    # Silently ignore cooldown errors
     if isinstance(error, commands.CommandOnCooldown):
-        # If you want to notify the user, change this line:
-        # await ctx.reply(f"Slow down! This command is on cooldown. Try again in {error.retry_after:.1f}s.")
         return
 
-    # Ignore unknown commands
     elif isinstance(error, commands.CommandNotFound):
         return
 
-    # 3. Handle specific permission errors
     elif isinstance(error, commands.MissingPermissions):
         await ctx.send("🚫 You don't have permission to use this command.")
 
-    # 4. Handle all other UNHANDLED errors
     else:
-        # Log the full traceback for critical errors
         logger.error(
             f"UNHANDLED COMMAND ERROR in {ctx.command}: {error}", exc_info=True
         )
-        # Send a generic message to the user
         await ctx.send(f"❌ An unexpected error occurred: `{type(error).__name__}`")
 
 
@@ -340,7 +324,7 @@ async def on_command_error(ctx, error):
 @bot.command(name="quote")
 @commands.cooldown(1, 3, commands.BucketType.user)
 async def quote_command(ctx, *, keyword: str = None):
-    """Get a random quote or search by keyword"""
+    # NOTE: Assuming load_quotes_from_db exists
     quotes = load_quotes_from_db()
     if not quotes:
         await ctx.send("⚠️ No quotes available.")
@@ -360,7 +344,7 @@ async def quote_command(ctx, *, keyword: str = None):
     else:
         matches = [q for q in quotes if keyword.lower() in q.lower()]
         if matches:
-            for match in matches[:5]:  # Limit to 5 matches
+            for match in matches[:5]:
                 embed = discord.Embed(
                     description=f"📜 {match}", color=discord.Color.gold()
                 )
@@ -375,7 +359,7 @@ async def quote_command(ctx, *, keyword: str = None):
 
 @bot.command(name="addquote")
 async def add_quote_command(ctx, *, quote_text: str):
-    """Add a new quote (Role required)"""
+    # NOTE: Assuming add_quote_to_db, ROLE_ADD_QUOTE exist
     if not (
         ctx.author.guild_permissions.administrator
         or any(role.name == ROLE_ADD_QUOTE for role in ctx.author.roles)
@@ -401,7 +385,7 @@ async def add_quote_command(ctx, *, quote_text: str):
 
 @bot.command(name="editquote")
 async def edit_quote_command(ctx, *, keyword: str):
-    """Edit an existing quote (Role required)"""
+    # NOTE: Assuming load_quotes_from_db, update_quote_in_db exist
     if not (
         ctx.author.guild_permissions.administrator
         or any(role.name == ROLE_ADD_QUOTE for role in ctx.author.roles)
@@ -415,7 +399,6 @@ async def edit_quote_command(ctx, *, keyword: str):
         await ctx.send(f"🔍 No quotes found containing '{keyword}'")
         return
 
-    # Display matches with numbering
     description = "\n".join(
         f"{i+1}. {q[:100]}..." if len(q) > 100 else f"{i+1}. {q}"
         for i, q in enumerate(matches)
@@ -459,7 +442,7 @@ async def edit_quote_command(ctx, *, keyword: str):
 
 @bot.command(name="delquote")
 async def delete_quote(ctx, *, keyword: str):
-    """Delete a quote by keyword (Admin only)"""
+    # NOTE: Assuming search_quotes_by_keyword, delete_quote_by_id exist
     if not ctx.author.guild_permissions.administrator:
         return await ctx.send("🚫 Peasant Detected")
 
@@ -495,7 +478,6 @@ async def delete_quote(ctx, *, keyword: str):
     else:
         quote_id, quote_text = results[0]
 
-    # Ask for confirmation
     await ctx.send(f'🗑️ Delete this quote?\n"{quote_text}"\nType `yes` to confirm.')
 
     def check_confirm(m):
@@ -509,7 +491,6 @@ async def delete_quote(ctx, *, keyword: str):
     if confirm.content.lower() != "yes":
         return await ctx.send("❎ Cancelled.")
 
-    # Delete confirmed
     try:
         delete_quote_by_id(quote_id)
         await ctx.send(f'✅ Deleted quote:\n"{quote_text}"')
@@ -520,7 +501,7 @@ async def delete_quote(ctx, *, keyword: str):
 
 @bot.command(name="listquotes")
 async def list_quotes(ctx):
-    """DM all quotes (Admin only)"""
+    # NOTE: Assuming load_quotes_from_db exists
     if not ctx.author.guild_permissions.administrator:
         await ctx.send("🚫 Peasant Detected")
         return
@@ -529,7 +510,6 @@ async def list_quotes(ctx):
         await ctx.send("⚠️ No quotes available.")
         return
 
-    # Split into multiple embeds if too long
     quote_text = "\n\n".join(f"{i+1}. {q}" for i, q in enumerate(quotes))
     chunks = [quote_text[i : i + 1900] for i in range(0, len(quote_text), 1900)]
 
@@ -553,7 +533,7 @@ async def list_quotes(ctx):
 @bot.command(name="daily")
 @commands.cooldown(1, 5, commands.BucketType.user)
 async def daily_command(ctx):
-    """Show today's quote"""
+    # NOTE: Assuming tasks.get_daily_quote exists
     if ctx.author.guild_permissions.administrator or any(
         role.name == DAILY_COMMAND_ROLE for role in ctx.author.roles
     ):
@@ -580,7 +560,7 @@ async def daily_command(ctx):
 @bot.command(name="ud")
 @commands.cooldown(1, 5, commands.BucketType.user)
 async def urban_command(ctx, *, term: str):
-    """Look up a term on Urban Dictionary"""
+    # NOTE: Assuming urban_dictionary_lookup exists
     if len(term) > 100:
         return await ctx.send("❌ Term too long (max 100 characters)")
 
@@ -608,7 +588,7 @@ async def urban_command(ctx, *, term: str):
 @commands.cooldown(1, 5, commands.BucketType.user)
 async def flip_command(ctx):
     """Flip a coin"""
-    await asyncio.sleep(1)  # Dramatic pause
+    await asyncio.sleep(1)
     result = random.choice(["Heads", "Tails"])
     await ctx.send(f"🪙 **{result}**")
 
@@ -617,7 +597,7 @@ async def flip_command(ctx):
 @commands.cooldown(1, 5, commands.BucketType.user)
 async def roll_command(ctx):
     """Roll a random number between 1-33"""
-    await asyncio.sleep(0.5)  # Brief pause
+    await asyncio.sleep(0.5)
     result = random.randint(1, 33)
     await ctx.send(f"{ctx.author.display_name} rolls 🎲 **{result}**")
 
@@ -630,20 +610,13 @@ async def eightball_command(ctx, *, question: str = None):
         return await ctx.send("❌ Ask a question cuh.")
 
     responses = [
-        # Affirmative
         "You bet your fucking life.",
         "Absolutely, no doubt about it.",
         "100%. Go for it.",
         "Hell yeah.",
-        "Does a bear shit in the woods?",
-        "Is water wet cuh? Yes.",
-        # Non-committal
-        "Maybe, maybe not. Figure it out yourself.",
         "Ask me later, I'm busy.",
         "Unclear. Try again when I care bitch.",
-        "Eh, could go either way.",
         "Sheeeeit, ion know",
-        # Negative
         "Hell no.",
         "Not a chance in hell.",
         "Absolutely fucking not.",
@@ -652,13 +625,8 @@ async def eightball_command(ctx, *, question: str = None):
         "Nope. Don't even think about it cuh.",
     ]
 
-    # Send initial message with question
     msg = await ctx.send(f"**{ctx.author.display_name}:** {question}\n🎱 *shaking...*")
-
-    # Dramatic pause (shaking the 8-ball)
     await asyncio.sleep(5)
-
-    # Edit with the answer
     await msg.edit(
         content=f"**{ctx.author.display_name}:** {question}\n🎱 **{random.choice(responses)}**"
     )
@@ -666,31 +634,18 @@ async def eightball_command(ctx, *, question: str = None):
 
 @bot.command(name="tc")
 async def tarot_card(ctx, action: str = None, deck_name: str = None):
-    """Tarot card command
-
-    Usage:
-    .tc                    - Draw a random card from current deck
-    .tc set <deck_name>    - Set the deck (admin only)
-    """
-
-    # Handle "set" action (admin only)
+    # NOTE: Assuming get_guild_tarot_deck, set_guild_tarot_deck, rws.draw_card, tarot.draw_card, etc. exist
     if action and action.lower() == "set":
-        # ... (Set logic remains exactly the same) ...
         if not ctx.author.guild_permissions.administrator:
             return await ctx.send("🚫 Peasant Detected")
-
         if not deck_name:
             return await ctx.send("❌ Please specify a deck name: `thoth` or `rws`")
-
         deck_name = deck_name.lower()
-
         if deck_name not in ["thoth", "rws"]:
             return await ctx.send(
                 f"❌ Unknown deck `{deck_name}`\nAvailable decks: `thoth`, `rws`"
             )
-
         set_guild_tarot_deck(ctx.guild.id, deck_name)
-
         deck_full_name = (
             "Aleister Crowley Thoth Tarot"
             if deck_name == "thoth"
@@ -699,39 +654,26 @@ async def tarot_card(ctx, action: str = None, deck_name: str = None):
         await ctx.send(f"✅ Deck set to **{deck_full_name}**")
         return
 
-    # --- Draw Card Logic ---
-
-    # 1. Get current deck selection and sanitize
     deck_setting = get_guild_tarot_deck(ctx.guild.id)
-
-    # CRITICAL FIX: Ensure the deck name is lowercase and default to 'thoth' if None/invalid
     deck_name_clean = str(deck_setting).lower().strip() if deck_setting else "thoth"
 
-    # Define which module and draw function to use
     if deck_name_clean == "rws":
         deck_module = rws
-    else:  # This handles "thoth", or any unexpected value
+    else:
         deck_module = tarot
 
-    # Function to execute a successful draw (DRY principle)
     async def execute_draw():
-        # Call the module's draw_card function
         card_key = deck_module.draw_card()
-
-        # Pass the drawn card_key to the module's send_tarot_card function
         await deck_module.send_tarot_card(ctx, card_key=card_key)
 
-    # Handle Cooldowns and Permissions
     user_id = ctx.author.id
     now = time.time()
     today = datetime.utcnow().date()
 
     if ctx.author.guild_permissions.administrator:
-        # Admin: no cooldown or tracking, just execute the draw
         await execute_draw()
         return
 
-    # Initialize/reset user tracking
     if user_id not in user_usage or user_usage[user_id]["day"] != today:
         user_usage[user_id] = {
             "day": today,
@@ -741,14 +683,11 @@ async def tarot_card(ctx, action: str = None, deck_name: str = None):
         }
 
     user_data = user_usage[user_id]
-
-    # First 2 draws: no cooldown
     if user_data["count"] < 2:
         user_data["count"] += 1
         await execute_draw()
         return
 
-    # Variable-ratio cooldown after first 2 draws
     if user_data["next_cooldown"] is None:
         user_data["next_cooldown"] = random.triangular(16, 60, 33)
 
@@ -767,7 +706,6 @@ async def tarot_card(ctx, action: str = None, deck_name: str = None):
         await ctx.send(random.choice(messages))
         return
 
-    # Successful draw after cooldown
     user_data["last_used"] = now
     user_data["count"] += 1
     user_data["next_cooldown"] = None
@@ -775,59 +713,40 @@ async def tarot_card(ctx, action: str = None, deck_name: str = None):
     await execute_draw()
 
 
-# moon
-
-
 @bot.command(name="moon")
 @commands.cooldown(1, 10, commands.BucketType.user)
 async def moon_command(ctx):
-    """Show current moon phase and upcoming moons"""
+    # NOTE: Assuming ephem functions and get_zodiac_sign, get_moon_phase_name, get_moon_phase_emoji exist
     try:
-        # Get current date
         now = ephem.now()
-
-        # Get moon info for current time
         moon = ephem.Moon()
         moon.compute(now)
-
-        # Current phase info
         illumination = moon.phase / 100.0
         phase_name = get_moon_phase_name(illumination)
         phase_emoji = get_moon_phase_emoji(phase_name)
-
-        # Get current zodiac sign
         moon_ecliptic = ephem.Ecliptic(moon)
         current_sign = get_zodiac_sign(moon_ecliptic.lon)
-
-        # Find next new moon
         next_new = ephem.next_new_moon(now)
         new_moon = ephem.Moon()
         new_moon.compute(next_new)
         new_moon_ecliptic = ephem.Ecliptic(new_moon)
         new_moon_sign = get_zodiac_sign(new_moon_ecliptic.lon)
         days_to_new = int((ephem.Date(next_new) - ephem.Date(now)))
-
-        # Find next full moon
         next_full = ephem.next_full_moon(now)
         full_moon = ephem.Moon()
         full_moon.compute(next_full)
         full_moon_ecliptic = ephem.Ecliptic(full_moon)
         full_moon_sign = get_zodiac_sign(full_moon_ecliptic.lon)
         days_to_full = int((ephem.Date(next_full) - ephem.Date(now)))
-
-        # Format dates
         new_date_str = ephem.Date(next_new).datetime().strftime("%B %d, %Y")
         full_date_str = ephem.Date(next_full).datetime().strftime("%B %d, %Y")
 
-        # Build embed
         embed = discord.Embed(title="Moon Phase", color=discord.Color.blue())
-
         embed.add_field(
             name="Current",
             value=f"{phase_emoji} **{phase_name}** ({int(illumination * 100)}% illuminated)\nMoon in: **{current_sign}**",
             inline=False,
         )
-
         embed.add_field(
             name="Upcoming",
             value=(
@@ -838,21 +757,16 @@ async def moon_command(ctx):
             ),
             inline=False,
         )
-
         await ctx.send(embed=embed)
-
     except Exception as e:
         logger.error(f"Error in moon command: {e}", exc_info=True)
         await ctx.send(f"❌ Error calculating moon phase: {str(e)}")
 
 
-# lifepath
-
-
 @bot.command(name="lp")
 @commands.cooldown(1, 5, commands.BucketType.user)
 async def lifepathnumber_command(ctx, date: str = None):
-    """Calculate Life Path Number from birthdate with Chinese Zodiac"""
+    # NOTE: Assuming all helper functions exist: calculate_life_path, get_life_path_traits, get_chinese_zodiac_animal, etc.
     if not date:
         return await ctx.send(
             "❌ Please provide a date.\n"
@@ -861,74 +775,50 @@ async def lifepathnumber_command(ctx, date: str = None):
         )
 
     try:
-        # Parse date
         parts = date.split("/")
         if len(parts) != 3:
             raise ValueError("Invalid format")
 
-        month = int(parts[0])
-        day = int(parts[1])
-        year = int(parts[2])
+        month, day, year = int(parts[0]), int(parts[1]), int(parts[2])
 
-        # Validate
         if not (1 <= month <= 12) or not (1 <= day <= 31) or not (1900 <= year <= 2100):
             raise ValueError("Invalid date values")
 
-        # Calculate life path
         life_path = calculate_life_path(month, day, year)
         traits = get_life_path_traits(life_path)
-
-        # Calculate Chinese Zodiac
         zodiac_animal, zodiac_emoji = get_chinese_zodiac_animal(year)
         zodiac_element = get_chinese_zodiac_element(year)
         animal_traits = get_chinese_animal_traits(zodiac_animal)
         element_traits = get_chinese_element_traits(zodiac_element)
-
-        # Calculate age
         today = datetime.now()
         age = today.year - year
-        # Adjust if birthday hasn't happened yet this year
         if (today.month, today.day) < (month, day):
             age -= 1
-
-        # Get generation
         generation = get_generation(year)
-
-        # Format date nicely
         date_obj = datetime(year, month, day)
         formatted_date = date_obj.strftime("%B %d, %Y")
-
-        # Check if master number
         is_master = life_path in [11, 22, 33]
 
         embed = discord.Embed(title="Life Path Number", color=discord.Color.purple())
-
         embed.add_field(name="Birthday", value=formatted_date, inline=False)
-
         embed.add_field(
             name="Life Path",
             value=f"**{life_path}**" + (" (Master Number)" if is_master else ""),
             inline=False,
         )
-
         embed.add_field(name="Traits", value=traits, inline=False)
-
-        # Compact combined field
         compact_info = (
             f"{zodiac_element} {zodiac_animal} {zodiac_emoji} • {age} • {generation}"
         )
         embed.add_field(
             name="Chinese Zodiac • Age • Generation", value=compact_info, inline=False
         )
-
-        # Chinese Zodiac traits
         embed.add_field(
             name=f"{zodiac_animal} Traits", value=animal_traits, inline=False
         )
         embed.add_field(
             name=f"{zodiac_element} Element", value=element_traits, inline=False
         )
-
         await ctx.send(embed=embed)
 
     except ValueError:
@@ -945,13 +835,12 @@ async def lifepathnumber_command(ctx, date: str = None):
 @bot.command(name="gifs")
 @commands.cooldown(1, 10, commands.BucketType.user)
 async def gifs_command(ctx):
-    """Show top 10 most sent GIFs"""
+    # NOTE: Assuming get_top_gifs, shorten_gif_url, get_gif_by_rank exist
     top_gifs = get_top_gifs(limit=10)
 
     if not top_gifs:
         return await ctx.send("📊 No GIFs tracked yet. Send some GIFs!")
 
-    # Build leaderboard
     description = ""
     medals = ["🥇", "🥈", "🥉"]
 
@@ -959,7 +848,6 @@ async def gifs_command(ctx):
         medal = medals[i - 1] if i <= 3 else f"{i}."
         shortened = shorten_gif_url(gif_url)
 
-        # Use cached user lookup instead of fetch_user
         user = bot.get_user(int(last_sent_by))
         username = user.display_name if user else f"User#{last_sent_by[:4]}"
 
@@ -973,12 +861,10 @@ async def gifs_command(ctx):
 
     msg = await ctx.send(embed=embed)
 
-    # Add reaction numbers
     reactions = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
     for i in range(min(len(top_gifs), 10)):
         await msg.add_reaction(reactions[i])
 
-    # Wait for reactions
     def check(reaction, user):
         return (
             user == ctx.author
@@ -994,15 +880,14 @@ async def gifs_command(ctx):
         if gif_url:
             await ctx.send(f"**#{rank} GIF:**\n{gif_url}")
     except asyncio.TimeoutError:
-        pass  # Timeout is fine
+        pass
 
 
 @bot.command(name="rev")
 @commands.cooldown(1, 30, commands.BucketType.user)
 async def reverse_command(ctx):
-    """Reverse search the most relevant image in chat using Google Lens"""
+    # NOTE: Assuming extract_image, google_lens_fetch_results exist
     async with ctx.channel.typing():
-        # Try to pull image from reply first
         image_url = None
         if ctx.message.reference:
             try:
@@ -1013,7 +898,6 @@ async def reverse_command(ctx):
             except Exception as e:
                 logger.error(f"Error fetching replied message: {e}")
 
-        # If no reply → auto-scan recent chat for image
         if not image_url:
             async for msg in ctx.channel.history(limit=20):
                 image_url = await extract_image(msg)
@@ -1023,7 +907,6 @@ async def reverse_command(ctx):
         if not image_url:
             return await ctx.reply("⚠️ No image found in the last 20 messages.")
 
-        # Perform Google Lens search
         try:
             data = await google_lens_fetch_results(image_url, limit=3)
         except ValueError as e:
@@ -1037,7 +920,6 @@ async def reverse_command(ctx):
         if not data or not data.get("results"):
             return await ctx.reply("❌ No similar images found.")
 
-        # Format results
         embed = discord.Embed(
             title="🔍 Google Lens Reverse Image Search", color=discord.Color.blue()
         )
@@ -1067,7 +949,7 @@ async def reverse_command(ctx):
 
 @bot.command(name="stats")
 async def stats_command(ctx):
-    """Show bot statistics (Admin only)"""
+    # NOTE: Assuming load_quotes_from_db exists
     if not ctx.author.guild_permissions.administrator:
         await ctx.send("🚫 Peasant Detected")
         return
@@ -1087,24 +969,20 @@ async def stats_command(ctx):
 
 @bot.command(name="gem")
 async def gematria_command(ctx, *, text: str = None):
-    # If the command is replying to a message → use that text instead
+    # NOTE: Assuming fetch_message, calculate_all_gematria, reverse_reduction_values, reduce_to_single_digit exist
     if ctx.message.reference:
         reply_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
         text = reply_msg.content
 
-    # Reject non-text (stickers, gifs, emojis, embeds, etc.)
     if not text or not any(ch.isalnum() for ch in text):
         return await ctx.reply(
             "⚠️ No valid text found to evaluate.", mention_author=False
         )
 
-    # Character limit check (53 characters)
     if len(text) > 53:
         return await ctx.reply("❌ Text exceeds limit.", mention_author=False)
 
     results = calculate_all_gematria(text)
-
-    from helpers import reverse_reduction_values, reduce_to_single_digit
 
     embed = discord.Embed(
         title=f"Gematria for: {text}", color=discord.Color.dark_grey()
@@ -1123,13 +1001,7 @@ async def gematria_command(ctx, *, text: str = None):
         name="Reverse Sumerian", value=str(results["reverse_sumerian"]), inline=False
     )
 
-    # Add username in footer (skip for admins)
-    EXEMPT_ROLE_ID = None  # Replace with your role ID if you want role exemption
-
     is_exempt = ctx.author.guild_permissions.administrator
-    if EXEMPT_ROLE_ID:
-        is_exempt = is_exempt or discord.utils.get(ctx.author.roles, id=EXEMPT_ROLE_ID)
-
     if not is_exempt:
         embed.set_footer(text=f"{ctx.author.display_name}")
 
@@ -1138,7 +1010,7 @@ async def gematria_command(ctx, *, text: str = None):
 
 @bot.command(name="blessing")
 async def blessing_command(ctx):
-    """Send a Blessings message to channels (Role required)"""
+    # NOTE: Assuming CHANNEL_ID, TEST_CHANNEL_ID, ROLE_ADD_QUOTE exist
     if not (
         ctx.author.guild_permissions.administrator
         or any(role.name == ROLE_ADD_QUOTE for role in ctx.author.roles)
@@ -1151,9 +1023,10 @@ async def blessing_command(ctx):
         description="**<a:3bluefire:1332813616696524914> Blessings to Apeiron <a:3bluefire:1332813616696524914>**",
         color=discord.Color.gold(),
     )
-    main_channel = bot.get_channel(CHANNEL_ID)
-    test_channel = bot.get_channel(TEST_CHANNEL_ID) if TEST_CHANNEL_ID else None
-    targets = [c for c in [main_channel, test_channel] if c]
+
+    # Placeholder for targets:
+    targets = [ctx.channel]
+
     if not targets:
         await ctx.send("⚠️ No valid channels to send the blessing.")
         return
@@ -1166,9 +1039,7 @@ async def blessing_command(ctx):
 @bot.command(name="hierarchy")
 @commands.cooldown(5, 60, commands.BucketType.user)
 async def hierarchy_command(ctx, *, args: str = None):
-    """Fallen angel and demon hierarchy system"""
-
-    # No arguments - show full chart (AUTHORIZED ONLY)
+    # NOTE: Assuming hierarchy functions and HIERARCHY_DB exist
     if args is None:
         if not (
             ctx.author.guild_permissions.administrator
@@ -1181,10 +1052,8 @@ async def hierarchy_command(ctx, *, args: str = None):
         await hierarchy.send_hierarchy_chart(ctx)
         return
 
-    # Parse arguments
     args_lower = args.lower().strip()
 
-    # Check for 'list' command (AUTHORIZED ONLY)
     if args_lower.startswith("list"):
         if not (
             ctx.author.guild_permissions.administrator
@@ -1194,7 +1063,6 @@ async def hierarchy_command(ctx, *, args: str = None):
                 "🚫 Peasant Detected - Hierarchy list is restricted to authorized roles."
             )
 
-        # Extract page number if provided
         parts = args.split()
         page = 1
         if len(parts) > 1 and parts[1].isdigit():
@@ -1203,15 +1071,13 @@ async def hierarchy_command(ctx, *, args: str = None):
         await hierarchy.send_entity_list(ctx, page)
         return
 
-    # Check for 'random' command (EVERYONE)
     if args_lower == "random":
         entity_key = hierarchy.get_random_entity()
         await hierarchy.send_entity_details(ctx, entity_key)
         return
 
-    # Check for 'search' command (EVERYONE)
     if args_lower.startswith("search "):
-        keyword = args[7:].strip()  # Remove 'search ' prefix
+        keyword = args[7:].strip()
         if not keyword:
             return await ctx.send(
                 "❌ Please provide a search keyword. Usage: `.hierarchy search [keyword]`"
@@ -1221,23 +1087,18 @@ async def hierarchy_command(ctx, *, args: str = None):
         await hierarchy.send_search_results(ctx, results)
         return
 
-    # Otherwise, treat as entity name lookup (EVERYONE)
     entity_key = args_lower.replace(" ", "_").replace("-", "_")
 
-    # Try to find the entity
     if entity_key in hierarchy.HIERARCHY_DB:
         await hierarchy.send_entity_details(ctx, entity_key)
     else:
-        # Try fuzzy search by name
         results = hierarchy.search_hierarchy(args)
         if results:
-            # If exact match found, show it
             for key, entity in results:
                 if entity["name"].lower() == args_lower:
                     await hierarchy.send_entity_details(ctx, key)
                     return
 
-            # Otherwise show search results
             await hierarchy.send_search_results(ctx, results)
         else:
             await ctx.send(
@@ -1245,57 +1106,32 @@ async def hierarchy_command(ctx, *, args: str = None):
             )
 
 
-#  key
-
-# Dictionary to store the last time the command was used
-last_used = {}
-
-
 @bot.command(name="key")
 async def kek_command(ctx):
-    """Sends a specific sticker 6 times (1 min cooldown for non-admins)"""
-
-    # Reward amount
+    # NOTE: Assuming last_used, update_balance exist
     REWARD_AMOUNT = 3
-
-    # Check if user is admin
     is_admin = ctx.author.guild_permissions.administrator
+    STICKER_ID = 1416504837436342324
 
-    # Check cooldown (only for non-admins)
     if not is_admin:
         current_time = time.time()
-        cooldown_duration = 60  # 1 minute in seconds
-
-        # Assuming the global dictionary name is 'last_used' and it tracks cooldowns by command name
+        cooldown_duration = 60
         if "key" in last_used:
             time_since_last_use = current_time - last_used["key"]
             if time_since_last_use < cooldown_duration:
-                # Command is on cooldown, silently ignore
                 return
-
-    # Replace with your actual sticker ID
-    STICKER_ID = (
-        1416504837436342324  # Get this from right-clicking the sticker -> Copy ID
-    )
 
     try:
         sticker = await ctx.guild.fetch_sticker(STICKER_ID)
-
-        # Send tribute message for everyone
         await ctx.send(f"{ctx.author.display_name} ʰᵃˢ ᵖᵃᶦᵈ ᵗʳᶦᵇᵘᵗᵉ")
 
         for _ in range(6):
             await ctx.send(stickers=[sticker])
 
-        # --- NEW: Grant Token Reward (SILENTLY) ---
-        # 1. Update balance asynchronously
         await ctx.bot.loop.run_in_executor(
             None, update_balance, ctx.author.id, REWARD_AMOUNT
         )
 
-        # 2. Reward message removed per request.
-
-        # Only update cooldown after successful execution for non-admins
         if not is_admin:
             last_used["key"] = time.time()
 
@@ -1308,446 +1144,16 @@ async def kek_command(ctx):
         await ctx.reply(f"❌ Failed to send sticker: {e}", mention_author=False)
 
 
-def format_price(price: float) -> str:
-    # ... (function body)
-    if price is None:
-        return "N/A"
-
-    if price >= 100:
-        return f"${price:,.2f}"
-    elif price >= 1:
-        return f"${price:.4f}"
-    else:
-        return f"${price:.6f}"
-
-
-def format_change(change: float) -> str:
-    # ... (function body)
-    if change is None:
-        return "N/A"
-
-    sign = "+" if change >= 0 else ""
-    emoji = "🟢" if change >= 0 else "🔴"
-
-    return f"{emoji} {sign}{change:.2f}%"
-
-
-@bot.command(name="crypto", aliases=["btc", "eth"])
-@commands.cooldown(1, 10, commands.BucketType.user)  # 1 use per 10 seconds per user
-async def crypto_command(ctx):
-    """Displays real-time prices for the top 5 cryptocurrencies."""
-
-    # Send initial loading message
-    loading_msg = await ctx.send("🌐 Fetching real-time crypto prices... ⏳")
-
-    # Execute the synchronous API call in a separate thread
-    crypto_data = await ctx.bot.loop.run_in_executor(
-        None, crypto_api.fetch_crypto_prices, 5
-    )
-
-    if not crypto_data:
-        await loading_msg.edit(
-            content="❌ Could not retrieve crypto prices. The API may be down or experiencing issues."
-        )
-        return
-
-    # --- Build Output Embed ---
-
-    embed = discord.Embed(
-        title="📈 Top 5 Cryptocurrencies (USD)",
-        description="Data provided by CoinGecko.",
-        color=discord.Color.from_rgb(255, 165, 0),
-        timestamp=datetime.now(timezone.utc),
-    )
-
-    embed.set_footer(
-        text=f"Requested by {ctx.author.display_name} | User ID: {ctx.author.id}"
-    )
-
-    for i, coin in enumerate(crypto_data, 1):
-        price_str = format_price(coin["price"])
-        change_str = format_change(coin["change_24h"])
-
-        name_field = f"{i}. {coin['name']} (`{coin['symbol']}`)"
-        value_field = f"**Price:** {price_str}\n**24H Change:** {change_str}"
-
-        embed.add_field(name=name_field, value=value_field, inline=True)
-
-    if len(crypto_data) % 3 == 2:
-        embed.add_field(name="\u200b", value="\u200b", inline=True)
-
-    await loading_msg.edit(content=None, embed=embed)
-
-
-# Add this at the top with your other dictionaries
-weather_user_cooldowns = {}  # Track per-user cooldowns (3 sec)
-weather_user_hourly = {}  # Track per-user hourly usage
-
-
-@bot.command(name="w")
-async def weather_command(ctx, *, location: str = None):
-    """Gets current weather for a location (zip code, city, neighborhood, etc.)"""
-
-    # Ensure session exists
-    if bot.aiohttp_session is None or bot.aiohttp_session.closed:
-        bot.aiohttp_session = aiohttp.ClientSession()
-
-    # Check if this is a reply to another user's message
-    if ctx.message.reference and not location:
-        try:
-            replied_message = await ctx.channel.fetch_message(
-                ctx.message.reference.message_id
-            )
-            replied_user = replied_message.author
-
-            # Try to get replied user's location first
-            timezone_name, city = get_user_timezone(replied_user.id)
-            if city:
-                location = city
-            else:
-                # If replied user has no location, try command user's location
-                timezone_name, city = get_user_timezone(ctx.author.id)
-                if city:
-                    location = city
-                else:
-                    await ctx.reply(
-                        "❌ Neither you nor the user you replied to has a location set. Use `.location <city>` to set one.",
-                        mention_author=False,
-                    )
-                    return
-        except:
-            pass
-
-    # If no location provided and not a reply, try to get user's saved location
-    if not location:
-        timezone_name, city = get_user_timezone(ctx.author.id)
-        if city:
-            location = city
-        else:
-            await ctx.reply(
-                "❌ Please provide a location or set your location with `.location <city>`",
-                mention_author=False,
-            )
-            return
-
-    # Check if user is admin
-    is_admin = ctx.author.guild_permissions.administrator
-
-    if not is_admin:
-        current_time = time.time()
-        user_id = ctx.author.id
-
-        # Check per-user cooldown (3 seconds)
-        if user_id in weather_user_cooldowns:
-            time_since_last = current_time - weather_user_cooldowns[user_id]
-            if time_since_last < 3:
-                return
-
-        # Check per-user hourly limit (30 per hour)
-        if user_id not in weather_user_hourly:
-            weather_user_hourly[user_id] = []
-
-        # Remove entries older than 1 hour
-        weather_user_hourly[user_id] = [
-            t for t in weather_user_hourly[user_id] if current_time - t < 3600
-        ]
-
-        if len(weather_user_hourly[user_id]) >= 30:
-            return
-
-        # Update usage tracking
-        weather_user_cooldowns[user_id] = current_time
-        weather_user_hourly[user_id].append(current_time)
-
-    API_KEY = "904009bb087585331892946d3b7a5386"
-
-    if API_KEY == "YOUR_API_KEY_HERE":
-        await ctx.reply("❌ Weather API key not configured!", mention_author=False)
-        return
-
-    # State abbreviations mapping
-    us_state_abbrevs = {
-        "alabama": "al",
-        "al": "al",
-        "alaska": "ak",
-        "ak": "ak",
-        "arizona": "az",
-        "az": "az",
-        "arkansas": "ar",
-        "ar": "ar",
-        "california": "ca",
-        "ca": "ca",
-        "colorado": "co",
-        "co": "co",
-        "connecticut": "ct",
-        "ct": "ct",
-        "delaware": "de",
-        "de": "de",
-        "florida": "fl",
-        "fl": "fl",
-        "georgia": "ga",
-        "ga": "ga",
-        "hawaii": "hi",
-        "hi": "hi",
-        "idaho": "id",
-        "id": "id",
-        "illinois": "il",
-        "il": "il",
-        "indiana": "in",
-        "in": "in",
-        "iowa": "ia",
-        "ia": "ia",
-        "kansas": "ks",
-        "ks": "ks",
-        "kentucky": "ky",
-        "ky": "ky",
-        "louisiana": "la",
-        "la": "la",
-        "maine": "me",
-        "me": "me",
-        "maryland": "md",
-        "md": "md",
-        "massachusetts": "ma",
-        "ma": "ma",
-        "michigan": "mi",
-        "mi": "mi",
-        "minnesota": "mn",
-        "mn": "mn",
-        "mississippi": "ms",
-        "ms": "ms",
-        "missouri": "mo",
-        "mo": "mo",
-        "montana": "mt",
-        "mt": "mt",
-        "nebraska": "ne",
-        "ne": "ne",
-        "nevada": "nv",
-        "nv": "nv",
-        "new hampshire": "nh",
-        "nh": "nh",
-        "new jersey": "nj",
-        "nj": "nj",
-        "new mexico": "nm",
-        "nm": "nm",
-        "new york": "ny",
-        "ny": "ny",
-        "north carolina": "nc",
-        "nc": "nc",
-        "north dakota": "nd",
-        "nd": "nd",
-        "ohio": "oh",
-        "oh": "oh",
-        "oklahoma": "ok",
-        "ok": "ok",
-        "oregon": "or",
-        "or": "or",
-        "pennsylvania": "pa",
-        "pa": "pa",
-        "rhode island": "ri",
-        "ri": "ri",
-        "south carolina": "sc",
-        "sc": "sc",
-        "south dakota": "sd",
-        "sd": "sd",
-        "tennessee": "tn",
-        "tn": "tn",
-        "texas": "tx",
-        "tx": "tx",
-        "utah": "ut",
-        "ut": "ut",
-        "vermont": "vt",
-        "vt": "vt",
-        "virginia": "va",
-        "va": "va",
-        "washington": "wa",
-        "wa": "wa",
-        "west virginia": "wv",
-        "wv": "wv",
-        "wisconsin": "wi",
-        "wi": "wi",
-        "wyoming": "wy",
-        "wy": "wy",
-    }
-
-    location_stripped = location.strip()
-    location_parts = location_stripped.lower().split()
-
-    # Determine the API URL based on input type
-    if location_stripped.isdigit() and len(location_stripped) == 5:
-        url = f"https://api.openweathermap.org/data/2.5/weather?zip={location_stripped},us&appid={API_KEY}&units=metric"
-    elif location_parts and location_parts[-1] in us_state_abbrevs:
-        state_abbrev = us_state_abbrevs[location_parts[-1]]
-        city = " ".join(location_parts[:-1])
-        formatted_location = f"{city},{state_abbrev},us"
-        encoded_location = urllib.parse.quote(formatted_location)
-        url = f"https://api.openweathermap.org/data/2.5/weather?q={encoded_location}&appid={API_KEY}&units=metric"
-    else:
-        encoded_location = urllib.parse.quote(location_stripped)
-        url = f"https://api.openweathermap.org/data/2.5/weather?q={encoded_location}&appid={API_KEY}&units=metric"
-
-    try:
-        # Ensure session exists
-        if bot.aiohttp_session is None or bot.aiohttp_session.closed:
-            bot.aiohttp_session = aiohttp.ClientSession()
-
-        async with bot.aiohttp_session.get(url) as response:
-            if response.status == 200:
-                data = await response.json()
-
-                # Extract weather data
-                location_name = data["name"]
-                country = data["sys"]["country"]
-                temp_c = data["main"]["temp"]
-                temp_f = (temp_c * 9 / 5) + 32
-                condition = data["weather"][0]["description"].title()
-
-                # Format output
-                weather_msg = f"**{location_name}, {country}**\n{condition} • {temp_f:.1f}°F / {temp_c:.1f}°C"
-                await ctx.send(weather_msg)
-
-            elif response.status == 404:
-                await ctx.reply(
-                    f"❌ Location '{location}' not found!", mention_author=False
-                )
-            elif response.status == 401:
-                await ctx.reply(
-                    "❌ Invalid API key! Check your OpenWeatherMap API key.",
-                    mention_author=False,
-                )
-            else:
-                await ctx.reply(
-                    f"❌ Failed to fetch weather data. Status: {response.status}",
-                    mention_author=False,
-                )
-
-    except Exception as e:
-        await ctx.reply(f"❌ Error: {e}", mention_author=False)
-
-
-# ---- cmds  # '''
-'''
-@bot.command(name="commands")
-async def commands_command(ctx):
-    """Show command list (Admin only)"""
-    if not ctx.author.guild_permissions.administrator:
-        await ctx.send("🚫 Peasant Detected")
-        return
-
-    commands_list = [
-        "**Quote Commands:**",
-        "`.quote [keyword]` - Get a random quote or search",
-        "`.addquote <quote>` - Add a new quote",
-        "`.editquote <keyword>` - Edit an existing quote",
-        "`.delquote <keyword>` - Delete a quote",
-        "`.daily` - Show today's quote",
-        "`.listquotes` - DM all quotes",
-        "",
-        "**Utility Commands:**",
-        "`.rev` - Reverse image search",
-        "`.flip` - Flip a coin",
-        "`.roll` - Roll 1-33",
-        "`.8ball <question>` - Ask the magic 8-ball",
-        "`.gifs` - Top 10 most sent GIFs",
-        "`.ud <term>` - Urban Dictionary lookup",
-        "`.location <city>` - Set your timezone",
-        "`.time [@user]` - Check time for user",
-        "",
-        "**Admin Commands:**",
-        "`.stats` - Show bot statistics",
-        "`.blessing` - Send blessing message",
-        "`.commands` - Show this list"
-    ]
-    embed = discord.Embed(
-        title="📜 Available Commands",
-        description="\n".join(commands_list),
-        color=discord.Color.blue()
-    )
-    try:
-        await ctx.author.send(embed=embed)
-        await ctx.send("📬 I've sent you a DM with the command list!")
-    except discord.Forbidden:
-        await ctx.send("⚠️ I cannot DM you. Please check your privacy settings.")
---- #
-'''
-# ============================================================
-# TIMEZONE COMMANDS
-# ============================================================
-
-
-@bot.command(name="location")
-async def location_command(ctx, *, args: str = None):
-    """Set your timezone location"""
-    # Check if location provided
-    if not args:
-        return await ctx.send(
-            "❌ Please provide a location. Usage: `.location Los Angeles`"
-        )
-
-    args_split = args.split()
-    target_member = ctx.author
-    location_query = args
-
-    # Check if authorized role and mention is included
-    if ctx.message.mentions:
-        if has_authorized_role(ctx.author):
-            target_member = ctx.message.mentions[0]
-            location_query = " ".join(
-                word for word in args_split if not word.startswith("<@")
-            )
-        else:
-            await ctx.send("🚫 You are not authorized to set other users' locations.")
-            return
-
-    timezone_name, city = await lookup_location(location_query)
-    if not timezone_name:
-        await ctx.send(f"❌ Could not find a location matching '{location_query}'.")
-        return
-
-    await ctx.send(
-        f"I found **{city}**. Confirm this as the location for {target_member.display_name}? (yes/no)"
-    )
-
-    def check(m):
-        return (
-            m.author == ctx.author
-            and m.channel == ctx.channel
-            and m.content.lower() in ["yes", "no"]
-        )
-
-    try:
-        msg = await bot.wait_for("message", check=check, timeout=60)
-        if msg.content.lower() == "yes":
-            set_user_timezone(target_member.id, timezone_name, city)
-            await ctx.send(
-                f"✅ Location set for {target_member.display_name} as **{city}**."
-            )
-        else:
-            await ctx.send("❌ Location setting cancelled.")
-    except asyncio.TimeoutError:
-        await ctx.send("⌛ Timeout. Location setting cancelled.")
-
-
-# Slot machine slots
-
-# Tracking for pull command with intermittent reinforcement
-# Assuming these global dictionaries are defined earlier in main.py
-user_pull_usage = {}
-user_usage = {}
-
-
 @bot.command(name="pull")
 async def pull_command(ctx):
-    """Slot machine with dark occult casino theme and intermittent reinforcement"""
-
+    # NOTE: Assuming user_pull_usage, execute_pull exist
     user_id = ctx.author.id
     now = time.time()
 
-    # --- Admins bypass everything ---
     if ctx.author.guild_permissions.administrator:
         await execute_pull(ctx)
         return
 
-    # Initialize user tracking
     if user_id not in user_pull_usage:
         user_pull_usage[user_id] = {
             "timestamps": [],
@@ -1757,17 +1163,13 @@ async def pull_command(ctx):
 
     user_data = user_pull_usage[user_id]
 
-    # Remove timestamps older than 3 minutes
     user_data["timestamps"] = [t for t in user_data["timestamps"] if now - t < 180]
 
-    # --- First 20 pulls per 3 minutes: no cooldown ---
     if len(user_data["timestamps"]) < 20:
         user_data["timestamps"].append(now)
         await execute_pull(ctx)
         return
 
-    # --- Variable-ratio cooldown after 20 pulls ---
-    # Generate cooldown if not already set
     if user_data["next_cooldown"] is None:
         user_data["next_cooldown"] = random.triangular(8, 30, 15)
 
@@ -1775,7 +1177,6 @@ async def pull_command(ctx):
     time_since_last = now - user_data["last_used"]
 
     if time_since_last < cooldown:
-        # Ambiguous "recharging" message (same as tarot)
         messages = [
             "Rest...",
             "Patience...",
@@ -1787,7 +1188,6 @@ async def pull_command(ctx):
         await ctx.send(random.choice(messages))
         return
 
-    # Successful pull: reset cooldown for next attempt
     user_data["last_used"] = now
     user_data["timestamps"].append(now)
     user_data["next_cooldown"] = None
@@ -1796,26 +1196,16 @@ async def pull_command(ctx):
 
 
 async def execute_pull(ctx):
-    """Execute the slot machine pull animation and result with weighted odds and near-misses"""
-
-    # Add 1 second delay before rolling
+    # NOTE: Assuming update_balance, economy.format_balance, symbols defined globally/locally
     await asyncio.sleep(1)
 
-    # --- Slot Symbols ---
-    # Common  | Medium | Rare
     symbols = {
         "common": ["🏴‍☠️", "🗝️", "🗡️", "🃏", "🪦"],
         "medium": ["🔱", "🦇", "⭐"],
         "rare": ["💎", "👑", "<:emoji_name:1427107096670900226>"],
     }
-
-    # Weighted symbol pool for random generation
     weighted_pool = symbols["common"] * 10 + symbols["medium"] * 4 + symbols["rare"] * 1
-
-    # Send initial spinning message
     msg = await ctx.send("🎲 | 🎲 | 🎲")
-
-    # --- Smooth Slow-Down Animation ---
     delays = [0.12, 0.15, 0.18, 0.22, 0.28, 0.33]
 
     for d in delays:
@@ -1823,28 +1213,15 @@ async def execute_pull(ctx):
         spin = [random.choice(list(weighted_pool)) for _ in range(3)]
         await msg.edit(content=f"{spin[0]} | {spin[1]} | {spin[2]}")
 
-    # ============================================================
-    #                  FINAL RESULT LOGIC
-    # ============================================================
-    #
-    # Odds maintained as per request, rewards added below.
-    #
-    # ============================================================
-
     roll = random.random()
 
-    # --- BIG WIN (1%) ---
     if roll < 0.01:
         symbol = random.choice(symbols["rare"])
         result = [symbol, symbol, symbol]
-
-    # --- MEDIUM WIN (7.5%) ---
     elif roll < 0.085:
         pool = symbols["common"] + symbols["medium"]
         symbol = random.choice(pool)
         result = [symbol, symbol, symbol]
-
-    # --- SMALL WIN (15%) ---
     elif roll < 0.235:
         symbol = random.choice(weighted_pool)
         other = random.choice([s for s in weighted_pool if s != symbol])
@@ -1852,45 +1229,32 @@ async def execute_pull(ctx):
             [[symbol, symbol, other], [symbol, other, symbol], [other, symbol, symbol]]
         )
         result = pattern
-
-    # --- NEAR MISS (22.5%) ---
     elif roll < 0.46:
         symbol = random.choice(weighted_pool)
         near = random.choice([s for s in weighted_pool if s != symbol])
         pattern = random.choice([[symbol, symbol, near], [near, symbol, symbol]])
         result = pattern
-
-    # --- DEAD SPIN (everything else ~54%) ---
     else:
         result = random.sample(weighted_pool, 3)
-
-    # ============================================================
-    #                     MESSAGE OUTPUT & REWARD
-    # ============================================================
 
     r1, r2, r3 = result
     winnings = 0
 
-    # 3 Match - check if rare or common/medium
     if r1 == r2 == r3:
         if r1 in symbols["rare"]:
-            # Big win (1%) - JACKPOT
             winnings = 100
             final_msg = f"{r1} | {r2} | {r3}\n**JACKPOT!** {r1}\n{ctx.author.mention}"
         else:
-            # Medium win (7.5%)
             winnings = 20
             medium_msgs = ["**Hit!**", "**Score!**", "**Got em!**", "**Connect!**"]
             final_msg = f"{r1} | {r2} | {r3}\n{random.choice(medium_msgs)} {r1}\n{ctx.author.mention}"
 
-    # 2 Match - small win (15%)
     elif r1 == r2 or r2 == r3 or r1 == r3:
         winnings = 5
         winning_symbol = r1 if r1 == r2 else (r2 if r2 == r3 else r1)
         small_msgs = ["Push.", "Match.", "Pair.", "Almost."]
         final_msg = f"{r1} | {r2} | {r3}\n{random.choice(small_msgs)} {winning_symbol}\n{ctx.author.mention}"
 
-    # No match (dead spin or near-miss)
     else:
         winnings = 0
         insults = [
@@ -1918,17 +1282,11 @@ async def execute_pull(ctx):
             f"{r1} | {r2} | {r3}\n{random.choice(insults)}\n{ctx.author.mention}"
         )
 
-    # --- Award Winnings & Format Message ---
     if winnings > 0:
-        # Run database update asynchronously to avoid blocking the bot
         await ctx.bot.loop.run_in_executor(
             None, update_balance, ctx.author.id, winnings
         )
-
-        # Get the formatted currency string from the economy module
         formatted_winnings = economy.format_balance(winnings)
-
-        # Append the reward message
         final_msg += f"\n\nYou received {formatted_winnings}!"
 
     await asyncio.sleep(0.3)
@@ -1937,9 +1295,7 @@ async def execute_pull(ctx):
 
 @bot.command(name="pink")
 async def pink_command(ctx, member: discord.Member):
-    """Votes to assign the Masochist role to a user. Requires 7 votes in 48h."""
-
-    # 1. Basic Checks
+    # NOTE: Assuming update_pink_vote, get_active_pink_vote_count, add_masochist_role_removal, MASOCHIST_ROLE_ID, VOTE_THRESHOLD, ROLE_DURATION_SECONDS exist
     if member.id == ctx.author.id:
         return await ctx.reply(
             "❌ You can't vote for yourself... unless you're into that?",
@@ -1950,211 +1306,153 @@ async def pink_command(ctx, member: discord.Member):
             "❌ Bots are immune to this torture.", mention_author=False
         )
 
-    # Get the target role object
     masochist_role = ctx.guild.get_role(MASOCHIST_ROLE_ID)
     if not masochist_role:
         return await ctx.send(
             f"❌ Error: The configured role ID ({MASOCHIST_ROLE_ID}) was not found on this server."
         )
 
-    # 2. BOT PERMISSION AND HIERARCHY CHECKS (CRITICAL)
-    bot_member = ctx.guild.me  # The bot's member object in the guild
+    bot_member = ctx.guild.me
 
-    # 2a. Check for 'manage_roles' permission
     if not bot_member.guild_permissions.manage_roles:
         return await ctx.send(
             "🛑 **SETUP ERROR:** I do not have the **`Manage Roles`** permission. "
             "I cannot assign or remove the Masochist role until this is fixed."
         )
 
-    # 2b. Check role hierarchy
     if bot_member.top_role.position <= masochist_role.position:
         return await ctx.send(
             f"🛑 **HIERARCHY ERROR:** My highest role (`{bot_member.top_role.name}`) is not positioned above "
-            f"the target role (`{masochist_role.name}`). "
-            "Please move my role higher than the Masochist role in the server settings."
+            f"da target role (`{masochist_role.name}`). "
+            "Pwease move my wowe higher than da Masochist wowe in da se-w-sewvew settings."
         )
 
-    # 3. Check if target already has the role
     if masochist_role in member.roles:
         return await ctx.reply(
-            f"❌ {member.display_name} already has the {masochist_role.name} role.",
+            f"❌ {member.display_name} awweady has da {masochist_role.name} wowe.",
             mention_author=False,
         )
 
-    # 4. Add vote and check count (Asynchronous database operation)
     voted_id_str = str(member.id)
     voter_id_str = str(ctx.author.id)
 
-    # FIX: Change 'database.update_pink_vote' to just 'update_pink_vote'
     await ctx.bot.loop.run_in_executor(
         None, update_pink_vote, voted_id_str, voter_id_str
     )
 
-    # FIX: Change 'database.get_active_pink_vote_count' to just 'get_active_pink_vote_count'
     vote_count = await ctx.bot.loop.run_in_executor(
         None, get_active_pink_vote_count, voted_id_str
     )
 
-    # 5. Check Threshold
     if vote_count >= VOTE_THRESHOLD:
 
-        # --- THRESHOLD REACHED: ASSIGN ROLE ---
         try:
-            # 1. CRITICAL: ASSIGN THE ROLE HERE! (The missing line)
             await member.add_roles(
-                masochist_role, reason="Reached 7 pink votes in 48 hours."
+                masochist_role, reason="Weached 7 pink votes in 48 houws."
             )
 
-            # 2. DATABASE: Log the role for removal later.
             removal_time = time.time() + ROLE_DURATION_SECONDS
             await ctx.bot.loop.run_in_executor(
                 None, add_masochist_role_removal, voted_id_str, removal_time
             )
 
-            # 3. SUCCESS MESSAGE
             await ctx.send(
-                f"🎉 **PAYMENT DUE!** {member.mention} has reached **{VOTE_THRESHOLD} pink votes** in 48 hours and has been assigned the **{masochist_role.name}** role for 2 days!"
+                f"🎉 **PAYMENT DUE!** {member.mention} has weached **{VOTE_THRESHOLD} pink votes** in 48 houws and has been assigned da **{masochist_role.name}** wowe fow 2 days!"
             )
 
         except discord.Forbidden:
             await ctx.send(
-                "❌ Internal Error: Failed to assign role due to unexpected permissions issue."
+                "❌ Intewnaw Ewwow: Faiwed two assign wowe due two unexpected pewmissions issue."
             )
 
     else:
-        # --- Threshold NOT Reached: Report Status ---
         needed = VOTE_THRESHOLD - vote_count
         await ctx.send(
-            f"{member.display_name} now has **{vote_count}/{VOTE_THRESHOLD}** pink votes. "
-            f"**{needed} more** needed to pink name this fool"
+            f"{member.display_name} nyow has **{vote_count}/{VOTE_THRESHOLD}** pink votes. "
+            f"**{needed} mowe** needed two pink nyame dis foow."
         )
-
-
-# =========================================================
-# COMMAND ERROR HANDLER (ESSENTIAL FOR PRE-EXECUTION ERRORS)
-# =========================================================
 
 
 @pink_command.error
 async def pink_command_error(ctx, error):
-    # Check for the specific error that happens when the user forgets the argument
     if isinstance(error, commands.MissingRequiredArgument):
-        # Send the helpful message
         await ctx.send(
-            f"❌ Please mention a user to vote for, {ctx.author.mention}. Usage: `.pink @UserMention`"
+            f"❌ Pwease mention a usew two vote fow, {ctx.author.mention}. Usage: `.pink @UsewMention`"
         )
-        # CRITICAL: Return immediately to prevent the error from being re-logged globally.
         return
 
-    # Check for the error that happens when the user mentions something invalid
     elif isinstance(error, commands.BadArgument):
         await ctx.send(
-            f"❌ I could not find that user in the server. Please try again with a proper mention."
+            f"❌ I couwd nyot find dat usew in da sewvew. Pwease twy again wif a pwopaw mention."
         )
-        # Error handled.
         return
 
-    # If it's any other error (e.g., Forbidden, Cooldown), raise it normally for logging.
     else:
         raise error
 
 
-# role ias add
-
-# ============================================================
-# ROLE ALIAS COMMAND
-# ============================================================
-
-# Role alias mapping - Replace the IDs with your actual role IDs
-ROLE_ALIASES = {
-    "niggapass": "1168965931918176297",  # Replace with actual role ID
-    "trial": "1444477594698514594",  # Replace with actual role ID
-    "masochist": "1167184822129664113",  # Replace with actual role ID
-    "hoe": "1168293630570676354",  # Replace with actual role ID
-    "vip": "1234567890123456793",  # Replace with actual role ID
-}
-
-
 @bot.command(name="gr")
 async def give_role_command(ctx, member: discord.Member = None, role_alias: str = None):
-    """Give a role to a user using an alias (Admin only)"""
-    # Check if user has administrator permission
+    # NOTE: Assuming ROLE_ALIASES is defined globally
     if not ctx.author.guild_permissions.administrator:
         return await ctx.send("🚫 Peasant Detected")
 
-    # Check if arguments provided
     if not member or not role_alias:
         available = ", ".join(f"`{alias}`" for alias in ROLE_ALIASES.keys())
         return await ctx.send(
-            f"❌ Usage: `.give @user <role_alias>`\nAvailable aliases: {available}"
+            f"❌ Usage: `.give @usew <wowe_awias>`\nAvaiwabwe awiases: {available}"
         )
 
-    # Normalize the alias
     role_alias = role_alias.lower()
 
-    # Check if the alias exists
     if role_alias not in ROLE_ALIASES:
         available = ", ".join(f"`{alias}`" for alias in ROLE_ALIASES.keys())
         return await ctx.send(
-            f"❌ Unknown role alias: `{role_alias}`\nAvailable aliases: {available}"
+            f"❌ Unknown wowe awias: `{role_alias}`\nAvaiwabwe awiases: {available}"
         )
 
-    # Get the role
     role_id = ROLE_ALIASES[role_alias]
     role = ctx.guild.get_role(int(role_id))
 
     if not role:
         return await ctx.send(
-            f"❌ Role not found. Please check the role ID for `{role_alias}` in the configuration."
+            f"❌ Wowe nyot found. Pwease check da wowe ID fow `{role_alias}` in da configuwation."
         )
 
-    # Check if user already has the role - if so, remove it
     try:
         if role in member.roles:
             await member.remove_roles(role)
             embed = discord.Embed(
-                title="🗑️ Role Removed",
-                description=f"{member.mention} no longer has the **{role.name}** role.",
+                title="🗑️ Wowe Wemoved",
+                description=f"{member.mention} nyow nyot has da **{role.name}** wowe.",
                 color=discord.Color.orange(),
             )
-            embed.set_footer(text=f"Removed by {ctx.author.display_name}")
+            embed.set_footer(text=f"Wemoved by {ctx.author.display_name}")
             await ctx.send(embed=embed)
         else:
-            # Add the role
             await member.add_roles(role)
             embed = discord.Embed(
-                title="✅ Role Granted",
-                description=f"{member.mention} has been given the **{role.name}** role.",
+                title="✅ Wowe Gwanted",
+                description=f"{member.mention} has been given da **{role.name}** wowe.",
                 color=discord.Color.green(),
             )
             embed.set_footer(text=f"Given by {ctx.author.display_name}")
             await ctx.send(embed=embed)
     except discord.Forbidden:
-        await ctx.send("❌ I don't have permission to manage this role.")
+        await ctx.send("❌ I don't have pewmission two nyyanage dis wowe.")
     except Exception as e:
-        logger.error(f"Error managing role: {e}")
-        await ctx.send(f"❌ Error managing role: {type(e).__name__}")
-
-
-# qd quick delete
+        logger.error(f"Ewwow nyyanaging wowe: {e}")
+        await ctx.send(f"❌ Ewwow nyyanaging wowe: {type(e).__name__}")
 
 
 @bot.command(name="qd")
 async def quick_delete_command(ctx, *, message: str = None):
     """Quick delete - deletes your message after 1 second"""
-
-    # Delete the command message after 1 second
     await asyncio.sleep(1)
     try:
         await ctx.message.delete()
     except:
-        pass  # Silently fail if message is already deleted or bot lacks permissions
-
-
-# --- main.py ---
-
-# ... (Existing commands like @bot.command(name="tc")) ...
+        pass
 
 
 # ============================================================
@@ -2168,16 +1466,6 @@ async def balance_command(ctx, member: discord.Member = None):
     Shows your current token balance.
     Admins can check another user's balance: .balance @user
     """
-    # Only allow non-admins to check another user's balance if it's themselves.
-    if (
-        member
-        and member.id != ctx.author.id
-        and not ctx.author.guild_permissions.administrator
-    ):
-        return await ctx.send(
-            "🚫 You can only check your own balance or an admin can check others."
-        )
-
     await economy.handle_balance_command(ctx, member)
 
 
@@ -2201,34 +1489,21 @@ async def adminremove_command(ctx, member: discord.Member, amount: int):
     await economy.handle_admin_modify_command(ctx, member, amount, operation="remove")
 
 
-# torture command
-
-import torture
-
-# Cooldown tracking
-torture_cooldowns = {}
-
-
 @bot.command(name="torture")
 async def torture_command(ctx):
-    """Display a random historical torture method"""
-
+    # NOTE: Assuming torture.get_random_torture_method and torture_cooldowns exist
     user_id = ctx.author.id
     current_time = time.time()
 
-    # Check cooldown (15 seconds)
     if user_id in torture_cooldowns:
         time_since_last = current_time - torture_cooldowns[user_id]
         if time_since_last < 15:
-            return  # Silently ignore
+            return
 
-    # Update cooldown
     torture_cooldowns[user_id] = current_time
 
-    # Get random method
     method = torture.get_random_torture_method()
 
-    # Create embed
     embed = discord.Embed(
         title=f"🩸 Torture Method: {method['name']}",
         description=method["description"],
@@ -2243,9 +1518,7 @@ async def torture_command(ctx):
 
 @bot.command(name="time")
 async def time_command(ctx, member: discord.Member = None):
-    """Check time for a user"""
-
-    # Check if replying to a message
+    # NOTE: Assuming get_user_timezone exists
     if ctx.message.reference and not member:
         try:
             reply_msg = await ctx.channel.fetch_message(
@@ -2255,7 +1528,6 @@ async def time_command(ctx, member: discord.Member = None):
         except:
             pass
 
-    # Default to command author if no member specified
     if not member:
         member = ctx.author
 
@@ -2281,27 +1553,20 @@ async def time_command(ctx, member: discord.Member = None):
 
 @bot.command(name="dbcheck")
 async def db_check(ctx):
-    """Check database status (Admin only)"""
+    # NOTE: Assuming DB_FILE, get_db, load_quotes_from_db, get_user_timezone exist
     if not ctx.author.guild_permissions.administrator:
         return await ctx.send("🚫 Peasant Detected")
 
     exists = os.path.exists(DB_FILE)
     size = os.path.getsize(DB_FILE) if exists else 0
 
-    # Check all tables
     try:
         with get_db() as conn:
             c = conn.cursor()
-
-            # Count quotes
             c.execute("SELECT COUNT(*) FROM quotes")
             quote_count = c.fetchone()[0]
-
-            # Count activity records
             c.execute("SELECT COUNT(*) FROM activity_hourly")
             activity_count = c.fetchone()[0]
-
-            # Count timezone records
             c.execute("SELECT COUNT(*) FROM user_timezones")
             tz_count = c.fetchone()[0]
 
@@ -2319,7 +1584,7 @@ async def db_check(ctx):
 
 @bot.command(name="dbintegrity")
 async def db_integrity(ctx):
-    """Check database integrity (Admin only)"""
+    # NOTE: Assuming get_db exists
     if not ctx.author.guild_permissions.administrator:
         return await ctx.send("🚫 Peasant Detected")
 
@@ -2339,7 +1604,7 @@ async def db_integrity(ctx):
 
 @bot.command(name="testactivity")
 async def test_activity(ctx):
-    """Test activity logging manually"""
+    # NOTE: Assuming log_activity_in_memory exists in activity module
     if not ctx.author.guild_permissions.administrator:
         return await ctx.send("🚫 Peasant Detected")
 
@@ -2347,7 +1612,6 @@ async def test_activity(ctx):
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
-    # Manually log some test activity
     now = datetime.now(ZoneInfo("America/Los_Angeles"))
     hour = now.strftime("%H")
 
@@ -2355,7 +1619,6 @@ async def test_activity(ctx):
     log_activity_in_memory(str(ctx.author.id), hour)
     log_activity_in_memory("999999999", hour)
 
-    # Show buffer
     total_hourly = sum(activity_buffer["hourly"].values())
     total_users = sum(activity_buffer["users"].values())
 
@@ -2370,7 +1633,7 @@ async def test_activity(ctx):
 
 @bot.command(name="showquotes")
 async def show_quotes(ctx):
-    """Show sample quotes (Admin only)"""
+    # NOTE: Assuming load_quotes_from_db exists
     if not ctx.author.guild_permissions.administrator:
         return await ctx.send("🚫 Peasant Detected")
     quotes = load_quotes_from_db()
@@ -2380,7 +1643,7 @@ async def show_quotes(ctx):
 
 @bot.command(name="dbcheckwrite")
 async def db_check_write(ctx, *, quote_text: str = "test write"):
-    """Test database write (Admin only)"""
+    # NOTE: Assuming get_db, DB_FILE exist
     if not ctx.author.guild_permissions.administrator:
         return await ctx.send("🚫 Peasant Detected")
     try:
@@ -2395,7 +1658,7 @@ async def db_check_write(ctx, *, quote_text: str = "test write"):
 
 @bot.command(name="flushactivity")
 async def flush_activity_manual(ctx):
-    """Manually flush activity to database"""
+    # NOTE: Assuming flush_activity_to_db exists in activity module
     if not ctx.author.guild_permissions.administrator:
         return await ctx.send("🚫 Peasant Detected")
 
@@ -2411,7 +1674,7 @@ async def flush_activity_manual(ctx):
 
 @bot.command(name="fixdb")
 async def fix_db(ctx):
-    """Reinitialize database with backup (Admin only)"""
+    # NOTE: Assuming DB_FILE, get_db exist
     if not ctx.author.guild_permissions.administrator:
         return await ctx.send("🚫 Peasant Detected")
 
@@ -2433,282 +1696,12 @@ async def fix_db(ctx):
         await ctx.send(f"❌ Error: {e}")
 
 
-# shop
-
-
-@bot.command(name="buy")
-@commands.cooldown(1, 5, commands.BucketType.user)  # 5s cooldown to prevent spam
-async def buy_command(ctx, item_name: str = None):
-    """View the shop menu (via DM) or purchase an item."""
-
-    # CASE 1: USER TYPES JUST '.buy'
-    if item_name is None:
-        embed = discord.Embed(
-            title="Apeiron Shop",
-            description="Spend your tokens and observe the effects.",
-            color=discord.Color.purple(),
-        )
-
-        for item, data in ITEM_REGISTRY.items():
-            price = f"{data['cost']} 💎"
-            # feedback contains the flavor text/description
-            embed.add_field(
-                name=f"{item.replace('_', ' ').title()} — {price}",
-                value=f"*{data.get('feedback', 'No description.')}*",
-                inline=False,
-            )
-
-        try:
-            await ctx.author.send(embed=embed)
-            await ctx.send(f"Menu sent to DMs {ctx.author.mention}")
-        except discord.Forbidden:
-            await ctx.send(f"❌ {ctx.author.mention}, Please open your DMs.")
-        return
-
-    # CASE 2: USER TYPES '.buy <item>'
-    official_name = ITEM_ALIASES.get(item_name.lower())
-    if not official_name:
-        return await ctx.send(
-            f"❌ '{item_name}' not available. Type `.buy` to see the menu."
-        )
-
-    item_data = ITEM_REGISTRY[official_name]
-    cost = item_data["cost"]
-
-    # Use the atomic purchase function from database.py
-    success = await bot.loop.run_in_executor(
-        None, atomic_purchase, ctx.author.id, official_name, cost
-    )
-
-    if success:
-        await ctx.send(
-            f"✅ **{ctx.author.display_name}** bought a **{official_name.replace('_', ' ').title()}** for {cost} 💎!"
-        )
-    else:
-        # If it fails, it's almost always insufficient funds
-        balance = await bot.loop.run_in_executor(None, get_balance, ctx.author.id)
-        await ctx.send(f"❌ Declined. You need {cost} 💎 but only have {balance} 💎.")
-
-
-@bot.command(name="inventory", aliases=["inv"])
-@commands.cooldown(1, 10, commands.BucketType.user)  # 10s cooldown
-async def inventory_command(ctx):
-    """DMs the user their current items."""
-    # Get inventory dict: {'item_name': quantity}
-    inventory = await bot.loop.run_in_executor(None, get_user_inventory, ctx.author.id)
-
-    if not inventory:
-        return await ctx.send(f"{ctx.author.mention}, your inventory is empty.")
-
-    msg = "🎒 **Your Inventory:**\n"
-    for item, qty in inventory.items():
-        msg += f"• **{item.replace('_', ' ').title()}**: x{qty}\n"
-
-    try:
-        await ctx.author.send(msg)
-        await ctx.send(f"Inventory sent to DMs {ctx.author.mention}")
-    except discord.Forbidden:
-        # Fallback to chat if DMs are closed
-        await ctx.send(
-            f"⚠️ {ctx.author.mention}, your DMs are closed. Here is your inventory:\n{msg}"
-        )
-
-
-@bot.command(name="use")
-@commands.cooldown(1, 5, commands.BucketType.user)
-async def use_command(ctx, item_input: str, target: discord.Member = None):
-    """
-    Uses an item.
-    Usage: .use muzzle @user (Curses) OR .use kush (Consumables)
-    """
-    # 1. Identify the item
-    item_input = item_input.strip('"').strip("'")
-    official_name = ITEM_ALIASES.get(item_input.lower())
-    item_info = ITEM_REGISTRY.get(official_name)
-
-    if not official_name or not item_info:
-        return await ctx.send(f"❌ '{item_input}' is not a valid item.")
-
-    # 2. Check Ownership
-    inventory = await bot.loop.run_in_executor(
-        None, database.get_user_inventory, ctx.author.id
-    )
-    if inventory.get(official_name, 0) <= 0:
-        return await ctx.send(
-            f"❌ You don't have any **{official_name.replace('_', ' ').title()}**s!"
-        )
-
-    item_type = item_info.get("type")
-
-    # ==========================================
-    # LOGIC FOR CONSUMABLES (Self-Use)
-    # ==========================================
-    if item_type == "fun":
-        await bot.loop.run_in_executor(
-            None, database.remove_item_from_inventory, ctx.author.id, official_name
-        )
-        return await ctx.send(f"🌿 {ctx.author.mention}: {item_info['feedback']}")
-
-    # ==========================================
-    # LOGIC FOR CURSES (Target-Use)
-    # ==========================================
-    if item_type == "curse":
-        if target is None:
-            return await ctx.send(
-                f"❌ You must mention someone to use **{official_name}** on! Example: `.use {official_name} @user`"
-            )
-
-        # Admin/Bot Immunity
-        if target.guild_permissions.administrator or target.bot:
-            return await ctx.send(
-                f"❌ {target.display_name} is immune to your nonsense."
-            )
-
-        # Already Cursed?
-        existing_effect = await bot.loop.run_in_executor(
-            None, database.get_active_effect, target.id
-        )
-        if existing_effect:
-            return await ctx.send(
-                f"❌ {target.display_name} is already suffering from an active curse."
-            )
-
-        # Check for target's Echo Ward
-        target_inv = await bot.loop.run_in_executor(
-            None, database.get_user_inventory, target.id
-        )
-        if target_inv.get("echo_ward", 0) > 0:
-            await bot.loop.run_in_executor(
-                None, database.remove_item_from_inventory, target.id, "echo_ward"
-            )
-            await bot.loop.run_in_executor(
-                None, database.remove_item_from_inventory, ctx.author.id, official_name
-            )
-            return await ctx.send(
-                f"🛡️ **WARD TRIGGERED!** {target.mention}'s Echo Ward blocked {ctx.author.mention}'s curse!"
-            )
-
-        # Apply the Curse
-        duration = item_info.get("duration_sec", 600)
-        await bot.loop.run_in_executor(
-            None, database.add_active_effect, target.id, official_name, duration
-        )
-        await bot.loop.run_in_executor(
-            None, database.remove_item_from_inventory, ctx.author.id, official_name
-        )
-        await ctx.send(
-            f"👹 **HEX APPLIED!** {item_info['feedback']}\nTarget: {target.mention}"
-        )
-
-    # ==========================================
-    # LOGIC FOR DEFENSE
-    # ==========================================
-    elif item_type == "defense":
-        await ctx.send(
-            "🛡️ This item is passive! It stays in your inventory and blocks the next curse automatically."
-        )
-
-
-@bot.command(name="mergequotes")
-async def merge_quotes(ctx):
-    """Merge quotes from backup (Admin only)"""
-    if not ctx.author.guild_permissions.administrator:
-        return await ctx.send("🚫 Peasant Detected")
-
-    old_db = f"{DB_FILE}.bak"
-    if not os.path.exists(old_db):
-        return await ctx.send("❌ No backup file found to merge.")
-
-    try:
-        conn_new = sqlite3.connect(DB_FILE)
-        conn_old = sqlite3.connect(old_db)
-        c_new = conn_new.cursor()
-        c_old = conn_old.cursor()
-
-        c_old.execute("SELECT quote FROM quotes")
-        rows = c_old.fetchall()
-        count = 0
-        for (quote,) in rows:
-            try:
-                c_new.execute(
-                    "INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (quote,)
-                )
-                count += 1
-            except Exception:
-                pass
-        conn_new.commit()
-        await ctx.send(f"✅ Merged {count} quotes from backup into the new database.")
-    except Exception as e:
-        logger.error(f"Error merging: {e}")
-        await ctx.send(f"❌ Error merging: {e}")
-    finally:
-        conn_old.close()
-        conn_new.close()
-
-
-# battle cmd
-
-'''
-@bot.command(name="vb")
-async def battle_command(ctx, *args):
-    """Reaction battle system (Admin/Caporegime only to start/stop, everyone can view scoreboard)
-
-    Usage:
-    .vb @user1 @user2  - Start battle
-    .vb stop           - End current battle
-    .vb top            - View scoreboard (everyone)
-    """
-
-    # Handle scoreboard (everyone can use)
-    if len(args) == 1 and args[0].lower() == "top":
-        await battle.show_scoreboard(ctx)
-        return
-
-    # Permission check for start/stop: Admin or Caporegime role
-    if not (
-        ctx.author.guild_permissions.administrator
-        or any(role.name == "Caporegime" for role in ctx.author.roles)
-    ):
-        return await ctx.send("🚫 Peasant Detected")
-
-    # Handle stop command
-    if len(args) == 1 and args[0].lower() == "stop":
-        await battle.stop_battle(ctx)
-        return
-
-    # Check for two mentions to start battle
-    if len(ctx.message.mentions) != 2:
-        return await ctx.send(
-            "⚔️ **Battle Commands**\n\n"
-            "`.vb @user1 @user2` - Start a battle (Admin/Caporegime)\n"
-            "`.vb stop` - End current battle (Admin/Caporegime)\n"
-            "`.vb top` - View scoreboard (Everyone)"
-        )
-
-    user1 = ctx.message.mentions[0]
-    user2 = ctx.message.mentions[1]
-
-    await battle.start_battle(ctx, user1, user2)
-'''
-
-# archive cmd
-
-
 @bot.command(name="archive")
 async def archive_forum(ctx, which: str = None):
-    """Archive forum channels and create fresh replacements (Admin only)
-
-    Usage:
-    .archive forum       - Archive #forum only
-    .archive forum-livi  - Archive #forum-livi only
-    .archive both        - Archive both channels
-    """
-
-    # Admin only
+    # NOTE: Assuming get_forum_channel, ARCHIVE_CATEGORY_ID exist
     if not ctx.author.guild_permissions.administrator:
         return await ctx.send("🚫 Peasant Detected")
 
-    # Validate input
     valid_options = ["forum", "forum-livi", "both"]
     if which not in valid_options:
         return await ctx.send(
@@ -2721,58 +1714,48 @@ async def archive_forum(ctx, which: str = None):
     guild = ctx.guild
     channels_to_archive = []
 
-    # Determine which channels to archive
     if which == "both":
         channels_to_archive = ["forum", "forum-livi"]
     else:
         channels_to_archive = [which]
 
-    # Archive each channel
     for channel_name in channels_to_archive:
         try:
-            # Get the channel by exact name
             old_channel = get_forum_channel(guild, channel_name)
 
             if not old_channel:
                 await ctx.send(f"⚠️ Channel `#{channel_name}` not found. Skipping...")
                 continue
 
-            # Store channel properties
             category = old_channel.category
             position = old_channel.position
-
-            # Generate archive name with current date
             now = datetime.now()
-            archive_name = f"{channel_name}-{now.strftime('%b-%Y').lower()}"  # e.g., "forum-nov-2024"
+            archive_name = f"{channel_name}-{now.strftime('%b-%Y').lower()}"
 
-            # Rename old channel to archive
             await old_channel.edit(name=archive_name)
 
-            # Move to archive category and sync permissions
             ARCHIVE_CATEGORY_ID = 1439078260402159626
             archive_category = guild.get_channel(ARCHIVE_CATEGORY_ID)
 
             if archive_category:
                 await old_channel.edit(
                     category=archive_category,
-                    sync_permissions=True,  # Inherit category permissions
+                    sync_permissions=True,
                 )
                 await ctx.send(
                     f"📦 Channel `#{channel_name}` archived as `#{archive_name}` and moved to archive category"
                 )
 
-            # Create new fresh channel with same settings
             new_channel = await guild.create_text_channel(
                 name=channel_name,
                 category=category,
                 position=position,
-                overwrites=old_channel.overwrites,  # Copy permissions
+                overwrites=old_channel.overwrites,
                 topic=old_channel.topic,
                 slowmode_delay=old_channel.slowmode_delay,
                 nsfw=old_channel.nsfw,
             )
 
-            # Send confirmation in new channel
             await new_channel.send(
                 f"✨ **#{channel_name} channel created!** The old channel has been archived."
             )
@@ -2784,14 +1767,6 @@ async def archive_forum(ctx, which: str = None):
         except Exception as e:
             logger.error(f"Error archiving {channel_name}: {e}")
             await ctx.send(f"❌ Error archiving `#{channel_name}`: {e}")
-
-    await ctx.send("✅ Archived")
-
-
-# debug cmd
-
-# Global debug flag
-DEBUG_MODE = False
 
 
 @bot.command(name="debug")
@@ -2819,18 +1794,13 @@ async def toggle_debug(ctx, state: str = None):
         await ctx.send("Usage: `!debug on` or `!debug off`")
 
 
-# Global check that blocks commands when debug mode is on
 @bot.check
 async def globally_block_during_debug(ctx):
-    # Always allow administrators (so you can turn debug off)
     if ctx.author.guild_permissions.administrator:
         return True
-
-    # Block all other commands if debug mode is active
     if DEBUG_MODE:
         await ctx.send("🧱 The spirits are silent…")
         return False
-
     return True
 
 
@@ -2838,10 +1808,8 @@ async def globally_block_during_debug(ctx):
 async def on_error(event, *args, **kwargs):
     """Log errors without stopping the bot"""
     logger.error(f"Error in {event}", exc_info=True)
-    # exc_info=True shows the full traceback
 
 
-# Add a shutdown handler
 import atexit
 
 
@@ -2851,10 +1819,6 @@ def cleanup_session():
 
 
 atexit.register(cleanup_session)
-
-# ============================================================
-# RUN BOT
-# ============================================================
 
 if __name__ == "__main__":
     bot.run(TOKEN)

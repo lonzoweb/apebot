@@ -42,9 +42,6 @@ ITEM_ALIASES = {
     "silence": "muzzle",
     "uwu": "uwu",
     "uwuify": "uwu",
-    "saturn": "saturn_uwu",
-    "babytalk": "saturn_uwu",
-    "saturn_uwu": "saturn_uwu",
     "ward": "echo_ward",
     "echo": "echo_ward",
     "shield": "echo_ward",
@@ -56,8 +53,6 @@ ITEM_ALIASES = {
 # ============================================================
 # TRANSFORMATION LOGIC
 # ============================================================
-
-import random
 
 
 def aggressive_uwu(text: str) -> str:
@@ -80,7 +75,6 @@ def aggressive_uwu(text: str) -> str:
     transformed_words = []
 
     # Define interactive insertions with the exact formatting: **\*phrase\***
-    # NOTE: The double space at the start of the string will be stripped later, but adds spacing here.
     interactive_actions = [
         " **\*bweops your nose\***",
         " **\*kisses your cheek\***",
@@ -89,7 +83,7 @@ def aggressive_uwu(text: str) -> str:
         " **\*pouts\***",
         " **\*pwease\***",
         " **\*sniffles\***",
-        " **\*wags taiw\***",
+        " **\*wags tail\***",
     ]
 
     # Controlled insertion chance: 15% chance to insert an action between words
