@@ -23,12 +23,6 @@ ITEM_REGISTRY = {
         "type": "curse",
         "feedback": "🎀 Dawww~",
     },
-    "saturn_uwu": {
-        "cost": 350,
-        "duration_sec": 600,  # 10 mins
-        "type": "curse",
-        "feedback": "🧿 Saturn Uwu upon you, cursed baby-talk.",
-    },
     "echo_ward": {
         "cost": 400,
         "type": "defense",
