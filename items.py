@@ -54,7 +54,6 @@ ITEM_ALIASES = {
 # TRANSFORMATION LOGIC
 # ============================================================
 
-
 # NOTE: The list of unreadable/unwanted final slop is manually curated here
 CLEAN_FINAL_SLOP = [
     " (✿◡‿◡)",
@@ -69,6 +68,37 @@ CLEAN_FINAL_SLOP = [
     " *pats head*",
 ]
 
+# Specific word overrides for smoother reading
+UWU_WORD_MAP = {
+    "you": "yuw",
+    "have": "haz",
+    "are": "r",
+    "love": "wuv",
+    "the": "da",
+    "this": "dis",
+    "that": "dat",
+    "with": "wif",
+    "what": "wat",
+    "no": "nyo",
+    "oh": "owh",
+    "is": "iz",
+    "to": "two",
+}
+
+# Define interactive insertions with the exact formatting: **\*phrase\***
+INTERACTIVE_ACTIONS = [
+    " **\*bweops your nose\***",
+    " **\*kisses your cheek\***",
+    " **\*leaks\***",
+    " **\*giggles\***",
+    " **\*pouts\***",
+    " **\*pwease\***",
+    " **\*sniffles\***",
+    " **\*wags tail\***",
+]
+
+CLEAN_SUFFIXES = ["-ie", "-wie", "-y", "-wy"]
+
 
 def aggressive_uwu(text: str) -> str:
     """
@@ -78,69 +108,96 @@ def aggressive_uwu(text: str) -> str:
     if not text:
         return "..."
 
-    # 1. LINK/MEDIA PURGE (New step: Remove all URLs and Discord formatting)
-    # Target: URLs, Discord mentions (<@...>), Discord emotes (<:name:id>), and channel links (<#...>)
-
-    # Remove URLs (simplified regex)
+    # 1. LINK/MEDIA PURGE
+    # Remove URLs
     text = re.sub(r"https?://[^\s]+", "", text)
-
-    # Remove Discord formatting (emotes, mentions, channel links - simplified regex)
+    # Remove Discord formatting (emotes, mentions, channel links)
     text = re.sub(r"<a?:[^:]+:\d+>|@\w+|#\w+|@&[0-9]+|<#[0-9]+>", "", text)
 
-    # 2. Standardize and Lowercase
+    if not text.strip():
+        return random.choice(CLEAN_FINAL_SLOP)
+
+    # 2. Standardize
     text = text.lower()
 
-    # 3. Fundamental UWU Swaps (L/R -> W, Th -> Fw/Tw)
-    text = text.replace("l", "w").replace("r", "w")
-    text = text.replace("th", "fw").replace("to", "two")
+    # 3. "Nya-fication" (Turn na/ne/ni/no/nu into nya/nye/nyi/nyo/nyu)
+    # Checks for n followed by a vowel, replaces with ny+vowel
+    text = re.sub(r"n([aeiou])", r"ny\1", text)
 
-    # 4. Aggressive but Controlled Stuttering (25% chance)
+    # 4. Fundamental Letter Swaps
+    # We do this before splitting to catch partials, but after Nya-fication
+    text = text.replace("l", "w").replace("r", "w")
+    text = text.replace("th", "fw")
+
     words = text.split()
     transformed_words = []
 
-    # Define interactive insertions with the exact formatting: **\*phrase\***
-    interactive_actions = [
-        " **\*bweops your nose\***",
-        " **\*kisses your cheek\***",
-        " **\*leaks\***",
-        " **\*giggles\***",
-        " **\*pouts\***",
-        " **\*pwease\***",
-        " **\*sniffles\***",
-        " **\*wags tail\***",  # Corrected from 'taiw'
-    ]
-
-    # Define cleaner suffixes
-    clean_suffixes = ["-ie", "-wie", "-y", "-wy"]  # Removed -kun, -chan
-
-    # Controlled insertion chance: 15% chance to insert an action between words
+    # 5. Word-by-Word Processing
     for i, word in enumerate(words):
+        # Clean punctuation for dictionary lookup
+        clean_word = word.strip(".,!?")
 
-        # Apply stuttering logic (unchanged)
-        if (
-            len(word) > 4
-            and not word.startswith(("<", "@", "http", "da", "two"))
-            and random.random() < 0.35
-        ):
-            stutter = f"{word[0]}-"
-            word = stutter + word
+        # A. Check Dictionary Overrides First (Highest Quality)
+        if clean_word in UWU_WORD_MAP:
+            # Replace the word but keep punctuation attached if possible
+            # Simple replace for now, context usually implies punctuation isn't critical for uwu
+            word = UWU_WORD_MAP[clean_word]
 
-        # Apply clean suffixes logic (10% chance)
-        if random.random() < 0.10:
-            word = word.rstrip("s") + random.choice(clean_suffixes)
+        else:
+            # B. Aggressive but Controlled Stuttering (30% chance)
+            # Don't stutter short words (<=3) or words starting with w (looks weird)
+            if len(word) > 3 and not word.startswith("w") and random.random() < 0.30:
+                stutter = f"{word[0]}-"
+                word = stutter + word
+
+            # C. Apply clean suffixes logic (10% chance)
+            # Only if word is long enough and doesn't already end in a vowel-like sound
+            if len(word) > 4 and random.random() < 0.10:
+                word = word.rstrip("s") + random.choice(CLEAN_SUFFIXES)
 
         transformed_words.append(word)
 
-        # 4. Insert Interactive Action (After 3-5 words, 15% chance)
-        if (i % random.randint(3, 5) == 0 and i > 0) and random.random() < 0.15:
-            transformed_words.append(random.choice(interactive_actions))
+        # 6. Insert Interactive Action (After 3-6 words, 15% chance)
+        # We ensure it doesn't happen at the very start
+        if (i % random.randint(3, 6) == 0 and i > 0) and random.random() < 0.15:
+            transformed_words.append(random.choice(INTERACTIVE_ACTIONS))
 
     text = " ".join(transformed_words)
 
-    # 5. Final Polish and Emoji
+    # 7. Final Polish
     if text:
         # Capitalize the first letter for readability
         text = text[0].upper() + text[1:]
 
     # Remove excessive whitespace and append final slop
     return text.strip() + random.choice(CLEAN_FINAL_SLOP)
+
+
+# ============================================================
+# UTILITIES
+# ============================================================
+
+
+def extract_gif_url(message):
+    """
+    Checks if a message contains a GIF via attachment or URL.
+    Used for GIF tracking logic in main.py.
+    """
+    # Check attachments
+    if message.attachments:
+        for anim in message.attachments:
+            if anim.content_type and "gif" in anim.content_type:
+                return anim.url
+
+    # Check text for Tenor/Giphy links
+    gif_patterns = [
+        r"https?://[^\s]+giphy\.com/[^\s]+",
+        r"https?://[^\s]+tenor\.com/[^\s]+",
+        r"https?://[^\s]+\.gif",
+    ]
+    for pattern in gif_patterns:
+        match = re.search(pattern, message.content)
+        if match:
+            return match.group(0)
+
+    return None
