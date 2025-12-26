@@ -57,10 +57,13 @@ ITEM_ALIASES = {
 # TRANSFORMATION LOGIC
 # ============================================================
 
+import random
+
 
 def aggressive_uwu(text: str) -> str:
     """
-    Transforms text into a readable, high-quality UWU style with integrated interactive actions.
+    Transforms text into a readable, high-quality UWU style with integrated interactive actions
+    formatted as **\*bolded phrase*** (literal bolded asterisks).
     """
     if not text:
         return "..."
@@ -76,16 +79,17 @@ def aggressive_uwu(text: str) -> str:
     words = text.split()
     transformed_words = []
 
-    # Define interactive insertions
+    # Define interactive insertions with the exact formatting: **\*phrase\***
+    # NOTE: The double space at the start of the string will be stripped later, but adds spacing here.
     interactive_actions = [
-        " *bweops your nose*",
-        " *kisses your cheek*",
-        " *leaks*",
-        " *giggles*",
-        " *pouts*",
-        " *pwease*",
-        " *sniffles*",
-        " *wags taiw*",
+        " **\*bweops your nose\***",
+        " **\*kisses your cheek\***",
+        " **\*leaks\***",
+        " **\*giggles\***",
+        " **\*pouts\***",
+        " **\*pwease\***",
+        " **\*sniffles\***",
+        " **\*wags taiw\***",
     ]
 
     # Controlled insertion chance: 15% chance to insert an action between words
@@ -121,16 +125,16 @@ def aggressive_uwu(text: str) -> str:
         " (✿◡‿◡)",
         " UwU",
         " owo",
-        " rawr x3",
+        " grr",
         " :3",
-        " ^-^",
+        " ts",
         " *blushes*",
-        " *sweats*",
-        " hehehe",
-        " *teehee*",
+        " *dies*",
+        " lol",
+        " *stop*",
     ]
 
-    # Remove any internal leading/trailing whitespace and append final slop
+    # Remove excessive whitespace and append final slop
     return text.strip() + random.choice(final_slop)
 
 
