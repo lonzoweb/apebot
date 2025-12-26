@@ -108,7 +108,7 @@ def aggressive_uwu(text: str) -> str:
     # 0. ANTI-CIRCUMVENTION (UNICODE NORMALIZATION)
     # This converts "𝐇𝐞𝐥𝐥𝐨", "𝘏𝘦𝘭𝘭𝘰", "𝐻𝑒𝑙𝑙𝑜" etc. back to standard "Hello"
     # NFKC = Normalization Form Compatibility Composition
-    text = unicodedata.normalize('NFKC', text)
+    text = unicodedata.normalize("NFKC", text)
 
     # 1. LINK/MEDIA PURGE
     text = re.sub(r"https?://[^\s]+", "", text)
@@ -143,7 +143,7 @@ def aggressive_uwu(text: str) -> str:
                 word = stutter + word
 
             # C. Elongation (Randomly extend vowels or 'y') - 15% Chance
-            elif len(word) > 3 and random.random() < 0.45:
+            elif len(word) > 3 and random.random() < 0.35:
                 vowels = [i for i, char in enumerate(word) if char in "aeiouy"]
                 if vowels:
                     target_index = vowels[-1]
@@ -153,13 +153,13 @@ def aggressive_uwu(text: str) -> str:
                     word = word[:target_index] + extension + word[target_index:]
 
             # D. Suffixes (10% chance)
-            elif len(word) > 4 and random.random() < 0.20:
+            elif len(word) > 4 and random.random() < 0.30:
                 word = word.rstrip("s") + random.choice(CLEAN_SUFFIXES)
 
         transformed_words.append(word)
 
         # 5. Insert Interactive Action
-        if (i % random.randint(3, 6) == 0 and i > 0) and random.random() < 0.45:
+        if (i % random.randint(3, 6) == 0 and i > 0) and random.random() < 0.35:
             transformed_words.append(random.choice(INTERACTIVE_ACTIONS))
 
     text = " ".join(transformed_words)
@@ -181,4 +181,17 @@ def extract_gif_url(message):
     """
     if message.attachments:
         for anim in message.attachments:
-            if anim.content_type and
+            if anim.content_type and "gif" in anim.content_type:
+                return anim.url
+
+    gif_patterns = [
+        r"https?://[^\s]+giphy\.com/[^\s]+",
+        r"https?://[^\s]+tenor\.com/[^\s]+",
+        r"https?://[^\s]+\.gif",
+    ]
+    for pattern in gif_patterns:
+        match = re.search(pattern, message.content)
+        if match:
+            return match.group(0)
+
+    return None
