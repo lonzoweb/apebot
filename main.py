@@ -2529,13 +2529,33 @@ async def inventory_command(ctx):
         )
 
 
+# --- Replacement for the .use command in main.py ---
+
+
 @bot.command(name="use")
 @commands.cooldown(1, 5, commands.BucketType.user)
-async def use_command(ctx, item_input: str, target: discord.Member = None):
+async def use_command(
+    ctx, item_input: str = None, target: discord.Member = None
+):  # <-- Made item_input optional
     """
     Uses an item.
     Usage: .use muzzle @user (Curses) OR .use kush (Consumables)
     """
+
+    # 0. Check if input is missing
+    if not item_input:
+        embed = discord.Embed(title="🎒 Item Usage Guide", color=discord.Color.blue())
+        embed.add_field(
+            name="Curses (Target @User)",
+            value="`.use muzzle @user`\n`.use uwu @user`",
+            inline=False,
+        )
+        embed.add_field(name="Consumables (Self)", value="`.use kush`", inline=False)
+        embed.add_field(
+            name="Info", value="Check your `.inv` to see what you own.", inline=False
+        )
+        return await ctx.send(embed=embed)
+
     # 1. Identify the item
     item_input = item_input.strip('"').strip("'")
     official_name = ITEM_ALIASES.get(item_input.lower())
