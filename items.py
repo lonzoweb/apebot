@@ -92,7 +92,7 @@ def aggressive_uwu(text: str) -> str:
 
     # 3. Fundamental UWU Swaps (L/R -> W, Th -> Fw/Tw)
     text = text.replace("l", "w").replace("r", "w")
-    text = text.replace("th", "fw").replace("the", "da").replace("to", "two")
+    text = text.replace("th", "fw").replace("to", "two")
 
     # 4. Aggressive but Controlled Stuttering (25% chance)
     words = text.split()
@@ -111,7 +111,7 @@ def aggressive_uwu(text: str) -> str:
     ]
 
     # Define cleaner suffixes
-    clean_suffixes = ["-ie", "-wie", "-y", "-wy", "s-sama"]  # Removed -kun, -chan
+    clean_suffixes = ["-ie", "-wie", "-y", "-wy"]  # Removed -kun, -chan
 
     # Controlled insertion chance: 15% chance to insert an action between words
     for i, word in enumerate(words):
@@ -120,7 +120,7 @@ def aggressive_uwu(text: str) -> str:
         if (
             len(word) > 4
             and not word.startswith(("<", "@", "http", "da", "two"))
-            and random.random() < 0.25
+            and random.random() < 0.35
         ):
             stutter = f"{word[0]}-"
             word = stutter + word
