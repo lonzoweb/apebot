@@ -89,7 +89,7 @@ INTERACTIVE_ACTIONS = [
     " **\*pouts\***",
     " **\*pwease\***",
     " **\*sniffles\***",
-    " **\*wags tail\***",
+    " **\*screeeeech\***",
 ]
 
 CLEAN_SUFFIXES = ["-ie", "-wie", "-y", "-wy"]
