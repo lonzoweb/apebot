@@ -1742,13 +1742,23 @@ async def location_command(ctx, *, args: str = None):
         await ctx.send("⌛ Timeout. Location setting cancelled.")
 
 
-# street dice bones
+import random
+import asyncio
+import time
+
+# ==========================================
+# 1. CONFIGURATION & UTILITIES
+# ==========================================
+
+DICE_EMOJIS = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️⃣", 6: "6️⃣"}
+
 user_dice_usage = {}
 
 
 def get_ceelo_score(dice):
     """
-    Rank 4: 4-5-6 | Rank 3: Triple | Rank 2: Pair + Point | Rank 1: 1-2-3
+    Returns (rank, point_value)
+    Rank 4: 4-5-6 | Rank 3: Triple | Rank 2: Point | Rank 1: 1-2-3 | Rank 0: Junk
     """
     d = sorted(dice)
     if d == [4, 5, 6]:
@@ -1766,81 +1776,80 @@ def get_ceelo_score(dice):
     return 0, 0
 
 
-DICE_EMOJIS = {1: "⚀", 2: "⚁", 3: "⚂", 4: "⚃", 5: "⚄", 6: "⚅"}
+# ==========================================
+# 2. MAIN DICE COMMAND
+# ==========================================
 
 
 @bot.command(name="dice")
-async def dice_command(ctx, bet: str = None):  # Change 'int' to 'str' here
+async def dice_command(ctx, bet: str = None):
+    """Street Dice (Cee-lo). .dice <amount> or .dice all"""
     user_id = ctx.author.id
+
+    # --- Check Balance ---
     balance = await bot.loop.run_in_executor(None, get_balance, user_id)
 
-    # Handle "all" or specific numbers
     if bet == "all":
-        bet = balance
+        bet_amt = balance
     else:
         try:
-            bet = int(bet)
+            bet_amt = int(bet)
         except (ValueError, TypeError):
-            return await ctx.send("`Usage: .dice <amount> or .dice all`")
+            return await ctx.send(
+                '`Usage: .dice <amount> or .dice all`\n"Put some dough on the floor homie."'
+            )
 
-    if bet <= 0:
-        return await ctx.send("Put some dough on the floor homie")
+    if bet_amt <= 0:
+        return await ctx.send("Stop playing. Enter a real bet.")
 
-    user_id = ctx.author.id
-
-    # --- 1. ADMIN BYPASS ---
-    if ctx.author.guild_permissions.administrator:
-        await execute_dice(ctx, bet)
-        return
-
-    # --- 2. BALANCE CHECK ---
-    balance = await bot.loop.run_in_executor(None, get_balance, user_id)
-    if balance < bet:
+    if balance < bet_amt:
         return await ctx.send(
-            f"❌ You're broke, homie. You only got {economy.format_balance(balance)}."
+            f"❌ You're broke, homie. Balance: {economy.format_balance(balance)}"
         )
 
-    # --- 3. COOLDOWN LOGIC (Matches your Slot Machine logic) ---
-    now = time.time()
-    if user_id not in user_dice_usage:
-        user_dice_usage[user_id] = {
-            "timestamps": [],
-            "last_used": 0,
-            "next_cooldown": None,
-        }
+    # --- Admin Bypass & Cooldown ---
+    if not ctx.author.guild_permissions.administrator:
+        now = time.time()
+        if user_id not in user_dice_usage:
+            user_dice_usage[user_id] = {
+                "timestamps": [],
+                "last_used": 0,
+                "next_cooldown": None,
+            }
 
-    u_data = user_dice_usage[user_id]
-    u_data["timestamps"] = [t for t in u_data["timestamps"] if now - t < 180]
+        u_data = user_dice_usage[user_id]
+        u_data["timestamps"] = [t for t in u_data["timestamps"] if now - t < 180]
 
-    # After 15 rolls in 3 mins, trigger variable cooldown
-    if len(u_data["timestamps"]) >= 15:
-        if u_data["next_cooldown"] is None:
-            u_data["next_cooldown"] = random.triangular(8, 30, 15)
+        if len(u_data["timestamps"]) >= 15:  # Cooldown after 15 rolls
+            if u_data["next_cooldown"] is None:
+                u_data["next_cooldown"] = random.triangular(8, 30, 15)
+            if now - u_data["last_used"] < u_data["next_cooldown"]:
+                return await ctx.send(
+                    random.choice(
+                        [
+                            "Patience...",
+                            "Cool them bones...",
+                            "The alley is hot, wait a minute...",
+                        ]
+                    )
+                )
+            u_data["next_cooldown"] = None
 
-        if now - u_data["last_used"] < u_data["next_cooldown"]:
-            messages = [
-                "Patience...",
-                "Cool them bones...",
-                "The alley is hot, wait a minute...",
-                "Twelve is watching, hold up.",
-            ]
-            return await ctx.send(random.choice(messages))
+        u_data["last_used"] = now
+        u_data["timestamps"].append(now)
 
-        u_data["next_cooldown"] = None
+    await execute_dice(ctx, bet_amt)
 
-    u_data["last_used"] = now
-    u_data["timestamps"].append(now)
 
-    # --- 4. EXECUTE GAME ---
-    await execute_dice(ctx, bet)
+# ==========================================
+# 3. GAMEPLAY EXECUTION
+# ==========================================
 
 
 async def execute_dice(ctx, bet):
-    """Handle the Cee-lo gameplay loop and payouts"""
-
-    # Visual Start
+    # Initial Message
     msg = await ctx.send(
-        f"🎰 **{ctx.author.display_name}** shakes the bones for {economy.format_balance(bet)}..."
+        f"🎰 **{ctx.author.display_name}** is shaking the bones for {economy.format_balance(bet)}..."
     )
     await asyncio.sleep(1.2)
 
@@ -1848,30 +1857,25 @@ async def execute_dice(ctx, bet):
     player_rank, player_point = 0, 0
     player_dice = []
 
-    # Roll until we get a valid Cee-lo score
     while player_rank == 0:
         player_dice = [random.randint(1, 6) for _ in range(3)]
         player_rank, player_point = get_ceelo_score(player_dice)
 
-        dice_str = " ".join([DICE_EMOJIS[d] for d in player_dice])
+        d_str = f"{DICE_EMOJIS[player_dice[0]]} {DICE_EMOJIS[player_dice[1]]} {DICE_EMOJIS[player_dice[2]]}"
         if player_rank == 0:
-            await msg.edit(
-                content=f'🎲 | {dice_str}\n"Bones bounced. Rollin\' again..."'
-            )
-            await asyncio.sleep(1)
+            await msg.edit(content=f'🎲 | {d_str}\n"Bones bounced. Rollin\' again..."')
+            await asyncio.sleep(0.8)
 
-    # --- IMMEDIATE RESULTS (4-5-6, 1-2-3, Trips) ---
-    if player_rank == 4:  # 4-5-6 (2.5x Payout = original bet + 1.5x profit)
+    # Immediate Player Results
+    if player_rank == 4:  # 4-5-6 (Win 2.5x Total)
         return await finalize_dice(
             ctx, msg, player_dice, "4-5-6! THE CLEAN SWEEP.", int(bet * 1.5), bet
         )
-
-    if player_rank == 1:  # 1-2-3 (Instant Loss)
+    if player_rank == 1:  # 1-2-3 (Loss)
         return await finalize_dice(
             ctx, msg, player_dice, "1-2-3... You went out sad.", -bet, bet
         )
-
-    if player_rank == 3:  # TRIPS (3x Payout = original bet + 2x profit)
+    if player_rank == 3:  # Trips (Win 3.0x Total)
         return await finalize_dice(
             ctx,
             msg,
@@ -1881,38 +1885,34 @@ async def execute_dice(ctx, bet):
             bet,
         )
 
-    # --- BOT'S TURN (Player set a point) ---
-    dice_str = " ".join([DICE_EMOJIS[d] for d in player_dice])
+    # --- BOT'S TURN ---
+    d_str = f"{DICE_EMOJIS[player_dice[0]]} {DICE_EMOJIS[player_dice[1]]} {DICE_EMOJIS[player_dice[2]]}"
     await msg.edit(
-        content=f"🎲 | {dice_str}\n**Your point is {player_point}**. Bot is rolling..."
+        content=f"🎲 | {d_str}\n**Your point is {player_point}**. Bot is rolling..."
     )
     await asyncio.sleep(1.5)
 
     bot_rank, bot_point = 0, 0
     bot_dice = []
-
     while bot_rank == 0:
         bot_dice = [random.randint(1, 6) for _ in range(3)]
         bot_rank, bot_point = get_ceelo_score(bot_dice)
 
-    bot_dice_str = " ".join([DICE_EMOJIS[d] for d in bot_dice])
+    # --- WIN/LOSS COMPARISON ---
+    win, draw = False, False
 
-    # --- COMPARISON LOGIC ---
-    win = False
-    draw = False
-
-    if bot_rank == 4:
-        win = False  # Bot instant win
-    elif bot_rank == 1:
-        win = True  # Bot instant loss
-    elif bot_rank == 3:
+    if bot_rank == 4:  # Bot 4-5-6
+        win = False
+    elif bot_rank == 1:  # Bot 1-2-3
+        win = True
+    elif bot_rank == 3:  # Bot Trips
         if player_rank == 3 and player_point > bot_point:
             win = True
         else:
-            win = False  # Bot trips beat player point or lower trips
-    elif bot_rank == 2:
+            win = False
+    elif bot_rank == 2:  # Bot Point
         if player_rank == 3:
-            win = True  # Player trips beat bot point
+            win = True  # Trips beats points
         elif player_point > bot_point:
             win = True
         elif player_point < bot_point:
@@ -1920,51 +1920,53 @@ async def execute_dice(ctx, bet):
         else:
             draw = True
 
-    # --- FINALIZE ---
-    bot_msg = f"Bot rolled {bot_dice_str}."
+    bot_d_str = f"{DICE_EMOJIS[bot_dice[0]]} {DICE_EMOJIS[bot_dice[1]]} {DICE_EMOJIS[bot_dice[2]]}"
+    status = f"Bot rolled {bot_d_str}."
+
     if draw:
-        await finalize_dice(ctx, msg, player_dice, f"{bot_msg}\nPush. A wash.", 0, bet)
+        await finalize_dice(ctx, msg, player_dice, f"{status}\nPush. A wash.", 0, bet)
     elif win:
         await finalize_dice(
-            ctx, msg, player_dice, f"{bot_msg}\nYou took his lunch money.", bet, bet
+            ctx, msg, player_dice, f"{status}\nYou took his lunch money.", bet, bet
         )
     else:
         await finalize_dice(
             ctx,
             msg,
             player_dice,
-            f"{bot_msg}\nCleaned you out. Better luck in the trap.",
+            f"{status}\nCleaned you out. Better luck in the trap.",
             -bet,
             bet,
         )
 
 
-async def finalize_dice(ctx, msg, dice, status_text, winnings, bet):
-    """Format final output and update database - Mirrors .pull style"""
-    dice_str = " ".join([DICE_EMOJIS[d] for d in dice])
+# ==========================================
+# 4. FINAL PAYOUT & MESSAGE
+# ==========================================
 
-    # Update Balance (Database)
+
+async def finalize_dice(ctx, msg, dice, status_text, winnings, bet):
+    # Run DB update
     await ctx.bot.loop.run_in_executor(None, update_balance, ctx.author.id, winnings)
 
-    # Styling the result message
-    if winnings > 0:
-        result_color = "✅"
-        amount_str = f"You received {economy.format_balance(winnings)}!"
-    elif winnings < 0:
-        result_color = "❌"
-        amount_str = f"You lost {economy.format_balance(abs(winnings))}."
-    else:
-        result_color = "🤝"
-        amount_str = "Your bet was returned."
+    d_str = f"{DICE_EMOJIS[dice[0]]} {DICE_EMOJIS[dice[1]]} {DICE_EMOJIS[dice[2]]}"
 
-    final_msg = (
-        f"🎲 | {dice_str}\n"
+    if winnings > 0:
+        res_sym, res_txt = "✅", f"You received {economy.format_balance(winnings)}!"
+    elif winnings < 0:
+        res_sym, res_txt = "❌", f"You lost {economy.format_balance(abs(winnings))}."
+    else:
+        res_sym, res_txt = "🤝", "Your bet was returned."
+
+    final_output = (
+        f"**┏━━━━ STREET DICE ━━━━┓**\n"
+        f"        {d_str}\n"
+        f"**┗━━━━━━━━━━━━━━━━━━┛**\n"
         f"**{status_text}**\n\n"
-        f"{result_color} {amount_str}\n"
+        f"{res_sym} {res_txt}\n"
         f"{ctx.author.mention}"
     )
-
-    await msg.edit(content=final_msg)
+    await msg.edit(content=final_output)
 
 
 # Slot machine slots
