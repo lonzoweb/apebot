@@ -56,16 +56,14 @@ ITEM_ALIASES = {
 # ============================================================
 
 CLEAN_FINAL_SLOP = [
-    " (✿◡‿◡)",
-    " UwU",
-    " owo",
-    " :3",
-    " ^-^",
+    " *runs away*",
+    " *snuggles you*",
+    " *gets on their knees*",
     " *blushes*",
-    " hehehe",
+    " *kisses your cheek*",
     " *teehee*",
     " *snuggles*",
-    " *pats head*",
+    " *bops your nose*",
 ]
 
 # Word overrides for smoother reading
