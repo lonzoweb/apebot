@@ -94,6 +94,7 @@ async def on_ready():
         bot.aiohttp_session = aiohttp.ClientSession()
 
     from api import set_bot_session
+
     set_bot_session(bot.aiohttp_session)
 
     # 2. Get owner timezone
@@ -143,6 +144,7 @@ async def on_ready():
 # HELPER FUNCTIONS
 # ============================================================
 
+
 async def get_or_create_webhook(channel):
     """Reuses existing webhook or creates one to mirror cursed users."""
     if not isinstance(channel, discord.TextChannel):
@@ -161,6 +163,7 @@ async def get_or_create_webhook(channel):
 # ============================================================
 # BOT EVENTS
 # ============================================================
+
 
 @bot.event
 async def on_message(message):
@@ -262,7 +265,7 @@ async def globally_block_channels(ctx):
         return True
 
     # Check debug mode
-    if getattr(bot, 'DEBUG_MODE', False):
+    if getattr(bot, "DEBUG_MODE", False):
         if not ctx.author.guild_permissions.administrator:
             await ctx.send("🧱 The spirits are silent…")
             return False
