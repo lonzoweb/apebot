@@ -13,19 +13,19 @@ import unicodedata  # <--- REQUIRED FOR FONT NORMALIZATION
 
 ITEM_REGISTRY = {
     "muzzle": {
-        "cost": 600,
+        "cost": 900,
         "duration_sec": 1800,  # 30 mins
         "type": "curse",
         "feedback": "🤐 Muzzle applied. They cannot speak or use commands!",
     },
     "uwu": {
-        "cost": 300,
+        "cost": 400,
         "duration_sec": 600,  # 10 mins
         "type": "curse",
         "feedback": "🎀 Dawww~",
     },
     "echo_ward": {
-        "cost": 400,
+        "cost": 500,
         "type": "defense",
         "feedback": "🛡️ Echo Ward added to inventory. Automatically reversing the next hex!",
     },
