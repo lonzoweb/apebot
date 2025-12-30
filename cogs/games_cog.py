@@ -63,7 +63,9 @@ class GamesCog(commands.Cog):
         if bet_amt <= 0:
             return await ctx.send("Enter a real bet.")
         if balance < bet_amt:
-            return await ctx.send(f"❌ Broke. Balance: {economy.format_balance(balance)}")
+            return await ctx.send(
+                f"❌ Broke. Balance: {economy.format_balance(balance)}"
+            )
 
         if not ctx.author.guild_permissions.administrator:
             now = time.time()
@@ -149,22 +151,30 @@ class GamesCog(commands.Cog):
                 draw = True
 
         bot_d_str = f"{DICE_EMOJIS[bot_dice[0]]} {DICE_EMOJIS[bot_dice[1]]} {DICE_EMOJIS[bot_dice[2]]}"
-        bot_status = f"Bot rolled {bot_d_str}"
+        bot_status = f"I rolled {bot_d_str}"
 
         if draw:
-            await self.finalize_dice(ctx, msg, player_dice, f"{bot_status} | Push.", 0, bet)
+            await self.finalize_dice(
+                ctx, msg, player_dice, f"{bot_status} | Push.", 0, bet
+            )
         elif win:
-            await self.finalize_dice(ctx, msg, player_dice, f"{bot_status} | You win.", bet, bet)
+            await self.finalize_dice(
+                ctx, msg, player_dice, f"{bot_status} | You win.", bet, bet
+            )
         else:
             await self.finalize_dice(
-                ctx, msg, player_dice, f"{bot_status} | Bot wins.", -bet, bet
+                ctx, msg, player_dice, f"{bot_status} | I win.", -bet, bet
             )
 
     async def finalize_dice(self, ctx, msg, dice, status_text, winnings, bet):
         """Finalize dice game and update balance"""
-        await ctx.bot.loop.run_in_executor(None, update_balance, ctx.author.id, winnings)
+        await ctx.bot.loop.run_in_executor(
+            None, update_balance, ctx.author.id, winnings
+        )
 
-        d_str = f"{DICE_EMOJIS[dice[0]]}  {DICE_EMOJIS[dice[1]]}  {DICE_EMOJIS[dice[2]]}"
+        d_str = (
+            f"{DICE_EMOJIS[dice[0]]}  {DICE_EMOJIS[dice[1]]}  {DICE_EMOJIS[dice[2]]}"
+        )
 
         if winnings > 0:
             result_header = f"### ✅ +{economy.format_balance(winnings)}"
@@ -242,7 +252,9 @@ class GamesCog(commands.Cog):
             "rare": ["💎", "👑", "<:emoji_name:1427107096670900226>"],
         }
 
-        weighted_pool = symbols["common"] * 10 + symbols["medium"] * 4 + symbols["rare"] * 1
+        weighted_pool = (
+            symbols["common"] * 10 + symbols["medium"] * 4 + symbols["rare"] * 1
+        )
 
         msg = await ctx.send("🎲 | 🎲 | 🎲")
 
@@ -266,7 +278,11 @@ class GamesCog(commands.Cog):
             symbol = random.choice(weighted_pool)
             other = random.choice([s for s in weighted_pool if s != symbol])
             pattern = random.choice(
-                [[symbol, symbol, other], [symbol, other, symbol], [other, symbol, symbol]]
+                [
+                    [symbol, symbol, other],
+                    [symbol, other, symbol],
+                    [other, symbol, symbol],
+                ]
             )
             result = pattern
         elif roll < 0.46:
@@ -283,7 +299,9 @@ class GamesCog(commands.Cog):
         if r1 == r2 == r3:
             if r1 in symbols["rare"]:
                 winnings = 100
-                final_msg = f"{r1} | {r2} | {r3}\n**JACKPOT!** {r1}\n{ctx.author.mention}"
+                final_msg = (
+                    f"{r1} | {r2} | {r3}\n**JACKPOT!** {r1}\n{ctx.author.mention}"
+                )
             else:
                 winnings = 20
                 medium_msgs = ["**Hit!**", "**Score!**", "**Got em!**", "**Connect!**"]
@@ -296,10 +314,25 @@ class GamesCog(commands.Cog):
         else:
             winnings = 0
             insults = [
-                "Pathetic.", "Trash.", "Garbage.", "Awful.", "Weak.",
-                "Embarrassing.", "Yikes.", "Oof.", "Cringe.", "Terrible.",
-                "Horrendous.", "Tragic.", "Broke.", "Washed.", "Cooked.",
-                "Mid.", "Kys.", "Loser.", "It's over.",
+                "Pathetic.",
+                "Trash.",
+                "Garbage.",
+                "Awful.",
+                "Weak.",
+                "Embarrassing.",
+                "Yikes.",
+                "Oof.",
+                "Cringe.",
+                "Terrible.",
+                "Horrendous.",
+                "Tragic.",
+                "Broke.",
+                "Washed.",
+                "Cooked.",
+                "Mid.",
+                "Kys.",
+                "Loser.",
+                "It's over.",
             ]
             final_msg = (
                 f"{r1} | {r2} | {r3}\n{random.choice(insults)}\n{ctx.author.mention}"
@@ -320,7 +353,7 @@ class GamesCog(commands.Cog):
     async def torture_command(self, ctx):
         """Display a random historical torture method"""
 
-        torture_cooldowns = getattr(self.bot, 'torture_cooldowns', {})
+        torture_cooldowns = getattr(self.bot, "torture_cooldowns", {})
         user_id = ctx.author.id
         current_time = time.time()
 
