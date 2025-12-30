@@ -1012,6 +1012,9 @@ async def gifs_command(ctx):
         pass  # Timeout is fine
 
 
+REVERSE_IMAGE_TOKEN_COST = 2
+
+
 @bot.command(name="rev")
 @commands.cooldown(1, 30, commands.BucketType.user)
 async def reverse_command(ctx):
@@ -1037,6 +1040,20 @@ async def reverse_command(ctx):
 
         if not image_url:
             return await ctx.reply("⚠️ No image found in the last 20 messages.")
+
+        # Ensure user has enough tokens before performing the search
+        balance = await ctx.bot.loop.run_in_executor(None, get_balance, ctx.author.id)
+        if balance < REVERSE_IMAGE_TOKEN_COST:
+            cost_str = economy.format_balance(REVERSE_IMAGE_TOKEN_COST)
+            bal_str = economy.format_balance(balance)
+            return await ctx.reply(
+                f"❌ Requires {cost_str}. Balance: {bal_str}.",
+                mention_author=False,
+            )
+
+        await ctx.bot.loop.run_in_executor(
+            None, update_balance, ctx.author.id, -REVERSE_IMAGE_TOKEN_COST
+        )
 
         # Perform Google Lens search
         try:
@@ -1100,6 +1117,9 @@ async def stats_command(ctx):
     await ctx.send(embed=embed)
 
 
+GEMATRIA_TOKEN_COST = 2
+
+
 @bot.command(name="gem")
 async def gematria_command(ctx, *, text: str = None):
     # If the command is replying to a message → use that text instead
@@ -1116,6 +1136,18 @@ async def gematria_command(ctx, *, text: str = None):
     # Character limit check (53 characters)
     if len(text) > 53:
         return await ctx.reply("❌ Text exceeds limit.", mention_author=False)
+
+    balance = await ctx.bot.loop.run_in_executor(None, get_balance, ctx.author.id)
+    if balance < GEMATRIA_TOKEN_COST:
+        cost_str = economy.format_balance(GEMATRIA_TOKEN_COST)
+        bal_str = economy.format_balance(balance)
+        return await ctx.reply(
+            f"❌ Requires {cost_str}. Balance: {bal_str}.", mention_author=False
+        )
+
+    await ctx.bot.loop.run_in_executor(
+        None, update_balance, ctx.author.id, -GEMATRIA_TOKEN_COST
+    )
 
     results = calculate_all_gematria(text)
 
