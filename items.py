@@ -37,7 +37,7 @@ ITEM_REGISTRY = {
     "global_transmission": {
         "cost": 700,
         "type": "broadcast",
-        "feedback": "📡 APEIRON TRANSMISSION SENT",
+        "feedback": "📡 APEIRON @everyone NOTICE",
     },
 }
 
