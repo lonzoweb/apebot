@@ -7,7 +7,7 @@ import discord
 from discord.ext import commands
 import logging
 import economy
-from database import get_balance, update_balance, atomic_purchase, get_user_inventory, remove_item_from_inventory, add_active_effect, get_active_effect
+from database import get_balance, update_balance, atomic_purchase, get_user_inventory, remove_item_from_inventory, add_active_effect, get_active_effect, set_balance
 from items import ITEM_REGISTRY, ITEM_ALIASES
 import database
 
@@ -51,6 +51,12 @@ class EconomyCog(commands.Cog):
     async def adminremove_command(self, ctx, member: discord.Member, amount: int):
         """[ADMIN] Manually remove tokens from a user. Usage: .balremove @user <amount>"""
         await economy.handle_admin_modify_command(ctx, member, amount, operation="remove")
+
+    @commands.command(name="baledit")
+    @commands.has_permissions(administrator=True)
+    async def baledit_command(self, ctx, member: discord.Member, new_balance: int):
+        """[ADMIN] Set a user's balance to an exact amount. Usage: .baledit @user <amount>"""
+        await economy.handle_baledit_command(ctx, member, new_balance)
 
     @commands.command(name="buy")
     @commands.cooldown(1, 5, commands.BucketType.user)

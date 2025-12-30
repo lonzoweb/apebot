@@ -1,7 +1,7 @@
 # --- economy.py ---
 import discord
 import logging
-from database import get_balance, update_balance, transfer_tokens
+from database import get_balance, update_balance, transfer_tokens, set_balance
 
 logger = logging.getLogger(__name__)
 
@@ -65,21 +65,13 @@ async def handle_send_command(ctx, member: discord.Member, amount: int):
     )
 
     if success:
-        # Fetch new balance in the thread
-        sender_new_balance = await ctx.bot.loop.run_in_executor(
-            None, get_balance, sender_id
-        )
+        # Don't reveal balance in public chat
         await ctx.send(
-            f"✅ **{format_balance(amount)}** transferred from {ctx.author.mention} to {member.mention}. "
-            f"Your new balance is {format_balance(sender_new_balance)}."
+            f"✅ **{format_balance(amount)}** transferred from {ctx.author.mention} to {member.mention}"
         )
     else:
-        # Fetch current balance in the thread
-        current_balance = await ctx.bot.loop.run_in_executor(
-            None, get_balance, sender_id
-        )
         await ctx.send(
-            f"❌ Transaction declined. You only have {format_balance(current_balance)}."
+            f"❌ Transaction declined. Insufficient balance."
         )
 
 
@@ -96,18 +88,24 @@ async def handle_admin_modify_command(
     # Determine the final amount to be passed to update_balance
     final_amount = amount if operation == "add" else -amount
 
-    # Get initial balance
-    initial_balance = await ctx.bot.loop.run_in_executor(None, get_balance, member.id)
-
     # Run update in a separate thread
     await ctx.bot.loop.run_in_executor(None, update_balance, member.id, final_amount)
 
-    # Get final balance
-    final_balance = await ctx.bot.loop.run_in_executor(None, get_balance, member.id)
-
+    # Silent confirmation - don't reveal balance
     action = "added to" if final_amount > 0 else "removed from"
+    await ctx.send(f"✅ Tokens {action} {member.mention}")
 
-    await ctx.send(
-        f"👑 Successfully {format_balance(abs(final_amount))} {action} {member.mention}'s account. "
-        f"New balance: **{format_balance(final_balance)}** (Change: {format_balance(initial_balance - final_balance)})"
-    )
+
+async def handle_baledit_command(ctx, member: discord.Member, new_balance: int):
+    """Handles .baledit command - sets exact balance."""
+
+    # Admin check is done in the cog before this function is called.
+
+    if new_balance < 0:
+        return await ctx.send("❌ Balance cannot be negative.")
+
+    # Set exact balance
+    await ctx.bot.loop.run_in_executor(None, set_balance, member.id, new_balance)
+
+    # Silent confirmation - don't reveal balance
+    await ctx.send(f"✅ Balance updated for {member.mention}")

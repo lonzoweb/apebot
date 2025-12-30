@@ -202,6 +202,19 @@ def update_balance(user_id: int, amount: int):
         )
 
 
+def set_balance(user_id: int, new_balance: int):
+    """Set a user's balance to an exact amount (for .baledit command)"""
+    user_id_str = str(user_id)
+    with get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO balances (user_id, balance) VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET balance = ?
+        """,
+            (user_id_str, new_balance, new_balance),
+        )
+
+
 def transfer_tokens(sender_id: int, recipient_id: int, amount: int) -> bool:
     if amount <= 0:
         return False

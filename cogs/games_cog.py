@@ -113,7 +113,7 @@ class GamesCog(commands.Cog):
             )
         if player_rank == 1:
             return await self.finalize_dice(
-                ctx, msg, player_dice, "1-2-3... You went out sad.", -bet, bet
+                ctx, msg, player_dice, "1-2-3... You got got mane.", -bet, bet
             )
         if player_rank == 3:
             return await self.finalize_dice(
@@ -122,7 +122,7 @@ class GamesCog(commands.Cog):
 
         d_str = f"{DICE_EMOJIS[player_dice[0]]} {DICE_EMOJIS[player_dice[1]]} {DICE_EMOJIS[player_dice[2]]}"
         await msg.edit(
-            content=f"🎲  **{d_str}**\n*Your point is {player_point}. Bot is rolling...*"
+            content=f"🎲  **{d_str}**\n*Your point is {player_point}. I'm rolling...*"
         )
         await asyncio.sleep(1.5)
 
@@ -192,6 +192,7 @@ class GamesCog(commands.Cog):
         await msg.edit(content=final_output)
 
     @commands.command(name="pull")
+    @commands.cooldown(2, 4, commands.BucketType.user)  # Hard limit: 2 uses per 4 seconds
     async def pull_command(self, ctx):
         """Slot machine with dark occult casino theme"""
 
@@ -212,16 +213,34 @@ class GamesCog(commands.Cog):
         user_data = user_pull_usage[user_id]
         user_data["timestamps"] = [t for t in user_data["timestamps"] if now - t < 180]
 
-        if len(user_data["timestamps"]) < 20:
+        # Changed from 20 to 2 free pulls per 3 minutes
+        if len(user_data["timestamps"]) < 2:
             user_data["timestamps"].append(now)
+            user_data["last_used"] = now
             await self.execute_pull(ctx)
             return
 
+        # Enforce minimum 3-4 second cooldown after free pulls
+        time_since_last = now - user_data["last_used"]
+        min_cooldown = random.uniform(3, 4)
+
+        if time_since_last < min_cooldown:
+            messages = [
+                "Rest...",
+                "Patience...",
+                "The abyss awaits...",
+                "You will wait...",
+                "Not on my watch...",
+                "The void beckons...",
+            ]
+            await ctx.send(random.choice(messages))
+            return
+
+        # Variable reinforcement after minimum cooldown
         if user_data["next_cooldown"] is None:
             user_data["next_cooldown"] = random.triangular(8, 30, 15)
 
-        cooldown = user_data["next_cooldown"]
-        time_since_last = now - user_data["last_used"]
+        cooldown = max(min_cooldown, user_data["next_cooldown"])  # Use whichever is higher
 
         if time_since_last < cooldown:
             messages = [
