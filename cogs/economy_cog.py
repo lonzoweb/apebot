@@ -123,10 +123,10 @@ class EconomyCog(commands.Cog):
 
     @commands.command(name="use")
     @commands.cooldown(1, 5, commands.BucketType.user)
-    async def use_command(self, ctx, item_input: str = None, target: discord.Member = None):
+    async def use_command(self, ctx, item_input: str = None, target: discord.Member = None, *, message: str = None):
         """
         Uses an item.
-        Usage: .use muzzle @user (Curses) OR .use kush (Consumables)
+        Usage: .use muzzle @user (Curses) OR .use kush (Consumables) OR .use global <message> (Broadcast)
         """
 
         if not item_input:
@@ -137,6 +137,7 @@ class EconomyCog(commands.Cog):
                 inline=False,
             )
             embed.add_field(name="Consumables (Self)", value="`.use kush`", inline=False)
+            embed.add_field(name="Broadcast", value="`.use global <message>`", inline=False)
             embed.add_field(
                 name="Info", value="Check your `.inv` to see what you own.", inline=False
             )
@@ -213,6 +214,27 @@ class EconomyCog(commands.Cog):
             await ctx.send(
                 "🛡️ This item is passive! It stays in your inventory and blocks the next curse automatically."
             )
+
+        elif item_type == "broadcast":
+            # Handle global transmission
+            if not message:
+                # Try to get message from target parameter if it's a string
+                if target and isinstance(target, str):
+                    message = str(target)
+                else:
+                    return await ctx.send(
+                        f"❌ You must provide a message! Usage: `.use global <your message>`"
+                    )
+
+            # Remove item from inventory
+            await self.bot.loop.run_in_executor(
+                None, database.remove_item_from_inventory, ctx.author.id, official_name
+            )
+
+            # Send the global transmission
+            transmission_text = f"📡 **APEIRON TRANSMISSION BY {ctx.author.mention}**\n@everyone\n\n{message}"
+            await ctx.send(transmission_text)
+            await ctx.send(item_info['feedback'])
 
 
 async def setup(bot):
