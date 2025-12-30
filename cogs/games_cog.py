@@ -192,7 +192,6 @@ class GamesCog(commands.Cog):
         await msg.edit(content=final_output)
 
     @commands.command(name="pull")
-    @commands.cooldown(2, 4, commands.BucketType.user)  # Hard limit: 2 uses per 4 seconds
     async def pull_command(self, ctx):
         """Slot machine with dark occult casino theme"""
 
@@ -213,34 +212,16 @@ class GamesCog(commands.Cog):
         user_data = user_pull_usage[user_id]
         user_data["timestamps"] = [t for t in user_data["timestamps"] if now - t < 180]
 
-        # Changed from 20 to 2 free pulls per 3 minutes
-        if len(user_data["timestamps"]) < 2:
+        if len(user_data["timestamps"]) < 20:
             user_data["timestamps"].append(now)
-            user_data["last_used"] = now
             await self.execute_pull(ctx)
             return
 
-        # Enforce minimum 3-4 second cooldown after free pulls
-        time_since_last = now - user_data["last_used"]
-        min_cooldown = random.uniform(3, 4)
-
-        if time_since_last < min_cooldown:
-            messages = [
-                "Rest...",
-                "Patience...",
-                "The abyss awaits...",
-                "You will wait...",
-                "Not on my watch...",
-                "The void beckons...",
-            ]
-            await ctx.send(random.choice(messages))
-            return
-
-        # Variable reinforcement after minimum cooldown
         if user_data["next_cooldown"] is None:
             user_data["next_cooldown"] = random.triangular(8, 30, 15)
 
-        cooldown = max(min_cooldown, user_data["next_cooldown"])  # Use whichever is higher
+        cooldown = user_data["next_cooldown"]
+        time_since_last = now - user_data["last_used"]
 
         if time_since_last < cooldown:
             messages = [
