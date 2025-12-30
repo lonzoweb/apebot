@@ -34,10 +34,10 @@ ITEM_REGISTRY = {
         "type": "fun",
         "feedback": "Sparking Apeiron Kush Pack. Shields active.",
     },
-    "global_transmission": {
+    "ping_everyone": {
         "cost": 700,
         "type": "broadcast",
-        "feedback": "📡 APEIRON @everyone NOTICE",
+        "feedback": "📡 PING SENT",
     },
 }
 
@@ -54,9 +54,9 @@ ITEM_ALIASES = {
     "kush": "kush_pack",
     "weed": "kush_pack",
     "pack": "kush_pack",
-    "global": "global_transmission",
-    "transmission": "global_transmission",
-    "broadcast": "global_transmission",
+    "everyone": "ping_everyone",
+    "ping": "ping_everyone",
+    "broadcast": "ping_everyone",
 }
 
 # ============================================================

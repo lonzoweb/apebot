@@ -47,6 +47,40 @@ class GamesCog(commands.Cog):
     @commands.command(name="dice")
     async def dice_command(self, ctx, bet: str = None):
         """Cee-lo dice game - bet tokens"""
+        
+        # Handle help command
+        if bet and bet.lower() == "help":
+            help_embed = discord.Embed(
+                title="🎲 Cee-Lo Dice Rules",
+                description="Street dice - you vs me",
+                color=discord.Color.gold()
+            )
+            help_embed.add_field(
+                name="How to Play",
+                value="`.dice <amount>` or `.dice all` to bet\n"
+                      "Roll 3 dice until you get a valid combo",
+                inline=False
+            )
+            help_embed.add_field(
+                name="Winning Combos",
+                value="**4-5-6** = Auto win (1.5x payout)\n"
+                      "**Trips** = Auto win (2x payout)\n"
+                      "**Point** = Higher point wins (1x payout)",
+                inline=False
+            )
+            help_embed.add_field(
+                name="Losing Combos",
+                value="**1-2-3** = Auto loss\n"
+                      "**Lower point** = Loss",
+                inline=False
+            )
+            help_embed.add_field(
+                name="Push",
+                value="Tie, money back",
+                inline=False
+            )
+            return await ctx.send(embed=help_embed)
+        
         user_id = ctx.author.id
         balance = await self.bot.loop.run_in_executor(None, get_balance, user_id)
 

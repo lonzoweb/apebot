@@ -143,7 +143,7 @@ class EconomyCog(commands.Cog):
                 inline=False,
             )
             embed.add_field(name="Consumables (Self)", value="`.use kush`", inline=False)
-            embed.add_field(name="Broadcast", value="`.use global <message>`", inline=False)
+            embed.add_field(name="Broadcast", value="`.use everyone <message>`", inline=False)
             embed.add_field(
                 name="Info", value="Check your `.inv` to see what you own.", inline=False
             )
@@ -222,14 +222,14 @@ class EconomyCog(commands.Cog):
             )
 
         elif item_type == "broadcast":
-            # Handle global transmission
+            # Handle ping everyone
             if not message:
                 # Try to get message from target parameter if it's a string
                 if target and isinstance(target, str):
                     message = str(target)
                 else:
                     return await ctx.send(
-                        f"❌ You must provide a message! Usage: `.use global <your message>`"
+                        f"❌ You must provide a message! Usage: `.use everyone <your message>`"
                     )
 
             # Remove item from inventory
@@ -237,8 +237,8 @@ class EconomyCog(commands.Cog):
                 None, database.remove_item_from_inventory, ctx.author.id, official_name
             )
 
-            # Send the global transmission
-            transmission_text = f"📡 **APEIRON TRANSMISSION BY {ctx.author.mention}**\n@everyone\n\n{message}"
+            # Send the ping
+            transmission_text = f"📡 **from {ctx.author.mention}**\n@everyone\n\n{message}"
             await ctx.send(transmission_text)
             await ctx.send(item_info['feedback'])
 
