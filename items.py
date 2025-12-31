@@ -39,6 +39,12 @@ ITEM_REGISTRY = {
         "type": "broadcast",
         "feedback": "📡 PING SENT",
     },
+    "npass": {
+        "cost": 2600,
+        "type": "role_grant",
+        "role_id": 1168965931918176297,
+        "feedback": "🎫 Nigga pass obtained! Real freedom of speech.",
+    },
 }
 
 # Aliases to make buying/using easier for users
@@ -57,6 +63,9 @@ ITEM_ALIASES = {
     "everyone": "ping_everyone",
     "ping": "ping_everyone",
     "broadcast": "ping_everyone",
+    "npass": "npass",
+    "n-pass": "npass",
+    "pass": "npass",
 }
 
 # ============================================================

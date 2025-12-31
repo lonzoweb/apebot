@@ -94,6 +94,16 @@ class EconomyCog(commands.Cog):
         item_data = ITEM_REGISTRY[official_name]
         cost = item_data["cost"]
 
+        # Special handling for npass - check if user already has role
+        if official_name == "npass":
+            role_id = item_data.get("role_id")
+            if role_id:
+                role = ctx.guild.get_role(role_id)
+                if role and role in ctx.author.roles:
+                    return await ctx.send(
+                        f"❌ You already have the **Npass** role! No need to buy it again."
+                    )
+
         success = await self.bot.loop.run_in_executor(
             None, atomic_purchase, ctx.author.id, official_name, cost
         )
@@ -142,7 +152,7 @@ class EconomyCog(commands.Cog):
                 value="`.use muzzle @user`\n`.use uwu @user`",
                 inline=False,
             )
-            embed.add_field(name="Consumables (Self)", value="`.use kush`", inline=False)
+            embed.add_field(name="Consumables (Self)", value="`.use kush`\n`.use npass`", inline=False)
             embed.add_field(name="Broadcast", value="`.use everyone <message>`", inline=False)
             embed.add_field(
                 name="Info", value="Check your `.inv` to see what you own.", inline=False
@@ -220,6 +230,27 @@ class EconomyCog(commands.Cog):
             await ctx.send(
                 "🛡️ This item is passive! It stays in your inventory and blocks the next curse automatically."
             )
+
+        elif item_type == "role_grant":
+            role_id = item_info.get("role_id")
+            if not role_id:
+                return await ctx.send("❌ Item configuration error.")
+            
+            role = ctx.guild.get_role(role_id)
+            if not role:
+                return await ctx.send("❌ Role not found on this server.")
+            
+            if role in ctx.author.roles:
+                return await ctx.send(f"❌ You already have the {role.name} role!")
+            
+            try:
+                await ctx.author.add_roles(role)
+                await self.bot.loop.run_in_executor(
+                    None, database.remove_item_from_inventory, ctx.author.id, official_name
+                )
+                await ctx.send(f"✅ {item_info['feedback']}")
+            except discord.Forbidden:
+                await ctx.send("❌ Bot lacks permission to grant roles.")
 
         elif item_type == "broadcast":
             # Handle ping everyone

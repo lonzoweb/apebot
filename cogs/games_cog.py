@@ -258,14 +258,14 @@ class GamesCog(commands.Cog):
             await ctx.send(random.choice(messages))
             return
 
-        if len(user_data["timestamps"]) < 11:
+        if len(user_data["timestamps"]) < 6:
             user_data["last_used"] = now
             user_data["timestamps"].append(now)
             await self.execute_pull(ctx)
             return
 
         if user_data["next_cooldown"] is None:
-            user_data["next_cooldown"] = random.triangular(8, 30, 15)
+            user_data["next_cooldown"] = random.triangular(8, 22, 15)
 
         cooldown = user_data["next_cooldown"]
         time_since_last = now - user_data["last_used"]
