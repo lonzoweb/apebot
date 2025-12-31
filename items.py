@@ -76,7 +76,10 @@ CLEAN_FINAL_SLOP = [
 
 # Word overrides for smoother reading
 UWU_WORD_MAP = {
+    # Core uwu exceptions
     "you": "yuw",
+    "your": "yuw",
+    "you're": "yuw",
     "have": "haz",
     "are": "r",
     "love": "wuv",
@@ -87,17 +90,50 @@ UWU_WORD_MAP = {
     "oh": "owh",
     "is": "iz",
     "to": "two",
+    # Common words that need smooth handling
+    "please": "pwease",
+    "sorry": "sowwy",
+    "very": "vewy",
+    "really": "weawwy",
+    "little": "wittwe",
+    "people": "peopwe",
+    "think": "fink",
+    "this": "dis",
+    "that": "dat",
+    "there": "dere",
+    "their": "dere",
+    "they're": "deyre",
+    # Cute overrides
+    "yes": "yesh",
+    "now": "nyow",
+    "know": "knyow",
+    "hi": "haiii",
+    "hello": "hewwo",
+    "thanks": "thxxx",
 }
 
 INTERACTIVE_ACTIONS = [
-    " **\*bweops your nose\***",
-    " **\*kisses your cheek\***",
-    " **\*leaks\***",
-    " **\*giggles\***",
-    " **\*pouts\***",
-    " **\*pwease\***",
-    " **\*sniffles\***",
-    " **\*screeeeech\***",
+    " ***boops your nose***",
+    " ***blushes***",
+    " ***whispers to self***",
+    " ***giggles***",
+    " ***pouts***",
+    " ***runs away***",
+    " ***glomps and huggles***",
+    " ***kisses your cheek***",
+    " ***omg im coming***",
+]
+
+KAOMOJI_POOL = [
+    " (ᵘﻌᵘ)",
+    " (｡ᴜ‿‿ᴜ｡)",
+    " :･ﾟ✧(ꈍᴗꈍ)✧･ﾟ:",
+    " ( ͡o ꒳ ͡o )",
+    " (◕‿◕✿)",
+    " UwU",
+    " owo",
+    " >w<",
+    " ^w^",
 ]
 
 CLEAN_SUFFIXES = ["-ie", "-wie", "-y", "-wy"]
@@ -116,9 +152,20 @@ def aggressive_uwu(text: str) -> str:
     # NFKC = Normalization Form Compatibility Composition
     text = unicodedata.normalize("NFKC", text)
 
-    # 1. LINK/MEDIA PURGE
+    # 1. LINK/MEDIA PURGE (ENHANCED)
+    # Remove URLs (http/https)
     text = re.sub(r"https?://[^\s]+", "", text)
-    text = re.sub(r"<a?:[^:]+:\d+>|@\w+|#\w+|@&[0-9]+|<#[0-9]+>", "", text)
+
+    # Remove Discord-specific: emojis, mentions, channels, roles
+    text = re.sub(r"<a?:[^:]+:\d+>", "", text)  # Custom emojis
+    text = re.sub(r"@\w+", "", text)  # @mentions (simple)
+    text = re.sub(r"<@!?\d+>", "", text)  # User mentions (full)
+    text = re.sub(r"<@&\d+>", "", text)  # Role mentions
+    text = re.sub(r"<#\d+>", "", text)  # Channel links
+
+    # Remove common image/gif hosts and file extensions
+    text = re.sub(r"(tenor|giphy|imgur|cdn\.discordapp)\.[^\s]+", "", text)
+    text = re.sub(r"\.(gif|png|jpg|jpeg|webp|mp4)[^\s]*", "", text, flags=re.IGNORECASE)
 
     if not text.strip():
         return random.choice(CLEAN_FINAL_SLOP)
@@ -143,12 +190,13 @@ def aggressive_uwu(text: str) -> str:
             word = UWU_WORD_MAP[clean_word]
 
         else:
-            # B. Stuttering (30% chance)
+            # B. Enhanced Stuttering (30% chance, 1-3 character repetitions)
             if len(word) > 3 and not word.startswith("w") and random.random() < 0.30:
-                stutter = f"{word[0]}-"
+                stutter_count = random.choice([1, 2, 3])
+                stutter = "-".join([word[0]] * stutter_count) + "-"
                 word = stutter + word
 
-            # C. Elongation (Randomly extend vowels or 'y') - 15% Chance
+            # C. Elongation (Randomly extend vowels or 'y') - 35% Chance
             elif len(word) > 3 and random.random() < 0.35:
                 vowels = [i for i, char in enumerate(word) if char in "aeiouy"]
                 if vowels:
@@ -164,8 +212,12 @@ def aggressive_uwu(text: str) -> str:
 
         transformed_words.append(word)
 
-        # 5. Insert Interactive Action
-        if (i % random.randint(3, 6) == 0 and i > 0) and random.random() < 0.35:
+        # 5. Insert Kaomoji (15% chance after each word)
+        if random.random() < 0.15:
+            transformed_words.append(random.choice(KAOMOJI_POOL))
+
+        # 6. Insert Interactive Action (increased frequency)
+        if (i % random.randint(3, 5) == 0 and i > 0) and random.random() < 0.25:
             transformed_words.append(random.choice(INTERACTIVE_ACTIONS))
 
     text = " ".join(transformed_words)
