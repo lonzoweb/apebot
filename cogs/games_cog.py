@@ -246,7 +246,20 @@ class GamesCog(commands.Cog):
         user_data = user_pull_usage[user_id]
         user_data["timestamps"] = [t for t in user_data["timestamps"] if now - t < 180]
 
-        if len(user_data["timestamps"]) < 20:
+        if now - user_data["last_used"] < 1.5:
+            messages = [
+                "Rest...",
+                "Patience...",
+                "The abyss awaits...",
+                "You will wait...",
+                "Not on my watch...",
+                "The void beckons...",
+            ]
+            await ctx.send(random.choice(messages))
+            return
+
+        if len(user_data["timestamps"]) < 11:
+            user_data["last_used"] = now
             user_data["timestamps"].append(now)
             await self.execute_pull(ctx)
             return

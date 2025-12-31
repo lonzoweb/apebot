@@ -9,9 +9,10 @@ import logging
 import time
 import random
 from datetime import datetime
-from database import get_guild_tarot_deck, set_guild_tarot_deck
+from database import get_guild_tarot_deck, set_guild_tarot_deck, get_balance, update_balance
 import tarot
 import rws
+import economy
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,12 @@ class TarotCog(commands.Cog):
         if ctx.author.guild_permissions.administrator:
             await execute_draw()
             return
+
+        balance = await ctx.bot.loop.run_in_executor(None, get_balance, user_id)
+        if balance < 1:
+            return await ctx.send(f"❌ Insufficient balance. You need {economy.format_balance(1)} to draw a card.")
+
+        await ctx.bot.loop.run_in_executor(None, update_balance, user_id, -1)
 
         if user_id not in user_usage or user_usage[user_id]["day"] != today:
             user_usage[user_id] = {
