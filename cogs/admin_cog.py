@@ -1,6 +1,6 @@
 """
 Admin Cog - Admin commands and system management
-Commands: pink, gr, qd, blessing, hierarchy, archive, debug, db* commands
+Commands: pink, gr, qd, blessing, cleanse, hierarchy, archive, debug, db* commands
 """
 
 import discord
@@ -19,12 +19,15 @@ from database import (
     add_masochist_role_removal,
     get_db,
     load_quotes_from_db,
+    get_active_effect,
+    remove_active_effect,
 )
 from config import (
     ROLE_ADD_QUOTE,
     CHANNEL_ID,
     TEST_CHANNEL_ID,
     DB_FILE,
+    AUTHORIZED_ROLES,
 )
 from helpers import get_forum_channel
 import hierarchy
@@ -231,6 +234,57 @@ class AdminCog(commands.Cog):
         for ch in targets:
             await ch.send(embed=embed)
         await ctx.send("✅ Blessings sent to channels.")
+
+    @commands.command(name="cleanse")
+    async def cleanse_command(self, ctx, member: discord.Member = None):
+        """[MOD] Remove all active hexes from a user. Usage: .cleanse @user"""
+        
+        # Permission check
+        if not any(role.name in AUTHORIZED_ROLES for role in ctx.author.roles):
+            return await ctx.reply(
+                "❌ You don't have permission to use this command.", 
+                mention_author=False
+            )
+        
+        # Argument validation
+        if member is None:
+            return await ctx.reply(
+                "❌ Please mention a user to cleanse. Usage: `.cleanse @user`",
+                mention_author=False
+            )
+        
+        # Check for active effects
+        try:
+            effect_data = get_active_effect(member.id)
+            
+            if effect_data is None:
+                return await ctx.reply(
+                    f"✨ {member.mention} has no active hexes.",
+                    mention_author=False
+                )
+            
+            effect_name, expiration_time = effect_data
+            
+            # Remove the effect
+            remove_active_effect(member.id)
+            
+            # Send success embed
+            embed = discord.Embed(
+                title="🌟 Hex Cleansed",
+                description=f"Removed **{effect_name}** from {member.mention}",
+                color=discord.Color.green()
+            )
+            embed.set_footer(text=f"Cleansed by {ctx.author.display_name}")
+            
+            await ctx.send(embed=embed)
+            logger.info(f"Cleanse: {ctx.author} removed {effect_name} from {member}")
+            
+        except Exception as e:
+            logger.error(f"Error in cleanse command: {e}", exc_info=True)
+            await ctx.reply(
+                "❌ An error occurred while cleansing. Check logs.",
+                mention_author=False
+            )
 
     @commands.command(name="hierarchy")
     @commands.cooldown(5, 60, commands.BucketType.user)
