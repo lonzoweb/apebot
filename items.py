@@ -45,6 +45,16 @@ ITEM_REGISTRY = {
         "role_id": 1168965931918176297,
         "feedback": "🎫 Nigga pass obtained! Real freedom of speech.",
     },
+    "rain": {
+        "cost": 2000,
+        "type": "event",
+        "feedback": "🌧️ **TOKEN RAIN!** The next 10 unique users to talk in this channel will earn 50 bonus tokens!",
+    },
+    "hot_potato": {
+        "cost": 1200,
+        "type": "event",
+        "feedback": "🥔🔥 **HOT POTATO!** A ticking muzzle is loose in the chat! Talk to pass it. Every pass earns you 15 tokens!",
+    },
 }
 
 # Aliases to make buying/using easier for users
@@ -66,6 +76,10 @@ ITEM_ALIASES = {
     "npass": "npass",
     "n-pass": "npass",
     "pass": "npass",
+    "rain": "rain",
+    "token_rain": "rain",
+    "hot_potato": "hot_potato",
+    "potato": "hot_potato",
 }
 
 # ============================================================

@@ -6,6 +6,7 @@ Commands: balance, send, buy, inventory, use, baladd, balremove
 import discord
 from discord.ext import commands
 import logging
+import asyncio
 import economy
 from database import get_balance, update_balance, atomic_purchase, get_user_inventory, remove_item_from_inventory, add_active_effect, get_active_effect, set_balance
 from exceptions import InsufficientTokens, InsufficientInventory, ActiveCurseError, ItemNotFoundError
@@ -18,6 +19,8 @@ logger = logging.getLogger(__name__)
 class EconomyCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.active_rain = {}  # channel_id -> message_count_remaining
+        self.active_potato = {} # channel_id -> {holder_id, expires_at, task}
 
     @commands.command(name="balance", aliases=["bal", "tokens"])
     async def balance_command(self, ctx, member: discord.Member = None):
@@ -249,11 +252,93 @@ class EconomyCog(commands.Cog):
                 await ctx.send(transmission_text)
                 await ctx.send(item_info['feedback'])
 
+            elif item_type == "event":
+                if official_name == "rain":
+                    if ctx.channel.id in self.active_rain:
+                        return await ctx.send("❌ A Token Rain is already active in this channel!")
+                    
+                    self.active_rain[ctx.channel.id] = {'remaining': 10, 'participants': set()}
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    await ctx.send(item_info['feedback'])
+
+                elif official_name == "hot_potato":
+                    if ctx.channel.id in self.active_potato:
+                        return await ctx.send("❌ A Hot Potato is already active in this channel!")
+                    
+                    if target is None:
+                        return await ctx.send("❌ You must target someone to start the Hot Potato! `.use potato @user`")
+                    
+                    if target.guild_permissions.administrator or target.bot:
+                        return await ctx.send(f"❌ {target.display_name} won't play your games.")
+
+                    # Start the event
+                    duration = 300 # 5 minutes
+                    
+                    # Potato logic: muzzle whoever is holding it at the end
+                    async def potato_timer(channel_id):
+                        await asyncio.sleep(duration)
+                        if channel_id in self.active_potato:
+                            p = self.active_potato[channel_id]
+                            loser_id = p['holder_id']
+                            del self.active_potato[channel_id]
+                            
+                            # Apply Muzzle (30 mins)
+                            await add_active_effect(loser_id, "muzzle", 1800)
+                            
+                            chan = self.bot.get_channel(channel_id)
+                            if chan:
+                                await chan.send(f"💥 **BOOM!** The potato exploded in <@!{loser_id}>'s hands! They are now muzzled for 30 minutes. 🤐")
+
+                    task = asyncio.create_task(potato_timer(ctx.channel.id))
+                    self.active_potato[ctx.channel.id] = {
+                        'holder_id': target.id,
+                        'task': task
+                    }
+
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    await ctx.send(f"{item_info['feedback']}\nTarget: {target.mention}")
+
         except InsufficientInventory:
             await ctx.send(f"❌ You don't have any **{official_name.replace('_', ' ').title()}**s!")
         except Exception as e:
             logger.error(f"Error using item {official_name}: {e}")
             await ctx.send("❌ An unexpected error occurred.")
+
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if message.author.bot or not message.guild:
+            return
+
+        channel_id = message.channel.id
+        user_id = message.author.id
+
+        # 🌧️ Handle Token Rain
+        if channel_id in self.active_rain:
+            rain = self.active_rain[channel_id]
+            if rain['remaining'] > 0 and user_id not in rain['participants']:
+                rain['remaining'] -= 1
+                rain['participants'].add(user_id)
+                bonus = 50
+                await update_balance(user_id, bonus)
+                
+                if rain['remaining'] == 0:
+                    del self.active_rain[channel_id]
+                    await message.channel.send("☀️ **The Token Rain has ended.**")
+
+        # 🥔 Handle Hot Potato
+        if channel_id in self.active_potato:
+            potato = self.active_potato[channel_id]
+            # If the speaker isn't the current holder, transfer it!
+            if user_id != potato['holder_id']:
+                old_holder_id = potato['holder_id']
+                potato['holder_id'] = user_id
+                
+                # Award Passer's Fee (15 tokens)
+                await update_balance(old_holder_id, 15)
+                
+                # Feedback
+                await message.channel.send(f"⚡ **PASSED!** {message.author.mention} is now holding the potato! 🥔🔥")
 
 
 async def setup(bot):
