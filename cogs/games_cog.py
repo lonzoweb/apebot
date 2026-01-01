@@ -452,7 +452,7 @@ class GamesCog(commands.Cog):
         players_needed = 3 - len(queue)
         
         if players_needed > 0:
-            await ctx.send(f"🔫 **{ctx.author.display_name}** has joined the round! [{len(queue)}/3]\nNeed **{players_needed}** more players to pull the trigger.")
+            await ctx.send(f"🔫 **{ctx.author.display_name}** has queued for roulette! [{len(queue)}/3]\nNeed **{players_needed}** more players to pull the trigger.")
         else:
             # 5. Start Game!
             self.roulette_spinning = True

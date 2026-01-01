@@ -40,23 +40,23 @@ ITEM_REGISTRY = {
         "feedback": "📡 PING SENT",
     },
     "npass": {
-        "cost": 2600,
+        "cost": 2500,
         "type": "role_grant",
         "role_id": 1168965931918176297,
         "feedback": "🎫 Nigga pass obtained! Real freedom of speech.",
     },
     "rain": {
-        "cost": 2000,
+        "cost": 1100,
         "type": "event",
         "feedback": "🌧️ **TOKEN RAIN!** The next 10 unique users to talk in this channel will earn 50 bonus tokens!",
     },
     "hot_potato": {
-        "cost": 1200,
+        "cost": 520,
         "type": "event",
         "feedback": "🥔🔥 **HOT POTATO!** A ticking muzzle is loose in the chat! Talk to pass it. Every pass earns you 15 tokens!",
     },
     "feast": {
-        "cost": 550,
+        "cost": 551,
         "type": "event",
         "feedback": "🍗🧛 **CRAZED FEAST!** You begin feasting upon the sleeping members of the chat...",
     },
