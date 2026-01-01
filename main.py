@@ -197,6 +197,11 @@ async def on_message(message):
 
             # UWU EFFECT
             elif effect_name == "uwu":
+                try:
+                    await message.delete()
+                except discord.Forbidden:
+                    pass
+
                 transformed_text = aggressive_uwu(message.content)
 
                 try:
