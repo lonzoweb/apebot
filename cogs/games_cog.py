@@ -489,10 +489,10 @@ class GamesCog(commands.Cog):
                 winners_mentions.append(m.display_name if m else f"User#{str(uid)[:4]}")
                 
             embed = discord.Embed(
-                title="💀 RUSSIAN ROULETTE: RESULT",
+                title="💀💀💀 WHO GOT GOT?",
                 color=discord.Color.red()
             )
-            embed.description = f"**CLICK... CLICK... CLICK... BANG!**\n\n{loser_mention} took the bullet! 😵"
+            embed.description = f"**CLICK... CLICK... CLICK... BANG!**\n\n{loser_mention} took the bullet. Hold that L 😵"
             embed.add_field(name="Outcome", value=f"🎀 {loser_mention} is **uwuud** for **5 minutes**.\n💰 The winners receive a **{economy.format_balance(payout)}** reward!", inline=False)
             embed.add_field(name="Survivors (+50 tokens)", value=", ".join(winners_mentions), inline=False)
             
