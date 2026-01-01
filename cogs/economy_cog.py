@@ -76,7 +76,10 @@ class EconomyCog(commands.Cog):
                 color=discord.Color.gold(),
             )
 
-            for item, data in ITEM_REGISTRY.items():
+            # Sort items by cost (ascending)
+            sorted_items = sorted(ITEM_REGISTRY.items(), key=lambda x: x[1]["cost"])
+
+            for item, data in sorted_items:
                 price = f"{data['cost']} 💎"
                 embed.add_field(
                     name=f"{item.replace('_', ' ').title()} — {price}",
@@ -99,6 +102,14 @@ class EconomyCog(commands.Cog):
 
         item_data = ITEM_REGISTRY[official_name]
         cost = item_data["cost"]
+
+        # Special handling for wards - limit to one in inventory
+        if item_data.get("type") == "defense":
+            inventory = await get_user_inventory(ctx.author.id)
+            if inventory.get("echo_ward", 0) > 0 or inventory.get("echo_ward_max", 0) > 0:
+                return await ctx.reply(
+                    "❌ You already have a ward in your stash. You can't handle another.", mention_author=False
+                )
 
         # Special handling for npass - check if user already has role
         if official_name == "npass":
@@ -197,6 +208,21 @@ class EconomyCog(commands.Cog):
                     )
 
                 target_inv = await get_user_inventory(target.id)
+                
+                # 1. Check for Echo Ward Max (Reflection)
+                if target_inv.get("echo_ward_max", 0) > 0:
+                    await remove_item_from_inventory(target.id, "echo_ward_max")
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    
+                    # Reflect! Apply effect to the sender (ctx.author)
+                    duration = item_info.get("duration_sec", 600)
+                    await add_active_effect(ctx.author.id, official_name, duration)
+                    
+                    return await ctx.send(
+                        f"🔮 **REFLECTED!** {target.mention}'s Echo Ward Max bounced the curse back! {ctx.author.mention} is hit with **{official_name}**!"
+                    )
+
+                # 2. Check for Standard Echo Ward (Blocking)
                 if target_inv.get("echo_ward", 0) > 0:
                     await remove_item_from_inventory(target.id, "echo_ward")
                     await remove_item_from_inventory(ctx.author.id, official_name)

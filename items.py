@@ -27,7 +27,12 @@ ITEM_REGISTRY = {
     "echo_ward": {
         "cost": 500,
         "type": "defense",
-        "feedback": "🛡️ Echo Ward added to inventory. Automatically reversing the next hex!",
+        "feedback": "🛡️ Echo Ward added to inventory. Blocks the next hex!",
+    },
+    "echo_ward_max": {
+        "cost": 700,
+        "type": "defense",
+        "feedback": "🔮 **ECHO WARD MAX!** Reverses the next hex back at the sender!",
     },
     "kush_pack": {
         "cost": 60,
@@ -35,7 +40,7 @@ ITEM_REGISTRY = {
         "feedback": "Sparking Apeiron Kush Pack. Shields active.",
     },
     "ping_everyone": {
-        "cost": 700,
+        "cost": 1440,
         "type": "broadcast",
         "feedback": "📡 PING SENT",
     },
@@ -72,6 +77,10 @@ ITEM_ALIASES = {
     "ward": "echo_ward",
     "echo": "echo_ward",
     "shield": "echo_ward",
+    "maxward": "echo_ward_max",
+    "echomax": "echo_ward_max",
+    "mirror": "echo_ward_max",
+    "max_ward": "echo_ward_max",
     "kush": "kush_pack",
     "weed": "kush_pack",
     "pack": "kush_pack",
