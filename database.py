@@ -100,13 +100,22 @@ async def init_db():
             await conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS active_effects (
-                    target_id TEXT PRIMARY KEY,
+                    user_id TEXT PRIMARY KEY,
                     effect_name TEXT NOT NULL,
-                    expiration_time REAL NOT NULL
+                    expires_at REAL NOT NULL
                 )
             """
             )
 
+            # ⏳ NEW: Global Cooldowns Table
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS global_cooldowns (
+                    name TEXT PRIMARY KEY,
+                    expires_at REAL NOT NULL
+                )
+            """
+            )
             # Add indexes
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_quotes_text ON quotes(quote)")
             await conn.execute(
@@ -536,4 +545,30 @@ async def cleanup_old_data():
         # Remove activity logs older than 30 days (optional)
         await conn.execute(
             "DELETE FROM activity_hourly WHERE last_updated < datetime('now', '-30 days')"
+        )
+
+# ============================================================
+# GLOBAL COOLDOWNS
+# ============================================================
+
+
+async def get_global_cooldown(name: str) -> float:
+    """Returns the expiration timestamp (epoch) for a global cooldown, or 0 if none."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT expires_at FROM global_cooldowns WHERE name = ?", (name,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return row[0]
+            return 0
+
+
+async def set_global_cooldown(name: str, duration_sec: int):
+    """Sets a global cooldown for the specified name and duration."""
+    expires_at = time.time() + duration_sec
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO global_cooldowns (name, expires_at) VALUES (?, ?)",
+            (name, expires_at),
         )

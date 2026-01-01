@@ -9,7 +9,7 @@ import logging
 import asyncio
 import random
 import economy
-from database import get_balance, update_balance, atomic_purchase, get_user_inventory, remove_item_from_inventory, add_active_effect, get_active_effect, set_balance, get_potential_victims
+from database import get_balance, update_balance, atomic_purchase, get_user_inventory, remove_item_from_inventory, add_active_effect, get_active_effect, set_balance, get_potential_victims, get_global_cooldown, set_global_cooldown
 from exceptions import InsufficientTokens, InsufficientInventory, ActiveCurseError, ItemNotFoundError
 from items import ITEM_REGISTRY, ITEM_ALIASES
 import database
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class EconomyCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.active_rain = {}  # channel_id -> message_count_remaining
+        self.active_storm = {}  # channel_id -> message_count_remaining
         self.active_potato = {} # channel_id -> {holder_id, expires_at, task}
         self.active_feasts = {} # channel_id -> {attacker_id, active_users, victim_counts, task}
 
@@ -262,18 +262,41 @@ class EconomyCog(commands.Cog):
                     await ctx.send("❌ Bot lacks permission to grant roles.")
 
             elif item_type == "broadcast":
-                # Handle ping everyone
-                if not message:
-                    # Try to get message from target parameter if it's a string
-                    if target and isinstance(target, str):
-                        message = str(target)
-                    else:
-                        return await ctx.send(
-                            f"❌ You must provide a message! Usage: `.use everyone <your message>`"
+                # Check Global Cooldown
+                if official_name == "ping_everyone":
+                    cooldown = await get_global_cooldown("ping_everyone")
+                    now = asyncio.get_event_loop().time()
+                    # get_global_cooldown returns epoch time, but database.py uses time.time()
+                    # However, time.time() and loop.time() are different. 
+                    # Let's fix database.py to use time.time() consistently or loop.time()
+                    # Actually database.py uses time.time() so let's stick to that.
+                    import time as pytime
+                    now = pytime.time()
+                    if cooldown > now:
+                        remaining_sec = int(cooldown - now)
+                        hours = remaining_sec // 3600
+                        minutes = (remaining_sec % 3600) // 60
+                        return await ctx.reply(
+                            f"⌛ **PING ON COOLDOWN.** The spirits are resting. Try again in **{hours}h {minutes}m**.",
+                            mention_author=False
                         )
 
                 # Remove item from inventory
                 await remove_item_from_inventory(ctx.author.id, official_name)
+
+                # Handle message extraction for broadcast
+                if not message:
+                    if target and isinstance(target, str):
+                        message = str(target)
+                    else:
+                        return await ctx.reply(
+                            f"❌ You must provide a message! Usage: `.use everyone <your message>`",
+                            mention_author=False
+                        )
+
+                # Set Global Cooldown
+                if official_name == "ping_everyone":
+                    await set_global_cooldown("ping_everyone", 86400)
 
                 # Send the ping
                 transmission_text = f"📡 **from {ctx.author.mention}**\n@everyone\n\n{message}"
@@ -281,11 +304,11 @@ class EconomyCog(commands.Cog):
                 await ctx.send(item_info['feedback'])
 
             elif item_type == "event":
-                if official_name == "rain":
-                    if ctx.channel.id in self.active_rain:
-                        return await ctx.send("❌ A Token Rain is already active in this channel!")
+                if official_name == "storm":
+                    if ctx.channel.id in self.active_storm:
+                        return await ctx.send("❌ A Token Storm is already active in this channel!")
                     
-                    self.active_rain[ctx.channel.id] = {'remaining': 10, 'participants': set()}
+                    self.active_storm[ctx.channel.id] = {'remaining': 10, 'participants': set()}
                     await remove_item_from_inventory(ctx.author.id, official_name)
                     await ctx.send(item_info['feedback'])
 
@@ -420,18 +443,18 @@ class EconomyCog(commands.Cog):
         channel_id = message.channel.id
         user_id = message.author.id
 
-        # 🌧️ Handle Token Rain
-        if channel_id in self.active_rain:
-            rain = self.active_rain[channel_id]
-            if rain['remaining'] > 0 and user_id not in rain['participants']:
-                rain['remaining'] -= 1
-                rain['participants'].add(user_id)
+        # 🌧️ Handle Token Storm
+        if channel_id in self.active_storm:
+            storm = self.active_storm[channel_id]
+            if storm['remaining'] > 0 and user_id not in storm['participants']:
+                storm['remaining'] -= 1
+                storm['participants'].add(user_id)
                 bonus = 50
                 await update_balance(user_id, bonus)
                 
-                if rain['remaining'] == 0:
-                    del self.active_rain[channel_id]
-                    await message.channel.send("☀️ **The Token Rain has ended.**")
+                if storm['remaining'] == 0:
+                    del self.active_storm[channel_id]
+                    await message.channel.send("☀️ **The Token Storm has ended.**")
 
         # 🥔 Handle Hot Potato
         if channel_id in self.active_potato:

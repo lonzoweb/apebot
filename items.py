@@ -16,18 +16,18 @@ ITEM_REGISTRY = {
         "cost": 900,
         "duration_sec": 1800,  # 30 mins
         "type": "curse",
-        "feedback": "🤐 Muzzle applied. They cannot speak or use commands!",
+        "feedback": "🤐 Muzzle applied. Target cannot speak or use commands for 30m",
     },
     "uwu": {
         "cost": 400,
         "duration_sec": 600,  # 10 mins
         "type": "curse",
-        "feedback": "🎀 Dawww~",
+        "feedback": "🎀 Dawww~, cute for 10m",
     },
     "echo_ward": {
         "cost": 500,
         "type": "defense",
-        "feedback": "🛡️ Echo Ward added to inventory. Blocks the next hex!",
+        "feedback": "🛡️ Echo Ward added to inventory. Blocks next hex on you.",
     },
     "echo_ward_max": {
         "cost": 700,
@@ -42,7 +42,7 @@ ITEM_REGISTRY = {
     "ping_everyone": {
         "cost": 1440,
         "type": "broadcast",
-        "feedback": "📡 PING SENT",
+        "feedback": "📡 Global Apeiron Ping. 24h cooldown.",
     },
     "npass": {
         "cost": 2500,
@@ -50,10 +50,10 @@ ITEM_REGISTRY = {
         "role_id": 1168965931918176297,
         "feedback": "🎫 Nigga pass obtained! Real freedom of speech.",
     },
-    "rain": {
+    "storm": {
         "cost": 1100,
         "type": "event",
-        "feedback": "🌧️ **TOKEN RAIN!** The next 10 unique users to talk in this channel will earn 50 bonus tokens!",
+        "feedback": "🌧️ **TOKEN STORM!** The next 10 unique users to talk in this channel earn 50 bonus tokens!",
     },
     "hot_potato": {
         "cost": 520,
@@ -63,7 +63,7 @@ ITEM_REGISTRY = {
     "feast": {
         "cost": 330,
         "type": "event",
-        "feedback": "🍗🧛 **CRAZED FEAST!** You begin feasting upon the sleeping members of the chat...\n💡 *To block attacks, you must speak in this channel!*",
+        "feedback": "🍗🧛 **CRAZED FEAST!** You begin feasting upon the sleeping members of the chat...\n💡 *Speak in chat to block attacks.*",
     },
 }
 
@@ -90,8 +90,8 @@ ITEM_ALIASES = {
     "npass": "npass",
     "n-pass": "npass",
     "pass": "npass",
-    "rain": "rain",
-    "token_rain": "rain",
+    "storm": "storm",
+    "token_storm": "storm",
     "hot_potato": "hot_potato",
     "potato": "hot_potato",
     "feast": "feast",
