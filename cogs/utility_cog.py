@@ -67,7 +67,7 @@ class UtilityCog(commands.Cog):
         if len(text) > 53:
             return await ctx.reply("❌ Text exceeds limit.", mention_author=False)
 
-        balance = await ctx.bot.loop.run_in_executor(None, get_balance, ctx.author.id)
+        balance = await get_balance(ctx.author.id)
         if balance < GEMATRIA_TOKEN_COST:
             cost_str = economy.format_balance(GEMATRIA_TOKEN_COST)
             bal_str = economy.format_balance(balance)
@@ -75,9 +75,7 @@ class UtilityCog(commands.Cog):
                 f"❌ Requires {cost_str}. Balance: {bal_str}.", mention_author=False
             )
 
-        await ctx.bot.loop.run_in_executor(
-            None, update_balance, ctx.author.id, -GEMATRIA_TOKEN_COST
-        )
+        await update_balance(ctx.author.id, -GEMATRIA_TOKEN_COST)
 
         results = calculate_all_gematria(text)
 
@@ -129,7 +127,7 @@ class UtilityCog(commands.Cog):
             if not image_url:
                 return await ctx.reply("⚠️ No image found in the last 20 messages.")
 
-            balance = await ctx.bot.loop.run_in_executor(None, get_balance, ctx.author.id)
+            balance = await get_balance(ctx.author.id)
             if balance < REVERSE_IMAGE_TOKEN_COST:
                 cost_str = economy.format_balance(REVERSE_IMAGE_TOKEN_COST)
                 bal_str = economy.format_balance(balance)
@@ -138,9 +136,7 @@ class UtilityCog(commands.Cog):
                     mention_author=False,
                 )
 
-            await ctx.bot.loop.run_in_executor(
-                None, update_balance, ctx.author.id, -REVERSE_IMAGE_TOKEN_COST
-            )
+            await update_balance(ctx.author.id, -REVERSE_IMAGE_TOKEN_COST)
 
             try:
                 data = await google_lens_fetch_results(image_url, limit=3)
@@ -409,11 +405,11 @@ class UtilityCog(commands.Cog):
                 )
                 replied_user = replied_message.author
 
-                timezone_name, city = get_user_timezone(replied_user.id)
+                timezone_name, city = await get_user_timezone(replied_user.id)
                 if city:
                     location = city
                 else:
-                    timezone_name, city = get_user_timezone(ctx.author.id)
+                    timezone_name, city = await get_user_timezone(ctx.author.id)
                     if city:
                         location = city
                     else:
@@ -426,7 +422,7 @@ class UtilityCog(commands.Cog):
                 pass
 
         if not location:
-            timezone_name, city = get_user_timezone(ctx.author.id)
+            timezone_name, city = await get_user_timezone(ctx.author.id)
             if city:
                 location = city
             else:
@@ -551,9 +547,7 @@ class UtilityCog(commands.Cog):
 
         loading_msg = await ctx.send("🌐 Fetching real-time crypto prices... ⏳")
 
-        crypto_data = await ctx.bot.loop.run_in_executor(
-            None, crypto_api.fetch_crypto_prices, 5
-        )
+        crypto_data = await crypto_api.fetch_crypto_prices(self.bot.aiohttp_session, 5)
 
         if not crypto_data:
             await loading_msg.edit(
@@ -607,7 +601,7 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def gifs_command(self, ctx):
         """Show top 10 most sent GIFs"""
-        top_gifs = get_top_gifs(limit=10)
+        top_gifs = await get_top_gifs(limit=10)
 
         if not top_gifs:
             return await ctx.send("📊 No GIFs tracked yet. Send some GIFs!")
@@ -646,7 +640,7 @@ class UtilityCog(commands.Cog):
         try:
             reaction, user = await self.bot.wait_for("reaction_add", timeout=60.0, check=check)
             rank = reactions.index(str(reaction.emoji)) + 1
-            gif_url = get_gif_by_rank(rank)
+            gif_url = await get_gif_by_rank(rank)
 
             if gif_url:
                 await ctx.send(f"**#{rank} GIF:**\n{gif_url}")
@@ -681,9 +675,7 @@ class UtilityCog(commands.Cog):
             for _ in range(6):
                 await ctx.send(stickers=[sticker])
 
-            await ctx.bot.loop.run_in_executor(
-                None, update_balance, ctx.author.id, REWARD_AMOUNT
-            )
+            await update_balance(ctx.author.id, REWARD_AMOUNT)
 
             if not is_admin:
                 last_used["key"] = time.time()
@@ -710,7 +702,7 @@ class UtilityCog(commands.Cog):
         minutes, seconds = divmod(remainder, 60)
 
         from database import load_quotes_from_db
-        quote_count = len(load_quotes_from_db())
+        quote_count = len(await load_quotes_from_db())
 
         embed = discord.Embed(title="📊 Bot Stats", color=discord.Color.teal())
         embed.add_field(name="Uptime", value=f"{hours}h {minutes}m {seconds}s", inline=True)
@@ -734,7 +726,7 @@ class UtilityCog(commands.Cog):
         if not member:
             member = ctx.author
 
-        timezone_name, city = get_user_timezone(member.id)
+        timezone_name, city = await get_user_timezone(member.id)
         if not timezone_name or not city:
             await ctx.send(
                 f"❌ {member.display_name} has not set their location yet. Use `.location <city>`."
@@ -789,7 +781,7 @@ class UtilityCog(commands.Cog):
         try:
             msg = await self.bot.wait_for("message", check=check, timeout=60)
             if msg.content.lower() == "yes":
-                set_user_timezone(target_member.id, timezone_name, city)
+                await set_user_timezone(target_member.id, timezone_name, city)
                 await ctx.send(
                     f"✅ Location set for {target_member.display_name} as **{city}**."
                 )

@@ -47,7 +47,7 @@ class TarotCog(commands.Cog):
                     f"❌ Unknown deck `{deck_name}`\nAvailable decks: `thoth`, `rws`"
                 )
 
-            set_guild_tarot_deck(ctx.guild.id, deck_name)
+            await set_guild_tarot_deck(ctx.guild.id, deck_name)
 
             deck_full_name = (
                 "Aleister Crowley Thoth Tarot"
@@ -58,7 +58,7 @@ class TarotCog(commands.Cog):
             return
 
         # Draw Card Logic
-        deck_setting = get_guild_tarot_deck(ctx.guild.id)
+        deck_setting = await get_guild_tarot_deck(ctx.guild.id)
         deck_name_clean = str(deck_setting).lower().strip() if deck_setting else "thoth"
 
         if deck_name_clean == "rws":
@@ -78,11 +78,11 @@ class TarotCog(commands.Cog):
             await execute_draw()
             return
 
-        balance = await ctx.bot.loop.run_in_executor(None, get_balance, user_id)
+        balance = await get_balance(user_id)
         if balance < 1:
             return await ctx.send(f"❌ Insufficient balance. You need {economy.format_balance(1)} to draw a card.")
 
-        await ctx.bot.loop.run_in_executor(None, update_balance, user_id, -1)
+        await update_balance(user_id, -1)
 
         if user_id not in user_usage or user_usage[user_id]["day"] != today:
             user_usage[user_id] = {

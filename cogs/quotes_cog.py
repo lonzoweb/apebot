@@ -29,7 +29,7 @@ class QuotesCog(commands.Cog):
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def quote_command(self, ctx, *, keyword: str = None):
         """Get a random quote or search by keyword"""
-        quotes = load_quotes_from_db()
+        quotes = await load_quotes_from_db()
         if not quotes:
             await ctx.send("⚠️ No quotes available.")
             return
@@ -73,7 +73,7 @@ class QuotesCog(commands.Cog):
             return await ctx.send("❌ Quote too long (max 2000 characters)")
 
         try:
-            add_quote_to_db(quote_text)
+            await add_quote_to_db(quote_text)
             embed = discord.Embed(
                 title="✅ Quote Added",
                 description=f"{quote_text}",
@@ -95,7 +95,7 @@ class QuotesCog(commands.Cog):
             await ctx.send("🚫 Peasant Detected")
             return
 
-        quotes = load_quotes_from_db()
+        quotes = await load_quotes_from_db()
         matches = [q for q in quotes if keyword.lower() in q.lower()]
         if not matches:
             await ctx.send(f"🔍 No quotes found containing '{keyword}'")
@@ -136,7 +136,7 @@ class QuotesCog(commands.Cog):
             if len(new_quote) > 2000:
                 return await ctx.send("❌ Quote too long (max 2000 characters)")
 
-            update_quote_in_db(old_quote, new_quote)
+            await update_quote_in_db(old_quote, new_quote)
             await ctx.send(f"✅ Quote updated.")
         except asyncio.TimeoutError:
             await ctx.send("⌛ Timeout. Edit cancelled.")
@@ -147,7 +147,7 @@ class QuotesCog(commands.Cog):
         if not ctx.author.guild_permissions.administrator:
             return await ctx.send("🚫 Peasant Detected")
 
-        results = search_quotes_by_keyword(keyword)
+        results = await search_quotes_by_keyword(keyword)
         if not results:
             return await ctx.send(f"🔍 No quotes found containing '{keyword}'")
 
@@ -193,7 +193,7 @@ class QuotesCog(commands.Cog):
             return await ctx.send("❎ Cancelled.")
 
         try:
-            delete_quote_by_id(quote_id)
+            await delete_quote_by_id(quote_id)
             await ctx.send(f'✅ Deleted quote:\n"{quote_text}"')
         except Exception as e:
             logger.error(f"Error deleting quote: {e}")
@@ -205,7 +205,7 @@ class QuotesCog(commands.Cog):
         if not ctx.author.guild_permissions.administrator:
             await ctx.send("🚫 Peasant Detected")
             return
-        quotes = load_quotes_from_db()
+        quotes = await load_quotes_from_db()
         if not quotes:
             await ctx.send("⚠️ No quotes available.")
             return

@@ -21,11 +21,10 @@ BATTLE_CHANNEL_NAME = "forum"  # Only count reactions in this channel
 # DATABASE FUNCTIONS
 # ============================================================
 
-def init_battle_db():
+async def init_battle_db():
     """Initialize battle stats table"""
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute("""
+    async with get_db() as conn:
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS battle_stats (
                 user_id TEXT PRIMARY KEY,
                 username TEXT,
@@ -34,13 +33,11 @@ def init_battle_db():
             )
         """)
 
-def update_battle_stats(user_id, username, won, reaction_count):
+async def update_battle_stats(user_id, username, won, reaction_count):
     """Update user's battle statistics"""
-    with get_db() as conn:
-        c = conn.cursor()
-        
+    async with get_db() as conn:
         # Insert or update
-        c.execute("""
+        await conn.execute("""
             INSERT INTO battle_stats (user_id, username, wins, total_reactions)
             VALUES (?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
@@ -49,18 +46,17 @@ def update_battle_stats(user_id, username, won, reaction_count):
                 total_reactions = total_reactions + ?
         """, (user_id, username, 1 if won else 0, reaction_count, username, 1 if won else 0, reaction_count))
 
-def get_battle_scoreboard(limit=20):
+async def get_battle_scoreboard(limit=20):
     """Get top battlers by wins"""
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute("""
+    async with get_db() as conn:
+        async with conn.execute("""
             SELECT username, wins, total_reactions
             FROM battle_stats
             WHERE wins > 0
             ORDER BY wins DESC, total_reactions DESC
             LIMIT ?
-        """, (limit,))
-        return c.fetchall()
+        """, (limit,)) as cursor:
+            return await cursor.fetchall()
 
 # ============================================================
 # BATTLE DATA STRUCTURE
@@ -198,13 +194,13 @@ async def end_battle_and_announce():
         loser_reactions = user1_reactions if loser == battle_data.user1 else user2_reactions
         
         # Winner gets win + their reactions
-        update_battle_stats(str(winner.id), winner.name, True, winner_count)
+        await update_battle_stats(str(winner.id), winner.name, True, winner_count)
         # Loser gets no win + their reactions
-        update_battle_stats(str(loser.id), loser.name, False, loser_count)
+        await update_battle_stats(str(loser.id), loser.name, False, loser_count)
     else:
         # Tie - both get wins
-        update_battle_stats(str(battle_data.user1.id), battle_data.user1.name, True, user1_reactions)
-        update_battle_stats(str(battle_data.user2.id), battle_data.user2.name, True, user2_reactions)
+        await update_battle_stats(str(battle_data.user1.id), battle_data.user1.name, True, user1_reactions)
+        await update_battle_stats(str(battle_data.user2.id), battle_data.user2.name, True, user2_reactions)
     
     # Build results embed
     embed = discord.Embed(
@@ -323,7 +319,7 @@ async def stop_battle(ctx):
 
 async def show_scoreboard(ctx):
     """Display battle scoreboard"""
-    scoreboard = get_battle_scoreboard(limit=20)
+    scoreboard = await get_battle_scoreboard(limit=20)
     
     if not scoreboard:
         return await ctx.send("📊 No battles have been fought yet!")

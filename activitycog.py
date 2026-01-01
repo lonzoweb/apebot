@@ -54,7 +54,7 @@ class ActivityCog(commands.Cog):
         if gif_url:
             try:
                 # Assuming increment_gif_count is imported from database.py
-                increment_gif_count(gif_url, message.author.id)
+                await increment_gif_count(gif_url, message.author.id)
             except Exception as e:
                 logger.error(f"Error tracking GIF: {e}")
 
@@ -81,9 +81,9 @@ class ActivityCog(commands.Cog):
 
         try:
             # 2. Get stats
-            total_msgs = activity_tracker.get_total_messages()
-            top_hours_raw = activity_tracker.get_most_active_hours(limit=5)
-            top_users_raw = activity_tracker.get_most_active_users(limit=10)
+            total_msgs = await activity_tracker.get_total_messages()
+            top_hours_raw = await activity_tracker.get_most_active_hours(limit=5)
+            top_users_raw = await activity_tracker.get_most_active_users(limit=10)
 
             if not total_msgs:
                 return await ctx.send("📊 No activity data yet.")
@@ -147,7 +147,7 @@ async def setup(bot):
     """The function Discord.py calls to load the cog."""
 
     # Ensure activity tables are initialized early
-    activity_tracker.init_activity_tables()
+    await activity_tracker.init_activity_tables()
 
     # Add the cog to the bot
     await bot.add_cog(ActivityCog(bot))

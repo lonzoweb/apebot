@@ -97,13 +97,9 @@ class AdminCog(commands.Cog):
         voted_id_str = str(member.id)
         voter_id_str = str(ctx.author.id)
 
-        await ctx.bot.loop.run_in_executor(
-            None, update_pink_vote, voted_id_str, voter_id_str
-        )
+        await update_pink_vote(voted_id_str, voter_id_str)
 
-        vote_count = await ctx.bot.loop.run_in_executor(
-            None, get_active_pink_vote_count, voted_id_str
-        )
+        vote_count = await get_active_pink_vote_count(voted_id_str)
 
         if vote_count >= VOTE_THRESHOLD:
             try:
@@ -112,9 +108,7 @@ class AdminCog(commands.Cog):
                 )
 
                 removal_time = time.time() + ROLE_DURATION_SECONDS
-                await ctx.bot.loop.run_in_executor(
-                    None, add_masochist_role_removal, voted_id_str, removal_time
-                )
+                await add_masochist_role_removal(voted_id_str, removal_time)
 
                 await ctx.send(
                     f"🎉 **PAYMENT DUE!** {member.mention} has reached **{VOTE_THRESHOLD} pink votes** in 48 hours and has been assigned the **{masochist_role.name}** role for 2 days!"
@@ -255,7 +249,7 @@ class AdminCog(commands.Cog):
         
         # Check for active effects
         try:
-            effect_data = get_active_effect(member.id)
+            effect_data = await get_active_effect(member.id)
             
             if effect_data is None:
                 return await ctx.reply(
@@ -266,7 +260,7 @@ class AdminCog(commands.Cog):
             effect_name, expiration_time = effect_data
             
             # Remove the effect
-            remove_active_effect(member.id)
+            await remove_active_effect(member.id)
             
             # Send success embed
             embed = discord.Embed(
@@ -468,17 +462,15 @@ class AdminCog(commands.Cog):
         size = os.path.getsize(DB_FILE) if exists else 0
 
         try:
-            with get_db() as conn:
-                c = conn.cursor()
+            async with get_db() as conn:
+                async with conn.execute("SELECT COUNT(*) FROM quotes") as cursor:
+                    quote_count = (await cursor.fetchone())[0]
 
-                c.execute("SELECT COUNT(*) FROM quotes")
-                quote_count = c.fetchone()[0]
+                async with conn.execute("SELECT COUNT(*) FROM activity_hourly") as cursor:
+                    activity_count = (await cursor.fetchone())[0]
 
-                c.execute("SELECT COUNT(*) FROM activity_hourly")
-                activity_count = c.fetchone()[0]
-
-                c.execute("SELECT COUNT(*) FROM user_timezones")
-                tz_count = c.fetchone()[0]
+                async with conn.execute("SELECT COUNT(*) FROM user_timezones") as cursor:
+                    tz_count = (await cursor.fetchone())[0]
 
                 await ctx.send(
                     f"🗄️ **Database Status**\n"
@@ -498,10 +490,9 @@ class AdminCog(commands.Cog):
             return await ctx.send("🚫 Peasant Detected")
 
         try:
-            with get_db() as conn:
-                c = conn.cursor()
-                c.execute("PRAGMA integrity_check")
-                result = c.fetchone()[0]
+            async with get_db() as conn:
+                async with conn.execute("PRAGMA integrity_check") as cursor:
+                    result = (await cursor.fetchone())[0]
 
                 if result == "ok":
                     await ctx.send("✅ Database integrity check passed!")
@@ -543,7 +534,7 @@ class AdminCog(commands.Cog):
         """Show sample quotes (Admin only)"""
         if not ctx.author.guild_permissions.administrator:
             return await ctx.send("🚫 Peasant Detected")
-        quotes = load_quotes_from_db()
+        quotes = await load_quotes_from_db()
         sample = quotes[-3:] if len(quotes) >= 3 else quotes
         await ctx.send(f"Loaded {len(quotes)} quotes.\nLast 3:\n" + "\n".join(sample))
 
@@ -553,9 +544,8 @@ class AdminCog(commands.Cog):
         if not ctx.author.guild_permissions.administrator:
             return await ctx.send("🚫 Peasant Detected")
         try:
-            with get_db() as conn:
-                c = conn.cursor()
-                c.execute("INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (quote_text,))
+            async with get_db() as conn:
+                await conn.execute("INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (quote_text,))
             await ctx.send(f'✅ Successfully wrote "{quote_text}" to {DB_FILE}')
         except Exception as e:
             logger.error(f"DB write error: {e}")
@@ -570,7 +560,7 @@ class AdminCog(commands.Cog):
         try:
             from activity import flush_activity_to_db
 
-            flush_activity_to_db(None)
+            await flush_activity_to_db()
             await ctx.send("✅ Activity flushed to database!")
         except Exception as e:
             logger.error(f"Error flushing: {e}")
@@ -588,10 +578,9 @@ class AdminCog(commands.Cog):
             await ctx.send(f"📦 Backed up old DB to {backup_path}")
 
         try:
-            with get_db() as conn:
-                c = conn.cursor()
-                c.execute("DROP TABLE IF EXISTS quotes")
-                c.execute(
+            async with get_db() as conn:
+                await conn.execute("DROP TABLE IF EXISTS quotes")
+                await conn.execute(
                     "CREATE TABLE quotes (id INTEGER PRIMARY KEY AUTOINCREMENT, quote TEXT UNIQUE)"
                 )
             await ctx.send(f"✅ Reinitialized quotes table at {DB_FILE}")
@@ -610,23 +599,21 @@ class AdminCog(commands.Cog):
             return await ctx.send("❌ No backup file found to merge.")
 
         try:
-            conn_new = sqlite3.connect(DB_FILE)
-            conn_old = sqlite3.connect(old_db)
-            c_new = conn_new.cursor()
-            c_old = conn_old.cursor()
-
-            c_old.execute("SELECT quote FROM quotes")
-            rows = c_old.fetchall()
-            count = 0
-            for (quote,) in rows:
-                try:
-                    c_new.execute(
-                        "INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (quote,)
-                    )
-                    count += 1
-                except Exception:
-                    pass
-            conn_new.commit()
+            import aiosqlite
+            async with aiosqlite.connect(DB_FILE) as conn_new:
+                async with aiosqlite.connect(old_db) as conn_old:
+                    async with conn_old.execute("SELECT quote FROM quotes") as cursor_old:
+                        rows = await cursor_old.fetchall()
+                        count = 0
+                        for (quote,) in rows:
+                            try:
+                                await conn_new.execute(
+                                    "INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (quote,)
+                                )
+                                count += 1
+                            except Exception:
+                                pass
+                        await conn_new.commit()
             await ctx.send(f"✅ Merged {count} quotes from backup into the new database.")
         except Exception as e:
             logger.error(f"Error merging: {e}")

@@ -2,6 +2,7 @@
 import discord
 import logging
 from database import get_balance, update_balance, transfer_tokens, set_balance
+from exceptions import InsufficientTokens
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +36,8 @@ async def handle_balance_command(ctx, member: discord.Member = None):
     """
     target = member if member else ctx.author
 
-    # We use asyncio.to_thread for database reads to prevent blocking the main loop
-    balance = await ctx.bot.loop.run_in_executor(None, get_balance, target.id)
+    # Directly await the async database function
+    balance = await get_balance(target.id)
 
     if target == ctx.author:
         message = f"{ctx.author.mention}, your current balance is **{format_balance(balance)}**."
@@ -59,17 +60,14 @@ async def handle_send_command(ctx, member: discord.Member, amount: int):
     sender_id = ctx.author.id
     recipient_id = member.id
 
-    # Run atomic transfer in a separate thread
-    success = await ctx.bot.loop.run_in_executor(
-        None, transfer_tokens, sender_id, recipient_id, amount
-    )
-
-    if success:
+    try:
+        # Directly await the async transfer function
+        await transfer_tokens(sender_id, recipient_id, amount)
         # Don't reveal balance in public chat
         await ctx.send(
             f"✅ **{format_balance(amount)}** transferred from {ctx.author.mention} to {member.mention}"
         )
-    else:
+    except InsufficientTokens:
         await ctx.send(
             f"❌ Transaction declined. Insufficient balance."
         )
@@ -88,8 +86,8 @@ async def handle_admin_modify_command(
     # Determine the final amount to be passed to update_balance
     final_amount = amount if operation == "add" else -amount
 
-    # Run update in a separate thread
-    await ctx.bot.loop.run_in_executor(None, update_balance, member.id, final_amount)
+    # Directly await the async update function
+    await update_balance(member.id, final_amount)
 
     # Silent confirmation - don't reveal balance
     action = "added to" if final_amount > 0 else "removed from"
@@ -104,8 +102,8 @@ async def handle_baledit_command(ctx, member: discord.Member, new_balance: int):
     if new_balance < 0:
         return await ctx.send("❌ Balance cannot be negative.")
 
-    # Set exact balance
-    await ctx.bot.loop.run_in_executor(None, set_balance, member.id, new_balance)
+    # Directly await the async set function
+    await set_balance(member.id, new_balance)
 
     # Silent confirmation - don't reveal balance
     await ctx.send(f"✅ Balance updated for {member.mention}")

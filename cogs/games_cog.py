@@ -82,7 +82,7 @@ class GamesCog(commands.Cog):
             return await ctx.send(embed=help_embed)
         
         user_id = ctx.author.id
-        balance = await self.bot.loop.run_in_executor(None, get_balance, user_id)
+        balance = await get_balance(user_id)
 
         if bet == "all":
             bet_amt = balance
@@ -202,9 +202,7 @@ class GamesCog(commands.Cog):
 
     async def finalize_dice(self, ctx, msg, dice, status_text, winnings, bet):
         """Finalize dice game and update balance"""
-        await ctx.bot.loop.run_in_executor(
-            None, update_balance, ctx.author.id, winnings
-        )
+        await update_balance(ctx.author.id, winnings)
 
         d_str = (
             f"{DICE_EMOJIS[dice[0]]}  {DICE_EMOJIS[dice[1]]}  {DICE_EMOJIS[dice[2]]}"
@@ -386,9 +384,7 @@ class GamesCog(commands.Cog):
             )
 
         if winnings > 0:
-            await ctx.bot.loop.run_in_executor(
-                None, update_balance, ctx.author.id, winnings
-            )
+            await update_balance(ctx.author.id, winnings)
 
             formatted_winnings = economy.format_balance(winnings)
             final_msg += f"\n\nYou received {formatted_winnings}!"

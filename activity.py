@@ -40,7 +40,7 @@ def log_activity_in_memory(user_id: str, hour: str):
         )
 
 
-def flush_activity_to_db():
+async def flush_activity_to_db():
     """Write batched activity data to database"""
     # Use 'try...finally' to ensure the buffer clears even if one part fails.
 
@@ -53,13 +53,11 @@ def flush_activity_to_db():
 
     # 2. Flush to DB
     try:
-        with get_db() as conn:
-            c = conn.cursor()
-
+        async with get_db() as conn:
             # Batch insert hourly data
             # Update last_updated timestamp to prevent cleanup from deleting recently updated entries
             for hour, count in hourly_data.items():
-                c.execute(
+                await conn.execute(
                     """
                     INSERT INTO activity_hourly (hour, count, last_updated) VALUES (?, ?, datetime('now'))
                     ON CONFLICT(hour) DO UPDATE SET 
@@ -71,7 +69,7 @@ def flush_activity_to_db():
 
             # Batch insert user data
             for user_id, count in user_data.items():
-                c.execute(
+                await conn.execute(
                     """
                     INSERT INTO activity_users (user_id, count, last_updated) VALUES (?, ?, datetime('now'))
                     ON CONFLICT(user_id) DO UPDATE SET 
@@ -96,85 +94,80 @@ def flush_activity_to_db():
 # ============================================================
 
 
-def init_activity_tables():
+async def init_activity_tables():
     """Placeholder to call the init_db logic from the database file"""
     from database import init_db
 
-    init_db()
+    await init_db()
     logger.info("✅ Activity tables initialized (via database.init_db)")
 
 
-def get_most_active_hours(limit=5):
+async def get_most_active_hours(limit=5):
     """Get top active hours"""
     try:
-        with get_db() as conn:
-            c = conn.cursor()
-            c.execute(
+        async with get_db() as conn:
+            async with conn.execute(
                 """
                 SELECT hour, count FROM activity_hourly 
                 ORDER BY count DESC 
                 LIMIT ?
             """,
                 (limit,),
-            )
-            return c.fetchall()
+            ) as cursor:
+                return await cursor.fetchall()
     except Exception as e:
         logger.error(f"Error getting active hours: {e}")
         return []
 
 
-def get_most_active_users(limit=10):
+async def get_most_active_users(limit=10):
     """Get top active users"""
     try:
-        with get_db() as conn:
-            c = conn.cursor()
-            c.execute(
+        async with get_db() as conn:
+            async with conn.execute(
                 """
                 SELECT user_id, count FROM activity_users 
                 ORDER BY count DESC 
                 LIMIT ?
             """,
                 (limit,),
-            )
-            return c.fetchall()
+            ) as cursor:
+                return await cursor.fetchall()
     except Exception as e:
         logger.error(f"Error getting active users: {e}")
         return []
 
 
-def get_total_messages():
+async def get_total_messages():
     """Get total messages tracked"""
     try:
-        with get_db() as conn:
-            c = conn.cursor()
-            c.execute("SELECT SUM(count) FROM activity_hourly")
-            result = c.fetchone()
-            return result[0] if result and result[0] else 0
+        async with get_db() as conn:
+            async with conn.execute("SELECT SUM(count) FROM activity_hourly") as cursor:
+                result = await cursor.fetchone()
+                return result[0] if result and result[0] else 0
     except Exception as e:
         logger.error(f"Error getting total messages: {e}")
         return 0
 
 
-def cleanup_old_activity(days=30):
+async def cleanup_old_activity(days=30):
     """Delete activity data older than X days"""
     try:
         # Calculate cutoff date in ISO format
         cutoff_datetime = datetime.now() - timedelta(days=days)
         cutoff_date = cutoff_datetime.isoformat()
 
-        with get_db() as conn:
-            c = conn.cursor()
-
+        async with get_db() as conn:
             # The WHERE clause uses the last_updated TIMESTAMP field
-            c.execute(
+            async with conn.execute(
                 "DELETE FROM activity_hourly WHERE last_updated < ?", (cutoff_date,)
-            )
-            hourly_rows = c.rowcount
+            ) as cursor:
+                hourly_rows = cursor.rowcount
 
-            c.execute(
+            async with conn.execute(
                 "DELETE FROM activity_users WHERE last_updated < ?", (cutoff_date,)
-            )
-            user_rows = c.rowcount
+            ) as cursor:
+                user_rows = cursor.rowcount
 
         logger.info(
             f"✅ Cleaned up activity data older than {days} days. Deleted {hourly_rows} hourly entries and {user_rows} user entries."

@@ -23,9 +23,14 @@ import tasks
 import battle
 from items import aggressive_uwu
 from config import TOKEN, COMMAND_PREFIX, AUTHORIZED_ROLES
-from database import init_db, get_active_effect, remove_active_effect, get_user_timezone
+from database import (
+    init_db,
+    get_active_effect,
+    remove_active_effect,
+    get_user_timezone,
+    increment_gif_count
+)
 from helpers import extract_gif_url
-from database import increment_gif_count
 import activity
 
 # ============================================================
@@ -100,12 +105,12 @@ async def on_ready():
     # 2. Get owner timezone
     if bot.owner_timezone is None:
         your_user_id = 154814148054745088
-        tz, _ = get_user_timezone(your_user_id)
+        tz, _ = await get_user_timezone(your_user_id)
         bot.owner_timezone = tz
 
     # 3. Initialize Database
-    await bot.loop.run_in_executor(None, init_db)
-    await bot.loop.run_in_executor(None, battle.init_battle_db)
+    await init_db()
+    await battle.init_battle_db()
     logger.info("✅ Database initialized")
 
     # 4. Load Cogs
@@ -173,18 +178,14 @@ async def on_message(message):
         return
 
     # Check if user has an active Muzzle or UwU effect
-    effect_data = await bot.loop.run_in_executor(
-        None, get_active_effect, message.author.id
-    )
+    effect_data = await get_active_effect(message.author.id)
 
     if effect_data:
         effect_name, expiration_time = effect_data
 
         # If expired, remove from DB and let message through
         if time.time() > expiration_time:
-            await bot.loop.run_in_executor(
-                None, remove_active_effect, message.author.id
-            )
+            await remove_active_effect(message.author.id)
         else:
             # MUZZLE EFFECT
             if effect_name == "muzzle":
@@ -233,7 +234,7 @@ async def on_message(message):
     gif_url = extract_gif_url(message)
     if gif_url:
         try:
-            increment_gif_count(gif_url, message.author.id)
+            await increment_gif_count(gif_url, message.author.id)
         except Exception as e:
             logger.error(f"Error tracking GIF: {e}")
 

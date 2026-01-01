@@ -41,9 +41,7 @@ def setup_tasks(bot, guild_id: int):
     async def cleanup_activity_daily():
         """Clean up activity data older than 30 days once per day"""
         try:
-            await bot.loop.run_in_executor(
-                None, activity_tracker.cleanup_old_activity, 30
-            )
+            await activity_tracker.cleanup_old_activity(30)
         except Exception as e:
             logger.error(f"Error in activity cleanup: {e}", exc_info=True)
 
@@ -59,7 +57,7 @@ def setup_tasks(bot, guild_id: int):
     async def flush_activity_frequent():
         """Flush batched activity data to database"""
         try:
-            await bot.loop.run_in_executor(None, activity_tracker.flush_activity_to_db)
+            await activity_tracker.flush_activity_to_db()
         except Exception as e:
             logger.error(f"Error in activity flush: {e}", exc_info=True)
 
@@ -90,9 +88,7 @@ def setup_tasks(bot, guild_id: int):
             now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
 
             if now_pt.hour == 10 and daily_quote_of_the_day is None:
-                quotes = await bot.loop.run_in_executor(
-                    None, database.load_quotes_from_db
-                )
+                quotes = await database.load_quotes_from_db()
                 if quotes:
                     daily_quote_of_the_day = random.choice(quotes)
                     embed = discord.Embed(
@@ -126,6 +122,43 @@ def setup_tasks(bot, guild_id: int):
 
     daily_quote.start()
 
+    async def handle_curse_expirations():
+        """Helper to process expired curses"""
+        try:
+            expired_curses = await database.get_all_expired_effects()
+            for target_id_str in expired_curses:
+                await database.remove_active_effect(int(target_id_str))
+                logger.info(f"🧹 Logic: Automatically removed expired curse from {target_id_str}")
+        except Exception as e:
+            logger.error(f"Error in curse cleanup: {e}")
+
+    async def handle_role_expirations(guild):
+        """Helper to process expired roles"""
+        masochist_role = guild.get_role(MASOCHIST_ROLE_ID)
+        if not masochist_role:
+            return
+
+        try:
+            users_to_remove_ids = await database.get_pending_role_removals()
+            for user_id_str in users_to_remove_ids:
+                user_id = int(user_id_str)
+                member = guild.get_member(user_id)
+
+                if member and masochist_role in member.roles:
+                    try:
+                        await member.remove_roles(masochist_role, reason="Masochist role expired.")
+                        logger.info(f"Removed Masochist role from {member.display_name}")
+                        try:
+                            await member.send(f"Your **{masochist_role.name}** role has expired!")
+                        except discord.Forbidden:
+                            pass
+                    except Exception as e:
+                        logger.error(f"Error removing role for {user_id}: {e}")
+
+                await database.remove_masochist_role_record(user_id_str)
+        except Exception as e:
+            logger.error(f"Error in role removal: {e}")
+
     # --- 4. Unified Expiration Task (Roles & Item Curses) ---
     @tasks.loop(minutes=5.0)
     async def unified_cleanup_loop():
@@ -134,61 +167,8 @@ def setup_tasks(bot, guild_id: int):
         if not guild:
             return
 
-        # --- Part A: Item Curse Cleanup ---
-        try:
-            expired_curses = await bot.loop.run_in_executor(
-                None, database.get_all_expired_effects
-            )
-            if expired_curses:
-                for target_id_str in expired_curses:
-                    await bot.loop.run_in_executor(
-                        None, database.remove_active_effect, int(target_id_str)
-                    )
-                    logger.info(
-                        f"🧹 Logic: Automatically removed expired curse from {target_id_str}"
-                    )
-        except Exception as e:
-            logger.error(f"Error in curse cleanup: {e}", exc_info=True)
-
-        # --- Part B: Masochist Role Removal ---
-        masochist_role = guild.get_role(MASOCHIST_ROLE_ID)
-        if not masochist_role:
-            return
-
-        try:
-            users_to_remove_ids = await bot.loop.run_in_executor(
-                None, database.get_pending_role_removals
-            )
-            if not users_to_remove_ids:
-                return
-
-            for user_id_str in users_to_remove_ids:
-                user_id = int(user_id_str)
-                member = guild.get_member(user_id)
-
-                if member and masochist_role in member.roles:
-                    try:
-                        await member.remove_roles(
-                            masochist_role, reason="Masochist role expired."
-                        )
-                        logger.info(
-                            f"Removed Masochist role from {member.display_name}"
-                        )
-                        try:
-                            await member.send(
-                                f"Your **{masochist_role.name}** role has expired!"
-                            )
-                        except discord.Forbidden:
-                            pass
-                    except Exception as e:
-                        logger.error(f"Error removing role for {user_id}: {e}")
-
-                await bot.loop.run_in_executor(
-                    None, database.remove_masochist_role_record, user_id_str
-                )
-
-        except Exception as e:
-            logger.error(f"Error in role_removal_loop: {e}", exc_info=True)
+        await handle_curse_expirations()
+        await handle_role_expirations(guild)
 
     @unified_cleanup_loop.before_loop
     async def before_unified_cleanup_loop():
