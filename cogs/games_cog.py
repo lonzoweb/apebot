@@ -92,16 +92,15 @@ class GamesCog(commands.Cog):
             try:
                 bet_amt = int(bet)
             except (ValueError, TypeError):
-                return await ctx.send(
-                    '`Usage: .dice <amount> or .dice all`\n"Put some dough on the floor."'
+                return await ctx.reply( # Changed to ctx.reply
+                    '`Usage: .dice <amount> or .dice all`\n"Put some dough on the floor."', mention_author=False
                 )
 
         if bet_amt <= 0:
-            return await ctx.send("Enter a real bet.")
+            return await ctx.reply("❌ Enter a real bet.", mention_author=False)
+
         if balance < bet_amt:
-            return await ctx.send(
-                f"❌ Broke. Balance: {economy.format_balance(balance)}"
-            )
+            return await ctx.reply(f"❌ You're flat. Need **{economy.format_balance(bet_amt)}**.", mention_author=False)
 
         if not ctx.author.guild_permissions.administrator:
             now = time.time()
@@ -432,7 +431,7 @@ class GamesCog(commands.Cog):
         
         # 1. Check if a game is already spinning
         if self.roulette_spinning:
-            return await ctx.send("🚨 **HOLD UP.** The cylinder is already spinning somewhere else. Relax.")
+            return await ctx.reply("🚨 **HOLD UP.** The cylinder is already spinning somewhere else. Relax.", mention_author=False)
             
         # 2. Prune expired queue members (1 hour limit) and refund them
         expired = [p for p in self.active_roulette if now - p['time'] >= 3600]
@@ -445,13 +444,13 @@ class GamesCog(commands.Cog):
         
         # 3. Check if user is already in queue
         if any(p['id'] == user_id for p in queue):
-            return await ctx.send(f"❌ {ctx.author.mention}, you're already in the chamber! Wait for more players.")
+            return await ctx.reply(f"❌ {ctx.author.mention}, you're already in the chamber! Wait for more players.", mention_author=False)
             
         # 5. Deduct buy-in and join
         buy_in = 20
         balance = await get_balance(user_id)
         if balance < buy_in:
-            return await ctx.send(f"❌ {ctx.author.mention}, you need {economy.format_balance(buy_in)} to buy in. Current balance: {economy.format_balance(balance)}")
+            return await ctx.reply(f"❌ You're flat. Need {economy.format_balance(buy_in)} to buy in.", mention_author=False)
             
         await update_balance(user_id, -buy_in)
         queue.append({'id': user_id, 'time': now})
@@ -459,7 +458,7 @@ class GamesCog(commands.Cog):
         players_needed = 3 - len(queue)
         
         if players_needed > 0:
-            await ctx.send(f"🔫 **{ctx.author.display_name}** has queued for roulette! [{len(queue)}/3]\nNeed **{players_needed}** more players to pull the trigger.")
+            await ctx.send(f"🔫 **{ctx.author.display_name}** has queued for roulette! [{len(queue)}/3]\nNeed **{players_needed}** more to pull the trigger.")
         else:
             # 5. Start Game!
             self.roulette_spinning = True

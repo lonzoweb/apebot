@@ -31,8 +31,7 @@ class QuotesCog(commands.Cog):
         """Get a random quote or search by keyword"""
         quotes = await load_quotes_from_db()
         if not quotes:
-            await ctx.send("⚠️ No quotes available.")
-            return
+            return await ctx.reply("⚠️ The scrolls are empty.", mention_author=False)
 
         if keyword is None:
             if ctx.author.guild_permissions.administrator or any(
@@ -44,7 +43,7 @@ class QuotesCog(commands.Cog):
                 )
                 await ctx.send(embed=embed)
             else:
-                await ctx.send("🚫 Peasant Detected")
+                await ctx.reply("🚫 Peasant Detected. Begone!", mention_author=False)
         else:
             matches = [q for q in quotes if keyword.lower() in q.lower()]
             if matches:
@@ -58,7 +57,7 @@ class QuotesCog(commands.Cog):
                         f"📊 Showing 5 of {len(matches)} matches. Be more specific!"
                     )
             else:
-                await ctx.send(f"🔍 No quotes found containing '{keyword}'")
+                await ctx.reply(f"🔍 Found nothing containing '{keyword}'.", mention_author=False)
 
     @commands.command(name="addquote")
     async def add_quote_command(self, ctx, *, quote_text: str):
@@ -67,10 +66,10 @@ class QuotesCog(commands.Cog):
             ctx.author.guild_permissions.administrator
             or any(role.name == ROLE_ADD_QUOTE for role in ctx.author.roles)
         ):
-            return await ctx.send("🚫 Peasant Detected")
+            return await ctx.reply("🚫 Peasant Detected. Begone!", mention_author=False)
 
         if len(quote_text) > 2000:
-            return await ctx.send("❌ Quote too long (max 2000 characters)")
+            return await ctx.reply("❌ Too long. Keep it under 2000 characters.", mention_author=False)
 
         try:
             await add_quote_to_db(quote_text)
@@ -83,7 +82,7 @@ class QuotesCog(commands.Cog):
             await ctx.send(embed=embed)
         except Exception as e:
             logger.error(f"Error adding quote: {e}")
-            await ctx.send("❌ Error adding quote")
+            await ctx.reply("❌ Error etching the scroll.", mention_author=False)
 
     @commands.command(name="editquote")
     async def edit_quote_command(self, ctx, *, keyword: str):
@@ -98,17 +97,16 @@ class QuotesCog(commands.Cog):
         quotes = await load_quotes_from_db()
         matches = [q for q in quotes if keyword.lower() in q.lower()]
         if not matches:
-            await ctx.send(f"🔍 No quotes found containing '{keyword}'")
-            return
+            return await ctx.reply(f"🔍 No quotes found matching '{keyword}'. Is it a ghost?", mention_author=False)
 
         description = "\n".join(
             f"{i+1}. {q[:100]}..." if len(q) > 100 else f"{i+1}. {q}"
             for i, q in enumerate(matches)
         )
         embed = discord.Embed(
-            title="Select a quote to edit (reply with number or 'cancel')",
+            title="📜 RECALL SELECTION (Reply with number or 'cancel')",
             description=description,
-            color=discord.Color.orange(),
+            color=discord.Color.gold(),
         )
         await ctx.send(embed=embed)
 
@@ -118,15 +116,15 @@ class QuotesCog(commands.Cog):
         try:
             msg = await self.bot.wait_for("message", check=check, timeout=60)
             if msg.content.lower() == "cancel":
-                return await ctx.send("❌ Edit cancelled.")
+                return await ctx.reply("❌ Edit aborted. The past remains.", mention_author=False)
 
             if not msg.content.isdigit() or not (1 <= int(msg.content) <= len(matches)):
-                return await ctx.send("❌ Invalid selection. Edit cancelled.")
+                return await ctx.reply("❌ Invalid choice. The spirits are confused. Aborted.", mention_author=False)
 
             index = int(msg.content) - 1
             old_quote = matches[index]
 
-            await ctx.send(f"✏️ Enter the new version of the quote (or 'cancel'):")
+            await ctx.send(f"✏️ Etch the new path (or type 'cancel'):")
             new_msg = await self.bot.wait_for("message", check=check, timeout=120)
 
             if new_msg.content.lower() == "cancel":
@@ -139,7 +137,7 @@ class QuotesCog(commands.Cog):
             await update_quote_in_db(old_quote, new_quote)
             await ctx.send(f"✅ Quote updated.")
         except asyncio.TimeoutError:
-            await ctx.send("⌛ Timeout. Edit cancelled.")
+            await ctx.reply("⌛ The sands have run out. Aborted.", mention_author=False)
 
     @commands.command(name="delquote")
     async def delete_quote(self, ctx, *, keyword: str):
@@ -157,8 +155,8 @@ class QuotesCog(commands.Cog):
                 for i, r in enumerate(results)
             )
             await ctx.send(
-                f"⚠️ Multiple quotes found containing '{keyword}'.\n{formatted}\n"
-                f"Type the number (1–{len(results)}), or `cancel`."
+                f"⚠️ Too many matches for '{keyword}'. Conflicting scrolls found.\n{formatted}\n"
+                f"Pick a number (1–{len(results)}), or `cancel`."
             )
 
             def check(m):
@@ -248,7 +246,7 @@ class QuotesCog(commands.Cog):
             else:
                 await ctx.send("⚠️ The daily quote has not been generated yet today.")
         else:
-            await ctx.send("🚫 Peasant Detected")
+            await ctx.reply("🚫 Peasant Detected. Begone!", mention_author=False)
 
 
 async def setup(bot):

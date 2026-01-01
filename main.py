@@ -200,21 +200,19 @@ async def on_message(message):
                 transformed_text = aggressive_uwu(message.content)
 
                 try:
-                    await message.delete()
-
-                    webhook = await get_or_create_webhook(message.channel)
-
-                    if webhook:
-                        await webhook.send(
-                            content=transformed_text,
-                            username=message.author.display_name,
-                            avatar_url=message.author.display_avatar.url,
-                            allowed_mentions=discord.AllowedMentions.none(),
-                        )
-                    else:
-                        await message.channel.send(
-                            f"**{message.author.display_name}**: {transformed_text}"
-                        )
+                    if transformed_text:
+                        webhook = await get_or_create_webhook(message.channel)
+                        if webhook:
+                            await webhook.send(
+                                content=transformed_text,
+                                username=message.author.display_name,
+                                avatar_url=message.author.display_avatar.url,
+                                allowed_mentions=discord.AllowedMentions.none(),
+                            )
+                        else:
+                            await message.channel.send(
+                                f"**{message.author.display_name}**: {transformed_text}"
+                            )
 
                 except discord.Forbidden:
                     await message.channel.send(
@@ -268,7 +266,6 @@ async def globally_block_channels(ctx):
     # Check debug mode
     if getattr(bot, "DEBUG_MODE", False):
         if not ctx.author.guild_permissions.administrator:
-            await ctx.send("🧱 The spirits are silent…")
             return False
 
     # Allow channels in these channel names
@@ -296,6 +293,10 @@ async def on_command_error(ctx, error):
     # Handle specific permission errors
     elif isinstance(error, commands.MissingPermissions):
         await ctx.send("🚫 You don't have permission to use this command.")
+
+    # Silence unauthorized channel errors
+    elif isinstance(error, commands.CheckFailure):
+        return
 
     # Handle all other UNHANDLED errors
     else:

@@ -56,9 +56,9 @@ ITEM_REGISTRY = {
         "feedback": "🥔🔥 **HOT POTATO!** A ticking muzzle is loose in the chat! Talk to pass it. Every pass earns you 15 tokens!",
     },
     "feast": {
-        "cost": 551,
+        "cost": 330,
         "type": "event",
-        "feedback": "🍗🧛 **CRAZED FEAST!** You begin feasting upon the sleeping members of the chat...",
+        "feedback": "🍗🧛 **CRAZED FEAST!** You begin feasting upon the sleeping members of the chat...\n💡 *To block attacks, you must speak in this channel!*",
     },
 }
 
@@ -154,15 +154,15 @@ INTERACTIVE_ACTIONS = [
 ]
 
 KAOMOJI_POOL = [
-    " (ᵘﻌᵘ)",
-    " (｡ᴜ‿‿ᴜ｡)",
-    " :･ﾟ✧(ꈍᴗꈍ)✧･ﾟ:",
-    " ( ͡o ꒳ ͡o )",
-    " (◕‿◕✿)",
-    " UwU",
-    " owo",
-    " >w<",
-    " ^w^",
+    " **(ᵘﻌᵘ)**",
+    " **(｡ᴜ‿‿ᴜ｡)**",
+    " **:･ﾟ✧(ꈍᴗꈍ)✧･ﾟ:**",
+    " **( ͡o ꒳ ͡o )**",
+    " **(◕‿◕✿)**",
+    " **UwU**",
+    " **owo**",
+    " **>w<**",
+    " **^w^**",
 ]
 
 CLEAN_SUFFIXES = ["-ie", "-wie", "-y", "-wy"]
@@ -197,7 +197,8 @@ def aggressive_uwu(text: str) -> str:
     text = re.sub(r"\.(gif|png|jpg|jpeg|webp|mp4)[^\s]*", "", text, flags=re.IGNORECASE)
 
     if not text.strip():
-        return random.choice(CLEAN_FINAL_SLOP)
+        # User requested silent deletion for emoji/link only messages
+        return ""
 
     # 2. Standardize
     text = text.lower()

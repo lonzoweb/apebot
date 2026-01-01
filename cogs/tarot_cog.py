@@ -35,26 +35,20 @@ class TarotCog(commands.Cog):
 
         if action and action.lower() == "set":
             if not ctx.author.guild_permissions.administrator:
-                return await ctx.send("🚫 Peasant Detected")
+                return await ctx.reply("🚫 Peasant Detected. Begone!", mention_author=False)
 
             if not deck_name:
-                return await ctx.send("❌ Please specify a deck name: `thoth` or `rws`")
+                return await ctx.reply("❌ Specify its name: `thoth` or `rws`. Don't guess.", mention_author=False)
 
             deck_name = deck_name.lower()
 
             if deck_name not in ["thoth", "rws"]:
-                return await ctx.send(
-                    f"❌ Unknown deck `{deck_name}`\nAvailable decks: `thoth`, `rws`"
+                return await ctx.reply(
+                    f"❌ Unknown deck `{deck_name}`. The spirits only know `thoth` or `rws`.", mention_author=False
                 )
 
             await set_guild_tarot_deck(ctx.guild.id, deck_name)
-
-            deck_full_name = (
-                "Aleister Crowley Thoth Tarot"
-                if deck_name == "thoth"
-                else "Rider-Waite-Smith Tarot"
-            )
-            await ctx.send(f"✅ Deck set to **{deck_full_name}**")
+            await ctx.send(f"🧿 The deck has been swapped to **{deck_name.upper()}**. The cards never lie.")
             return
 
         # Draw Card Logic
@@ -80,7 +74,7 @@ class TarotCog(commands.Cog):
 
         balance = await get_balance(user_id)
         if balance < 1:
-            return await ctx.send(f"❌ Insufficient balance. You need {economy.format_balance(1)} to draw a card.")
+            return await ctx.reply(f"❌ The spirits demand tribute. You're flat. (Need 1 💎)", mention_author=False)
 
         await update_balance(user_id, -1)
 

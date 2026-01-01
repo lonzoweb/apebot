@@ -610,7 +610,7 @@ async def send_tarot_card(ctx, card_key=None):
     # Look up card data in your RWS_DECK
     card = RWS_DECK.get(card_key)
     if not card:
-        return await ctx.send("⚠️ Error: Card data not found.")
+        return await ctx.reply("⚠️ The cards are blank. Error.", mention_author=False)
 
     card_name = card["name"]
     emojis = card["emojis"]
@@ -622,7 +622,7 @@ async def send_tarot_card(ctx, card_key=None):
         title=card_name,
         # Restored original complex description format
         description=f"\n{emojis} \n*({attribution})*\n*{att2}*\n\n{description}",
-        color=discord.Color.from_rgb(0, 0, 128),
+        color=discord.Color.purple(),
     )
 
     # Restore Exempt Role Logic for Footer

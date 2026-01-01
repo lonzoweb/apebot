@@ -71,9 +71,9 @@ class EconomyCog(commands.Cog):
 
         if item_name is None:
             embed = discord.Embed(
-                title="Apeiron Shop",
-                description="Spend your tokens and observe the effects.",
-                color=discord.Color.purple(),
+                title="🎰 APEIRON EXCHANGE",
+                description="Spend your tokens and observe the fallout.",
+                color=discord.Color.gold(),
             )
 
             for item, data in ITEM_REGISTRY.items():
@@ -93,8 +93,8 @@ class EconomyCog(commands.Cog):
 
         official_name = ITEM_ALIASES.get(item_name.lower())
         if not official_name:
-            return await ctx.send(
-                f"❌ '{item_name}' not available. Type `.buy` to see the menu."
+            return await ctx.reply(
+                f"❌ '{item_name}' isn't on the shelf. Type `.buy` to see the menu.", mention_author=False
             )
 
         item_data = ITEM_REGISTRY[official_name]
@@ -113,10 +113,10 @@ class EconomyCog(commands.Cog):
         try:
             await atomic_purchase(ctx.author.id, official_name, cost)
             await ctx.send(
-                f"✅ **{ctx.author.display_name}** bought a **{official_name.replace('_', ' ').title()}** for {cost} 💎!"
+                f"💰 **{ctx.author.display_name}** grabbed a **{official_name.replace('_', ' ').title()}** for {cost} 💎. Pleasure doing business."
             )
         except InsufficientTokens as e:
-            await ctx.send(f"❌ Declined. You need {e.required} 💎 but only have {e.actual} 💎.")
+            await ctx.reply(f"❌ Transaction declined. You're flat. Need {e.required} 💎.", mention_author=False)
 
     @commands.command(name="inventory", aliases=["inv"])
     @commands.cooldown(1, 10, commands.BucketType.user)
@@ -133,10 +133,10 @@ class EconomyCog(commands.Cog):
 
         try:
             await ctx.author.send(msg)
-            await ctx.send(f"Inventory sent to DMs {ctx.author.mention}")
+            await ctx.send(f"💰 Inventory sent to DMs {ctx.author.mention}")
         except discord.Forbidden:
-            await ctx.send(
-                f"⚠️ {ctx.author.mention}, your DMs are closed. Here is your inventory:\n{msg}"
+            await ctx.reply(
+                f"⚠️ DMs are locked. Here's your stash:\n{msg}", mention_author=False
             )
 
     @commands.command(name="use")
@@ -166,7 +166,7 @@ class EconomyCog(commands.Cog):
         item_info = ITEM_REGISTRY.get(official_name)
 
         if not official_name or not item_info:
-            return await ctx.send(f"❌ '{item_input}' is not a valid item.")
+            return await ctx.reply(f"❌ '{item_input}' isn't in your stash. Check `.inv`.", mention_author=False)
 
         try:
             inventory = await get_user_inventory(ctx.author.id)
@@ -181,8 +181,8 @@ class EconomyCog(commands.Cog):
 
             if item_type == "curse":
                 if target is None:
-                    return await ctx.send(
-                        f"❌ You must mention someone to use **{official_name}** on! Example: `.use {official_name} @user`"
+                    return await ctx.reply(
+                        f"❌ Who you aiming at? Mention a target. Example: `.use {official_name} @user`", mention_author=False
                     )
 
                 if target.guild_permissions.administrator or target.bot:
@@ -317,9 +317,10 @@ class EconomyCog(commands.Cog):
                     # Start Feast Loop
                     async def feast_loop(channel_id, attacker_id, total_duration):
                         start_time = asyncio.get_event_loop().time()
+                        attacker = self.bot.get_user(attacker_id)
                         while asyncio.get_event_loop().time() - start_time < total_duration:
-                            # Wait random interval (45-60s)
-                            await asyncio.sleep(random.randint(45, 60))
+                            # Wait random interval (30-45s) to get ~7-8 rounds
+                            await asyncio.sleep(random.randint(30, 45))
                             
                             if channel_id not in self.active_feasts:
                                 break
@@ -340,16 +341,16 @@ class EconomyCog(commands.Cog):
                             if str(target_id) in feast['active_users']:
                                 chan = self.bot.get_channel(channel_id)
                                 if chan:
-                                    mention = target_member.mention if target_member else f"<@{target_id}>"
-                                    await chan.send(f"🛡️ {mention} **BLOCKED** the attack!")
+                                    victim_member = target_member if target_member else f"<@{target_id}>"
+                                    await chan.send(f"🛡️ **{victim_member.display_name if isinstance(victim_member, discord.Member) else victim_member}** BLOCKED the attack! No snacks here.")
                                 continue
                                 
                             # Check if target has been eaten 2 times
                             if feast['victim_counts'].get(target_id, 0) >= 2:
                                 continue
                                 
-                            # Successful Eat
-                            amount = random.randint(5, 50)
+                            # Successful Eat (15-75 range aimed at ~330 total steal)
+                            amount = random.randint(15, 75)
                             current_bal = await get_balance(int(target_id))
                             if current_bal <= 0:
                                 continue
@@ -362,9 +363,8 @@ class EconomyCog(commands.Cog):
                             
                             chan = self.bot.get_channel(channel_id)
                             if chan:
-                                attacker_mention = f"<@{attacker_id}>"
-                                victim_mention = target_member.mention if target_member else f"<@{target_id}>"
-                                await chan.send(f"🍗🧛 {attacker_mention} **ate** {actual_steal} tokens from {victim_mention}!")
+                                victim_member = target_member if target_member else f"<@{target_id}>"
+                                await chan.send(f"🍗 **{attacker.display_name}** ate **{actual_steal} tokens** from **{victim_member.display_name if isinstance(victim_member, discord.Member) else victim_member}**. Delicious.")
 
                         # End Feast
                         if channel_id in self.active_feasts:

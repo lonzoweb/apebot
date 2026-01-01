@@ -61,18 +61,17 @@ class UtilityCog(commands.Cog):
 
         if not text or not any(ch.isalnum() for ch in text):
             return await ctx.reply(
-                "⚠️ No valid text found to evaluate.", mention_author=False
+                "⚠️ Nothing to read here.", mention_author=False
             )
 
         if len(text) > 53:
-            return await ctx.reply("❌ Text exceeds limit.", mention_author=False)
+            return await ctx.reply("❌ Too many words. Keep it under 53 characters.", mention_author=False)
 
         balance = await get_balance(ctx.author.id)
         if balance < GEMATRIA_TOKEN_COST:
             cost_str = economy.format_balance(GEMATRIA_TOKEN_COST)
-            bal_str = economy.format_balance(balance)
             return await ctx.reply(
-                f"❌ Requires {cost_str}. Balance: {bal_str}.", mention_author=False
+                f"❌ Requires {cost_str}. You're flat.", mention_author=False
             )
 
         await update_balance(ctx.author.id, -GEMATRIA_TOKEN_COST)
@@ -687,13 +686,13 @@ class UtilityCog(commands.Cog):
                 mention_author=False,
             )
         except discord.HTTPException as e:
-            await ctx.reply(f"❌ Failed to send sticker: {e}", mention_author=False)
+            await ctx.reply(f"❌ Failed to send sticker: {e}. My hands are tied!", mention_author=False)
 
     @commands.command(name="stats")
     async def stats_command(self, ctx):
         """Show bot statistics (Admin only)"""
         if not ctx.author.guild_permissions.administrator:
-            await ctx.send("🚫 Peasant Detected")
+            await ctx.reply("🚫 Peasant Detected. Begone!", mention_author=False)
             return
 
         bot_start_time = getattr(self.bot, 'start_time', datetime.now())
@@ -728,8 +727,8 @@ class UtilityCog(commands.Cog):
 
         timezone_name, city = await get_user_timezone(member.id)
         if not timezone_name or not city:
-            await ctx.send(
-                f"❌ {member.display_name} has not set their location yet. Use `.location <city>`."
+            await ctx.reply(
+                f"❌ {member.display_name} has not set their location yet. Use `.location <city>`. Are they lost in the mists?", mention_author=False
             )
             return
         try:
@@ -738,14 +737,14 @@ class UtilityCog(commands.Cog):
             await ctx.send(f"{time_str} in {city}")
         except Exception as e:
             logger.error(f"Error getting time: {e}")
-            await ctx.send(f"❌ Error getting time: {e}")
+            await ctx.reply(f"❌ Error getting time: {e}. The sands of time are shifting strangely!", mention_author=False)
 
     @commands.command(name="location")
     async def location_command(self, ctx, *, args: str = None):
         """Set your timezone location"""
         if not args:
-            return await ctx.send(
-                "❌ Please provide a location. Usage: `.location Los Angeles`"
+            return await ctx.reply(
+                "❌ Please provide a location. Usage: `.location <city>`. Don't wander aimlessly!", mention_author=False
             )
 
         args_split = args.split()
@@ -759,12 +758,12 @@ class UtilityCog(commands.Cog):
                     word for word in args_split if not word.startswith("<@")
                 )
             else:
-                await ctx.send("🚫 You are not authorized to set other users' locations.")
+                await ctx.reply("🚫 You are not authorized to set other users' locations. Stay in your lane!", mention_author=False)
                 return
 
         timezone_name, city = await lookup_location(location_query)
         if not timezone_name:
-            await ctx.send(f"❌ Could not find a location matching '{location_query}'.")
+            await ctx.reply(f"❌ Could not find a location matching '{location_query}'. Is it a phantom city?", mention_author=False)
             return
 
         await ctx.send(
@@ -786,9 +785,9 @@ class UtilityCog(commands.Cog):
                     f"✅ Location set for {target_member.display_name} as **{city}**."
                 )
             else:
-                await ctx.send("❌ Location setting cancelled.")
+                await ctx.reply("❌ Location setting cancelled. Perhaps another time, wanderer.", mention_author=False)
         except asyncio.TimeoutError:
-            await ctx.send("⌛ Timeout. Location setting cancelled.")
+            await ctx.reply("⌛ Timeout. Location setting cancelled. My patience wears thin!", mention_author=False)
 
 
 async def setup(bot):

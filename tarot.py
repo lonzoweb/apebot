@@ -642,7 +642,7 @@ async def send_tarot_card(ctx, card_key=None):
     embed = discord.Embed(
         title=card_name,
         description=f"\n{emojis}  \n*({attribution})*\n*{att2}*\n\n{description}",
-        color=discord.Color.from_rgb(0, 0, 128),
+        color=discord.Color.purple(),
     )
 
     # 1. Load File using Non-Blocking Utility
@@ -651,13 +651,13 @@ async def send_tarot_card(ctx, card_key=None):
         # Await the file read which runs in a separate thread
         file = await read_card_image(card_key)
     except FileNotFoundError:
-        embed.set_footer(text="⚠️ Image file not found")
+        embed.set_footer(text="⚠️ The image is lost in the void.")
         await ctx.send(embed=embed)
         return
     except Exception as e:
         logger.error(f"Error loading Thoth image {card_key}: {e}", exc_info=True)
         embed.set_footer(
-            text="❌ An unexpected error occurred while loading the image."
+            text="❌ The spirits blocked the image. Error."
         )
         await ctx.send(embed=embed)
         return

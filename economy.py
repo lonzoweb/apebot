@@ -40,9 +40,9 @@ async def handle_balance_command(ctx, member: discord.Member = None):
     balance = await get_balance(target.id)
 
     if target == ctx.author:
-        message = f"{ctx.author.mention}, your current balance is **{format_balance(balance)}**."
+        message = f"💰 {ctx.author.mention}, you're holding: **{format_balance(balance)}**"
     else:
-        message = f"**{target.display_name}**'s current balance is **{format_balance(balance)}**."
+        message = f"💰 **{target.display_name}** is holding: **{format_balance(balance)}**"
 
     await ctx.send(message)
 
@@ -51,11 +51,11 @@ async def handle_send_command(ctx, member: discord.Member, amount: int):
     """Handles the .send @user <amount> command."""
 
     if member.bot:
-        return await ctx.send("You cannot send tokens to a bot.")
+        return await ctx.reply("❌ Bots don't need your charity.", mention_author=False)
     if member.id == ctx.author.id:
-        return await ctx.send("You cannot send tokens to yourself.")
+        return await ctx.reply("❌ You can't send tokens to yourself, clown.", mention_author=False)
     if amount <= 0:
-        return await ctx.send("Amount must be positive.")
+        return await ctx.reply("❌ Enter a real amount.", mention_author=False)
 
     sender_id = ctx.author.id
     recipient_id = member.id
@@ -65,11 +65,11 @@ async def handle_send_command(ctx, member: discord.Member, amount: int):
         await transfer_tokens(sender_id, recipient_id, amount)
         # Don't reveal balance in public chat
         await ctx.send(
-            f"✅ **{format_balance(amount)}** transferred from {ctx.author.mention} to {member.mention}"
+            f"✅ **{format_balance(amount)}** moved from {ctx.author.mention} to {member.mention}"
         )
     except InsufficientTokens:
-        await ctx.send(
-            f"❌ Transaction declined. Insufficient balance."
+        await ctx.reply(
+            f"❌ Transaction declined. You're flat. Need **{format_balance(amount)}**.", mention_author=False
         )
 
 
