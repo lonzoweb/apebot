@@ -426,28 +426,35 @@ class GamesCog(commands.Cog):
 
     @commands.command(name="roulette")
     async def roulette_command(self, ctx):
-        """Multiplayer Russian Roulette - 3 players, 20 token buy-in. 1 muzzled, 2 split the pot!"""
+        """Multiplayer Russian Roulette - 3 players, 20 token buy-in. 1 uwuified, 2 split the pot!"""
         user_id = ctx.author.id
+        now = time.time()
         
         # 1. Check if a game is already spinning
         if self.roulette_spinning:
             return await ctx.send("🚨 **HOLD UP.** The cylinder is already spinning somewhere else. Relax.")
             
+        # 2. Prune expired queue members (1 hour limit) and refund them
+        expired = [p for p in self.active_roulette if now - p['time'] >= 3600]
+        if expired:
+            for p in expired:
+                await update_balance(p['id'], 20)
+            self.active_roulette = [p for p in self.active_roulette if now - p['time'] < 3600]
+            
         queue = self.active_roulette
         
-        # 2. Check if user is already in queue
-        if user_id in queue:
+        # 3. Check if user is already in queue
+        if any(p['id'] == user_id for p in queue):
             return await ctx.send(f"❌ {ctx.author.mention}, you're already in the chamber! Wait for more players.")
             
-        # 3. Check balance for buy-in (20 tokens)
+        # 5. Deduct buy-in and join
         buy_in = 20
         balance = await get_balance(user_id)
         if balance < buy_in:
             return await ctx.send(f"❌ {ctx.author.mention}, you need {economy.format_balance(buy_in)} to buy in. Current balance: {economy.format_balance(balance)}")
             
-        # 4. Deduct buy-in and join
         await update_balance(user_id, -buy_in)
-        queue.append(user_id)
+        queue.append({'id': user_id, 'time': now})
         
         players_needed = 3 - len(queue)
         
@@ -460,16 +467,17 @@ class GamesCog(commands.Cog):
             await asyncio.sleep(2.5)
             
             # Choose loser
-            loser_id = random.choice(queue)
-            winners = [uid for uid in queue if uid != loser_id]
+            player_ids = [p['id'] for p in queue]
+            loser_id = random.choice(player_ids)
+            winners = [uid for uid in player_ids if uid != loser_id]
             
             # Payout (Increased to 50 tokens each as requested)
             payout = 50
             for win_id in winners:
                 await update_balance(win_id, payout)
                 
-            # Muzzle loser (20 minutes)
-            await add_active_effect(loser_id, "muzzle", 1200)
+            # Apply UWU curse (20 minutes)
+            await add_active_effect(loser_id, "uwu", 1200)
             
             # Announcement
             loser_member = self.bot.get_user(loser_id)
@@ -485,7 +493,7 @@ class GamesCog(commands.Cog):
                 color=discord.Color.red()
             )
             embed.description = f"**CLICK... CLICK... CLICK... BANG!**\n\n{loser_mention} took the bullet! 😵"
-            embed.add_field(name="Outcome", value=f"🤐 {loser_mention} is muzzled for **20 minutes**.\n💰 The winners receive a **{economy.format_balance(payout)}** reward!", inline=False)
+            embed.add_field(name="Outcome", value=f"🎀 {loser_mention} is **uwuified** for **20 minutes**.\n💰 The winners receive a **{economy.format_balance(payout)}** reward!", inline=False)
             embed.add_field(name="Survivors (+50 tokens)", value=", ".join(winners_mentions), inline=False)
             
             await ctx.send(embed=embed)
