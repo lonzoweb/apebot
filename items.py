@@ -40,7 +40,7 @@ ITEM_REGISTRY = {
         "feedback": "Sparking Apeiron Kush Pack. Shields active.",
     },
     "ping_everyone": {
-        "cost": 1440,
+        "cost": 2400,
         "type": "broadcast",
         "feedback": "📡 Global Apeiron Ping. 24h cooldown.",
     },
