@@ -9,7 +9,7 @@ import logging
 import random
 import asyncio
 import time
-from database import get_balance, update_balance
+from database import get_balance, update_balance, add_active_effect
 import economy
 import torture
 
@@ -26,6 +26,8 @@ user_pull_usage = {}
 class GamesCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.active_roulette = []  # Global queue
+        self.roulette_spinning = False # Global lock
 
     def get_ceelo_score(self, dice):
         """Calculate Cee-lo score"""
@@ -420,6 +422,77 @@ class GamesCog(commands.Cog):
         embed.add_field(name="Era", value=method["era"], inline=True)
 
         await ctx.send(embed=embed)
+
+
+    @commands.command(name="roulette")
+    async def roulette_command(self, ctx):
+        """Multiplayer Russian Roulette - 3 players, 20 token buy-in. 1 muzzled, 2 split the pot!"""
+        user_id = ctx.author.id
+        
+        # 1. Check if a game is already spinning
+        if self.roulette_spinning:
+            return await ctx.send("🚨 **HOLD UP.** The cylinder is already spinning somewhere else. Relax.")
+            
+        queue = self.active_roulette
+        
+        # 2. Check if user is already in queue
+        if user_id in queue:
+            return await ctx.send(f"❌ {ctx.author.mention}, you're already in the chamber! Wait for more players.")
+            
+        # 3. Check balance for buy-in (20 tokens)
+        buy_in = 20
+        balance = await get_balance(user_id)
+        if balance < buy_in:
+            return await ctx.send(f"❌ {ctx.author.mention}, you need {economy.format_balance(buy_in)} to buy in. Current balance: {economy.format_balance(balance)}")
+            
+        # 4. Deduct buy-in and join
+        await update_balance(user_id, -buy_in)
+        queue.append(user_id)
+        
+        players_needed = 3 - len(queue)
+        
+        if players_needed > 0:
+            await ctx.send(f"🔫 **{ctx.author.display_name}** has joined the round! [{len(queue)}/3]\nNeed **{players_needed}** more players to pull the trigger.")
+        else:
+            # 5. Start Game!
+            self.roulette_spinning = True
+            await ctx.send("🚨 **THE CHAMBER IS FULL. SPINNING THE CYLINDER...** 🚨")
+            await asyncio.sleep(2.5)
+            
+            # Choose loser
+            loser_id = random.choice(queue)
+            winners = [uid for uid in queue if uid != loser_id]
+            
+            # Payout (Increased to 50 tokens each as requested)
+            payout = 50
+            for win_id in winners:
+                await update_balance(win_id, payout)
+                
+            # Muzzle loser (20 minutes)
+            await add_active_effect(loser_id, "muzzle", 1200)
+            
+            # Announcement
+            loser_member = self.bot.get_user(loser_id)
+            loser_mention = loser_member.mention if loser_member else f"<@{loser_id}>"
+            
+            winners_mentions = []
+            for uid in winners:
+                m = self.bot.get_user(uid)
+                winners_mentions.append(m.display_name if m else f"User#{str(uid)[:4]}")
+                
+            embed = discord.Embed(
+                title="💀 RUSSIAN ROULETTE: RESULT",
+                color=discord.Color.red()
+            )
+            embed.description = f"**CLICK... CLICK... CLICK... BANG!**\n\n{loser_mention} took the bullet! 😵"
+            embed.add_field(name="Outcome", value=f"🤐 {loser_mention} is muzzled for **20 minutes**.\n💰 The winners receive a **{economy.format_balance(payout)}** reward!", inline=False)
+            embed.add_field(name="Survivors (+50 tokens)", value=", ".join(winners_mentions), inline=False)
+            
+            await ctx.send(embed=embed)
+            
+            # Clear queue and lock
+            self.active_roulette.clear()
+            self.roulette_spinning = False
 
 
 async def setup(bot):

@@ -7,8 +7,9 @@ import discord
 from discord.ext import commands
 import logging
 import asyncio
+import random
 import economy
-from database import get_balance, update_balance, atomic_purchase, get_user_inventory, remove_item_from_inventory, add_active_effect, get_active_effect, set_balance
+from database import get_balance, update_balance, atomic_purchase, get_user_inventory, remove_item_from_inventory, add_active_effect, get_active_effect, set_balance, get_potential_victims
 from exceptions import InsufficientTokens, InsufficientInventory, ActiveCurseError, ItemNotFoundError
 from items import ITEM_REGISTRY, ITEM_ALIASES
 import database
@@ -21,6 +22,7 @@ class EconomyCog(commands.Cog):
         self.bot = bot
         self.active_rain = {}  # channel_id -> message_count_remaining
         self.active_potato = {} # channel_id -> {holder_id, expires_at, task}
+        self.active_feasts = {} # channel_id -> {attacker_id, active_users, victim_counts, task}
 
     @commands.command(name="balance", aliases=["bal", "tokens"])
     async def balance_command(self, ctx, member: discord.Member = None):
@@ -298,6 +300,85 @@ class EconomyCog(commands.Cog):
                     await remove_item_from_inventory(ctx.author.id, official_name)
                     await ctx.send(f"{item_info['feedback']}\nTarget: {target.mention}")
 
+                elif official_name == "feast":
+                    if ctx.channel.id in self.active_feasts:
+                        return await ctx.send("❌ A Feast is already occurring in this channel!")
+                    
+                    # 4-5 minutes duration
+                    duration = random.randint(240, 300)
+                    
+                    self.active_feasts[ctx.channel.id] = {
+                        'attacker_id': ctx.author.id,
+                        'active_users': {str(ctx.author.id)}, # Attacker is active
+                        'victim_counts': {}, # user_id -> count (max 2)
+                        'task': None
+                    }
+
+                    # Start Feast Loop
+                    async def feast_loop(channel_id, attacker_id, total_duration):
+                        start_time = asyncio.get_event_loop().time()
+                        while asyncio.get_event_loop().time() - start_time < total_duration:
+                            # Wait random interval (45-60s)
+                            await asyncio.sleep(random.randint(45, 60))
+                            
+                            if channel_id not in self.active_feasts:
+                                break
+                            
+                            feast = self.active_feasts[channel_id]
+                            # Get potential victims (exclude attacker and the bot)
+                            exclude = [attacker_id, self.bot.user.id]
+                            victims = await get_potential_victims(exclude)
+                            
+                            if not victims:
+                                continue
+                                
+                            target_id = random.choice(victims)
+                            # Discord IDs from DB are strings
+                            target_member = self.bot.get_user(int(target_id))
+                            
+                            # Check if target is "active" (blocked)
+                            if str(target_id) in feast['active_users']:
+                                chan = self.bot.get_channel(channel_id)
+                                if chan:
+                                    mention = target_member.mention if target_member else f"<@{target_id}>"
+                                    await chan.send(f"🛡️ {mention} **BLOCKED** the attack!")
+                                continue
+                                
+                            # Check if target has been eaten 2 times
+                            if feast['victim_counts'].get(target_id, 0) >= 2:
+                                continue
+                                
+                            # Successful Eat
+                            amount = random.randint(5, 50)
+                            current_bal = await get_balance(int(target_id))
+                            if current_bal <= 0:
+                                continue
+                                
+                            actual_steal = min(amount, current_bal)
+                            await update_balance(int(target_id), -actual_steal)
+                            await update_balance(attacker_id, actual_steal)
+                            
+                            feast['victim_counts'][target_id] = feast['victim_counts'].get(target_id, 0) + 1
+                            
+                            chan = self.bot.get_channel(channel_id)
+                            if chan:
+                                attacker_mention = f"<@{attacker_id}>"
+                                victim_mention = target_member.mention if target_member else f"<@{target_id}>"
+                                await chan.send(f"🍗🧛 {attacker_mention} **ate** {actual_steal} tokens from {victim_mention}!")
+
+                        # End Feast
+                        if channel_id in self.active_feasts:
+                            del self.active_feasts[channel_id]
+                            chan = self.bot.get_channel(channel_id)
+                            if chan:
+                                await chan.send("🌅 **The Feast has concluded. The sun rises...**")
+
+                    task = asyncio.create_task(feast_loop(ctx.channel.id, ctx.author.id, duration))
+                    self.active_feasts[ctx.channel.id]['task'] = task
+                    
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    await ctx.send(item_info['feedback'])
+
         except InsufficientInventory:
             await ctx.send(f"❌ You don't have any **{official_name.replace('_', ' ').title()}**s!")
         except Exception as e:
@@ -339,6 +420,10 @@ class EconomyCog(commands.Cog):
                 
                 # Feedback
                 await message.channel.send(f"⚡ **PASSED!** {message.author.mention} is now holding the potato! 🥔🔥")
+
+        # 🍗 Handle Feast In-Channel Activity (Blocking mechanism)
+        if channel_id in self.active_feasts:
+            self.active_feasts[channel_id]['active_users'].add(user_id)
 
 
 async def setup(bot):

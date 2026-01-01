@@ -209,6 +209,22 @@ async def set_balance(user_id: int, new_balance: int):
         )
 
 
+async def get_potential_victims(exclude_ids: list):
+    """Get user IDs with positive balance, excluding specific IDs."""
+    async with get_db() as conn:
+        if not exclude_ids:
+            query = "SELECT user_id FROM balances WHERE balance > 0"
+            params = ()
+        else:
+            placeholders = ", ".join(["?"] * len(exclude_ids))
+            query = f"SELECT user_id FROM balances WHERE balance > 0 AND user_id NOT IN ({placeholders})"
+            params = tuple(str(uid) for uid in exclude_ids)
+
+        async with conn.execute(query, params) as cursor:
+            rows = await cursor.fetchall()
+            return [row[0] for row in rows]
+
+
 async def transfer_tokens(sender_id: int, recipient_id: int, amount: int) -> bool:
     if amount <= 0:
         return False

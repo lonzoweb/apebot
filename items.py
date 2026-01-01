@@ -55,6 +55,11 @@ ITEM_REGISTRY = {
         "type": "event",
         "feedback": "🥔🔥 **HOT POTATO!** A ticking muzzle is loose in the chat! Talk to pass it. Every pass earns you 15 tokens!",
     },
+    "feast": {
+        "cost": 550,
+        "type": "event",
+        "feedback": "🍗🧛 **CRAZED FEAST!** You begin feasting upon the sleeping members of the chat...",
+    },
 }
 
 # Aliases to make buying/using easier for users
@@ -80,6 +85,7 @@ ITEM_ALIASES = {
     "token_rain": "rain",
     "hot_potato": "hot_potato",
     "potato": "hot_potato",
+    "feast": "feast",
 }
 
 # ============================================================
