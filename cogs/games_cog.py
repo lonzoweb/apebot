@@ -476,8 +476,8 @@ class GamesCog(commands.Cog):
             for win_id in winners:
                 await update_balance(win_id, payout)
                 
-            # Apply UWU curse (20 minutes)
-            await add_active_effect(loser_id, "uwu", 1200)
+            # Apply UWU curse (5 minutes)
+            await add_active_effect(loser_id, "uwu", 300)
             
             # Announcement
             loser_member = self.bot.get_user(loser_id)
@@ -493,7 +493,7 @@ class GamesCog(commands.Cog):
                 color=discord.Color.red()
             )
             embed.description = f"**CLICK... CLICK... CLICK... BANG!**\n\n{loser_mention} took the bullet! 😵"
-            embed.add_field(name="Outcome", value=f"🎀 {loser_mention} is **uwuified** for **20 minutes**.\n💰 The winners receive a **{economy.format_balance(payout)}** reward!", inline=False)
+            embed.add_field(name="Outcome", value=f"🎀 {loser_mention} is **uwuud** for **5 minutes**.\n💰 The winners receive a **{economy.format_balance(payout)}** reward!", inline=False)
             embed.add_field(name="Survivors (+50 tokens)", value=", ".join(winners_mentions), inline=False)
             
             await ctx.send(embed=embed)
