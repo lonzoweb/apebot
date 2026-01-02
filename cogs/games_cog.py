@@ -548,6 +548,12 @@ class GamesCog(commands.Cog):
         await update_balance(ctx.author.id, -cost)
 
         # 2. Assign or Find target
+        if not target and ctx.message.reference:
+            # Check if it's a reply to another message
+            ref_msg = ctx.message.reference.resolved
+            if isinstance(ref_msg, discord.Message):
+                target = ref_msg.author
+
         if target:
             # Validate manual target
             if target.bot:
