@@ -9,7 +9,7 @@ import logging
 import random
 import asyncio
 import time
-from database import get_balance, update_balance, add_active_effect
+from database import get_balance, update_balance, add_active_effect, is_economy_on, get_user_inventory, remove_item_from_inventory
 import economy
 import torture
 
@@ -49,6 +49,8 @@ class GamesCog(commands.Cog):
     @commands.command(name="dice")
     async def dice_command(self, ctx, bet: str = None):
         """Cee-lo dice game - bet tokens"""
+        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+            return await ctx.reply("🌑 **System Notice**: The underground casinos are closed while the economy is disabled.", mention_author=False)
         
         # Handle help command
         if bet and bet.lower() == "help":
@@ -83,6 +85,9 @@ class GamesCog(commands.Cog):
             )
             return await ctx.send(embed=help_embed)
         
+        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+            return await ctx.reply("🌑 **System Notice**: The underground casinos are closed while the economy is disabled.", mention_author=False)
+
         user_id = ctx.author.id
         balance = await get_balance(user_id)
 
@@ -227,6 +232,8 @@ class GamesCog(commands.Cog):
     @commands.command(name="pull")
     async def pull_command(self, ctx):
         """Slot machine with dark occult casino theme"""
+        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+            return await ctx.reply("🌑 **System Notice**: Slot machines are powered off. Economy is disabled.", mention_author=False)
 
         user_id = ctx.author.id
         now = time.time()
@@ -425,7 +432,9 @@ class GamesCog(commands.Cog):
 
     @commands.command(name="roulette")
     async def roulette_command(self, ctx):
-        """Multiplayer Russian Roulette - 3 players, 20 token buy-in. 1 uwuified, 2 split the pot!"""
+        """Join the Russian Roulette queue (20 buyout)"""
+        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+            return await ctx.reply("🌑 **System Notice**: The chamber is locked while the economy is disabled.", mention_author=False)
         user_id = ctx.author.id
         now = time.time()
         
@@ -465,18 +474,38 @@ class GamesCog(commands.Cog):
             await ctx.send("🚨 **THE CHAMBER IS FULL. SPINNING THE CYLINDER...** 🚨")
             await asyncio.sleep(2.5)
             
-            # Choose loser
+            # 6. Choose loser
             player_ids = [p['id'] for p in queue]
             loser_id = random.choice(player_ids)
             winners = [uid for uid in player_ids if uid != loser_id]
             
-            # Payout (Increased to 50 tokens each as requested)
-            payout = 50
+            # 7. Check for Wards and Apply Penalty (Ward Twist)
+            warded_players = []
+            for uid in player_ids:
+                inv = await get_user_inventory(uid)
+                if inv.get("echo_ward", 0) > 0 or inv.get("echo_ward_max", 0) > 0:
+                    warded_players.append(uid)
+            
+            penalty_msg = f"🎀 {loser_mention} is **uwuud** for **5 minutes**."
+            
+            if loser_id in warded_players:
+                # Twist: If ALL players are warded, one still gets hit
+                if len(warded_players) == len(player_ids):
+                    penalty_msg = f"🛡️ **WARD NULLIFIED.** You all tried to hide behind glass? The spirits laugh. {loser_mention} is hit anyway."
+                    await add_active_effect(loser_id, "uwu", 300)
+                else:
+                    # Normal block - consume ward
+                    inv = await get_user_inventory(loser_id)
+                    ward_to_remove = "echo_ward_max" if inv.get("echo_ward_max", 0) > 0 else "echo_ward"
+                    await remove_item_from_inventory(loser_id, ward_to_remove)
+                    penalty_msg = f"🛡️ **WARD CONSUMED.** {loser_mention} was hit, but their ward shattered the curse."
+            else:
+                await add_active_effect(loser_id, "uwu", 300)
+
+            # Payout (Increased to 60 tokens each)
+            payout = 60
             for win_id in winners:
                 await update_balance(win_id, payout)
-                
-            # Apply UWU curse (5 minutes)
-            await add_active_effect(loser_id, "uwu", 300)
             
             # Announcement
             loser_member = self.bot.get_user(loser_id)
@@ -492,8 +521,8 @@ class GamesCog(commands.Cog):
                 color=discord.Color.red()
             )
             embed.description = f"**CLICK... CLICK... CLICK... BANG!**\n\n{loser_mention} took the bullet. Hold that L 😵"
-            embed.add_field(name="Outcome", value=f"🎀 {loser_mention} is **uwuud** for **5 minutes**.\n💰 The winners receive a **{economy.format_balance(payout)}** reward!", inline=False)
-            embed.add_field(name="Survivors (+50 tokens)", value=", ".join(winners_mentions), inline=False)
+            embed.add_field(name="Outcome", value=f"{penalty_msg}\n💰 The winners receive a **{economy.format_balance(payout)}** reward!", inline=False)
+            embed.add_field(name="Survivors (+60 tokens)", value=", ".join(winners_mentions), inline=False)
             
             await ctx.send(embed=embed)
             
@@ -501,6 +530,64 @@ class GamesCog(commands.Cog):
             self.active_roulette.clear()
             self.roulette_spinning = False
 
+
+
+    @commands.command(name="lick", aliases=["hit_a_lick", "rob"])
+    @commands.cooldown(1, 600, commands.BucketType.user)
+    async def lick_command(self, ctx):
+        """Hit a lick on a random non-mod. (Cost: 357 tokens)"""
+        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+            return await ctx.reply("🌑 **System Notice**: The streets are too hot. Economy is disabled.", mention_author=False)
+
+        cost = 357
+        balance = await get_balance(ctx.author.id)
+        if balance < cost:
+            return await ctx.reply(f"❌ You aren't geared up for a lick. Need {economy.format_balance(cost)}.", mention_author=False)
+
+        # 1. Deduct cost
+        await update_balance(ctx.author.id, -cost)
+
+        # 2. Find target (Random non-mod with tokens)
+        potential_victims = []
+        for m in ctx.guild.members:
+            if m.bot: continue
+            if m.guild_permissions.administrator: continue
+            if m.id == ctx.author.id: continue
+            
+            bal = await get_balance(m.id)
+            if bal >= 200:
+                potential_victims.append(m)
+
+        if not potential_victims:
+            await update_balance(ctx.author.id, cost) # Refund
+            return await ctx.reply("❌ The streets are empty tonight. No licks to hit. (Refunded)", mention_author=False)
+
+        target = random.choice(potential_victims)
+
+        # 3. Announcement
+        await ctx.send(f"🌑 **{ctx.author.display_name}** is hitting a lick on {target.mention}!\n🚨 {target.mention}, you have **20 seconds** to spook them! (Type anything in chat)")
+
+        # 4. Wait for response
+        def check(m):
+            return m.author.id == target.id and m.channel.id == ctx.channel.id
+
+        try:
+            await self.bot.wait_for('message', timeout=20.0, check=check)
+            # Spooked!
+            await ctx.send(f"🚔 **SPOOKED!** {target.mention} spotted the thief and made a scene. **{ctx.author.display_name}** ran off, losing the gear fee.")
+        except asyncio.TimeoutError:
+            # Robbery success chance
+            if random.random() < 0.8:
+                rob_amount = random.randint(200, 500)
+                target_bal = await get_balance(target.id)
+                actual_steal = min(rob_amount, target_bal)
+                
+                await update_balance(target.id, -actual_steal)
+                await update_balance(ctx.author.id, actual_steal)
+                
+                await ctx.send(f"💰 **LICK SUCCESSFUL.** {ctx.author.mention} robbed **{economy.format_balance(actual_steal)}** from {target.mention}. Total silence.")
+            else:
+                await ctx.send(f"🌑 **LICK FAILED.** {ctx.author.display_name} got spooked by the shadows and ran off. Lost the fee.")
 
 async def setup(bot):
     await bot.add_cog(GamesCog(bot))

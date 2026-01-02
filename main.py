@@ -165,6 +165,13 @@ async def get_or_create_webhook(channel):
         return None
 
 
+async def get_log_channel(guild):
+    """Finds a log channel named 'bot-logs' or 'system-logs'."""
+    if not guild: return None
+    return discord.utils.get(guild.text_channels, name="bot-logs") or \
+           discord.utils.get(guild.text_channels, name="system-logs")
+
+
 # ============================================================
 # BOT EVENTS
 # ============================================================
@@ -302,6 +309,23 @@ async def on_command_error(ctx, error):
     # Silence unauthorized channel errors
     elif isinstance(error, commands.CheckFailure):
         return
+
+    # REDIRECT ERRORS TO LOGS
+    elif isinstance(error, (commands.MemberNotFound, commands.UserNotFound, commands.CommandInvokeError)):
+        log_channel = await get_log_channel(ctx.guild)
+        if log_channel:
+            embed = discord.Embed(
+                title=f"⚠️ System Error: {type(error).__name__}",
+                description=f"**User**: {ctx.author.mention} ({ctx.author.id})\n**Command**: `{ctx.message.content}`\n**Error**: `{error}`",
+                color=discord.Color.red(),
+                timestamp=datetime.now()
+            )
+            await log_channel.send(embed=embed)
+        
+        # Don't show technical MemberNotFound or InvokeErrors in public
+        if isinstance(error, (commands.MemberNotFound, commands.UserNotFound)):
+            return await ctx.reply("❌ That soul is not found in this realm.", mention_author=False)
+        return # Silence CommandInvokeError in public
 
     # Handle all other UNHANDLED errors
     else:

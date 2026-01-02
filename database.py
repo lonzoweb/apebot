@@ -96,7 +96,7 @@ async def init_db():
             """
             )
 
-            # 🧿 NEW: Active Effects Table (Curse/Mute)
+            # 🌑 NEW: Active Effects Table (Curse/Mute)
             await conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS active_effects (
@@ -113,6 +113,28 @@ async def init_db():
                 CREATE TABLE IF NOT EXISTS global_cooldowns (
                     name TEXT PRIMARY KEY,
                     expires_at REAL NOT NULL
+                )
+            """
+            )
+
+            # ⚙️ NEW: System Settings Table
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS system_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """
+            )
+
+            # 🤲 NEW: Daily Claims Table
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS daily_claims (
+                    user_id TEXT NOT NULL,
+                    claim_type TEXT NOT NULL,
+                    last_claim_date TEXT NOT NULL,
+                    PRIMARY KEY (user_id, claim_type)
                 )
             """
             )
@@ -571,4 +593,54 @@ async def set_global_cooldown(name: str, duration_sec: int):
         await conn.execute(
             "INSERT OR REPLACE INTO global_cooldowns (name, expires_at) VALUES (?, ?)",
             (name, expires_at),
+        )
+
+
+# ============================================================
+# SYSTEM SETTINGS & DAILY CLAIMS
+# ============================================================
+
+
+async def is_economy_on() -> bool:
+    """Checks if the global economy is enabled."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT value FROM system_settings WHERE key = 'economy_enabled'"
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return row[0] == "True"
+            return True  # Default to True
+
+
+async def set_economy_status(status: bool):
+    """Sets the global economy status."""
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO system_settings (key, value) VALUES ('economy_enabled', ?)",
+            (str(status),),
+        )
+
+
+async def can_claim_daily(user_id: int, claim_type: str) -> bool:
+    """Checks if a user can claim their daily reward."""
+    today = time.strftime("%Y-%m-%d")
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT last_claim_date FROM daily_claims WHERE user_id = ? AND claim_type = ?",
+            (str(user_id), claim_type),
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row or row[0] != today:
+                return True
+            return False
+
+
+async def record_daily_claim(user_id: int, claim_type: str):
+    """Records a daily claim for a user."""
+    today = time.strftime("%Y-%m-%d")
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO daily_claims (user_id, claim_type, last_claim_date) VALUES (?, ?, ?)",
+            (str(user_id), claim_type, today),
         )

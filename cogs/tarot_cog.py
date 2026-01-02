@@ -48,7 +48,7 @@ class TarotCog(commands.Cog):
                 )
 
             await set_guild_tarot_deck(ctx.guild.id, deck_name)
-            await ctx.send(f"🧿 The deck has been swapped to **{deck_name.upper()}**. The cards never lie.")
+            await ctx.send(f"🌑 The deck has been swapped to **{deck_name.upper()}**. The cards never lie.")
             return
 
         # Draw Card Logic

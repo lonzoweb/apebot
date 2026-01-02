@@ -9,7 +9,12 @@ import logging
 import asyncio
 import random
 import economy
-from database import get_balance, update_balance, atomic_purchase, get_user_inventory, remove_item_from_inventory, add_active_effect, get_active_effect, set_balance, get_potential_victims, get_global_cooldown, set_global_cooldown
+from database import (
+    get_balance, update_balance, atomic_purchase, get_user_inventory, 
+    remove_item_from_inventory, add_active_effect, get_active_effect, 
+    set_balance, get_potential_victims, get_global_cooldown, 
+    set_global_cooldown, is_economy_on, can_claim_daily, record_daily_claim
+)
 from exceptions import InsufficientTokens, InsufficientInventory, ActiveCurseError, ItemNotFoundError
 from items import ITEM_REGISTRY, ITEM_ALIASES
 import database
@@ -68,6 +73,8 @@ class EconomyCog(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def buy_command(self, ctx, item_name: str = None):
         """View the shop menu (via DM) or purchase an item."""
+        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+            return await ctx.reply("🌑 **System Notice**: The spirits have locked the exchange. Economy is currently disabled.", mention_author=False)
 
         if item_name is None:
             embed = discord.Embed(
@@ -157,6 +164,8 @@ class EconomyCog(commands.Cog):
         Uses an item.
         Usage: .use muzzle @user (Curses) OR .use kush (Consumables) OR .use global <message> (Broadcast)
         """
+        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+            return await ctx.reply("🌑 **System Notice**: Artifacts are inert while the economy is disabled.", mention_author=False)
 
         if not item_input:
             embed = discord.Embed(title="🎒 Item Usage Guide", color=discord.Color.blue())
@@ -323,7 +332,7 @@ class EconomyCog(commands.Cog):
                         return await ctx.send(f"❌ {target.display_name} won't play your games.")
 
                     # Start the event
-                    duration = 300 # 5 minutes
+                    duration = 180 # 3 minutes (shortened)
                     
                     # Potato logic: muzzle whoever is holding it at the end
                     async def potato_timer(channel_id):
@@ -410,10 +419,9 @@ class EconomyCog(commands.Cog):
                             
                             feast['victim_counts'][target_id] = feast['victim_counts'].get(target_id, 0) + 1
                             
-                            chan = self.bot.get_channel(channel_id)
                             if chan:
                                 victim_member = target_member if target_member else f"<@{target_id}>"
-                                await chan.send(f"🍗 **{attacker.display_name}** ate **{actual_steal} tokens** from **{victim_member.display_name if isinstance(victim_member, discord.Member) else victim_member}**. Delicious.")
+                                await chan.send(f"🍗 **{attacker.display_name}** ate **{actual_steal} tokens** from {victim_member.mention if isinstance(victim_member, discord.Member) else victim_member}. Delicious.")
 
                         # End Feast
                         if channel_id in self.active_feasts:
@@ -468,12 +476,27 @@ class EconomyCog(commands.Cog):
                 await update_balance(old_holder_id, 15)
                 
                 # Feedback
-                await message.channel.send(f"⚡ **PASSED!** {message.author.mention} is now holding the potato! 🥔🔥")
+                await message.channel.send(f"⚡ **PASSED!** {message.author.mention} takes the heat! (+15 tokens) 🥔🔥")
 
         # 🍗 Handle Feast In-Channel Activity (Blocking mechanism)
         if channel_id in self.active_feasts:
             self.active_feasts[channel_id]['active_users'].add(user_id)
 
+
+
+    @commands.command(name="beg", aliases=["claim", "daily"])
+    @commands.cooldown(1, 10, commands.BucketType.user)
+    async def beg_command(self, ctx):
+        """Claim your daily 88 tokens."""
+        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+            return await ctx.reply("🌑 **System Notice**: The treasury is sealed. Economy is disabled.", mention_author=False)
+
+        if await can_claim_daily(ctx.author.id, "beg"):
+            await update_balance(ctx.author.id, 88)
+            await record_daily_claim(ctx.author.id, "beg")
+            await ctx.reply("🌑 You held your hand out. Someone dropped **88 tokens** in your palm. Don't spend it all in one crackhouse.", mention_author=False)
+        else:
+            await ctx.reply("❌ You've already bled the streets dry today. Come back tomorrow.", mention_author=False)
 
 async def setup(bot):
     await bot.add_cog(EconomyCog(bot))

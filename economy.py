@@ -1,7 +1,7 @@
 # --- economy.py ---
 import discord
 import logging
-from database import get_balance, update_balance, transfer_tokens, set_balance
+from database import get_balance, update_balance, transfer_tokens, set_balance, is_economy_on
 from exceptions import InsufficientTokens
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,8 @@ async def handle_balance_command(ctx, member: discord.Member = None):
 
 async def handle_send_command(ctx, member: discord.Member, amount: int):
     """Handles the .send @user <amount> command."""
+    if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+        return await ctx.reply("🌑 **System Notice**: Token flow is currently frozen by the administration.", mention_author=False)
 
     if member.bot:
         return await ctx.reply("❌ Bots don't need your charity.", mention_author=False)
