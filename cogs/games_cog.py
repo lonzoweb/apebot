@@ -534,8 +534,8 @@ class GamesCog(commands.Cog):
 
     @commands.command(name="lick", aliases=["hit_a_lick", "rob"])
     @commands.cooldown(1, 600, commands.BucketType.user)
-    async def lick_command(self, ctx):
-        """Hit a lick on a random non-mod. (Cost: 357 tokens)"""
+    async def lick_command(self, ctx, target: discord.Member = None):
+        """Hit a lick on a user or a random non-mod. (Cost: 357 tokens)"""
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: The streets are too hot. Economy is disabled.", mention_author=False)
 
@@ -547,22 +547,40 @@ class GamesCog(commands.Cog):
         # 1. Deduct cost
         await update_balance(ctx.author.id, -cost)
 
-        # 2. Find target (Random non-mod with tokens)
-        potential_victims = []
-        for m in ctx.guild.members:
-            if m.bot: continue
-            if m.guild_permissions.administrator: continue
-            if m.id == ctx.author.id: continue
+        # 2. Assign or Find target
+        if target:
+            # Validate manual target
+            if target.bot:
+                await update_balance(ctx.author.id, cost)
+                return await ctx.reply("❌ You can't rob a machine.", mention_author=False)
+            if target.guild_permissions.administrator:
+                await update_balance(ctx.author.id, cost)
+                return await ctx.reply("❌ You tried to rob a mod? Are you suicidal?", mention_author=False)
+            if target.id == ctx.author.id:
+                await update_balance(ctx.author.id, cost)
+                return await ctx.reply("❌ Stop robbing yourself, clown.", mention_author=False)
             
-            bal = await get_balance(m.id)
-            if bal >= 200:
-                potential_victims.append(m)
+            target_bal = await get_balance(target.id)
+            if target_bal < 200:
+                await update_balance(ctx.author.id, cost)
+                return await ctx.reply(f"❌ {target.display_name} is too broke to be worth the heat. (Min 200 tokens)", mention_author=False)
+        else:
+            # Find random target
+            potential_victims = []
+            for m in ctx.guild.members:
+                if m.bot: continue
+                if m.guild_permissions.administrator: continue
+                if m.id == ctx.author.id: continue
+                
+                bal = await get_balance(m.id)
+                if bal >= 200:
+                    potential_victims.append(m)
 
-        if not potential_victims:
-            await update_balance(ctx.author.id, cost) # Refund
-            return await ctx.reply("❌ The streets are empty tonight. No licks to hit. (Refunded)", mention_author=False)
+            if not potential_victims:
+                await update_balance(ctx.author.id, cost) # Refund
+                return await ctx.reply("❌ The streets are empty tonight. No licks to hit. (Refunded)", mention_author=False)
 
-        target = random.choice(potential_victims)
+            target = random.choice(potential_victims)
 
         # 3. Announcement
         await ctx.send(f"🌑 **{ctx.author.display_name}** is hitting a lick on {target.mention}!\n🚨 {target.mention}, you have **20 seconds** to spook them! (Type anything in chat)")
