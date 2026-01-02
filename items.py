@@ -53,7 +53,7 @@ ITEM_REGISTRY = {
     "storm": {
         "cost": 1100,
         "type": "event",
-        "feedback": "🌧️ **TOKEN STORM!** The next 10 unique users to talk in this channel earn 50 bonus tokens!",
+        "feedback": "⛈️ **TOKEN STORM!** The next 10 unique users to talk in this channel earn 50 bonus tokens!",
     },
     "hot_potato": {
         "cost": 520,

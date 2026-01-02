@@ -459,6 +459,7 @@ class EconomyCog(commands.Cog):
                 storm['participants'].add(user_id)
                 bonus = 50
                 await update_balance(user_id, bonus)
+                await message.channel.send(f"⛈️ **{message.author.display_name}** grabbed a shard! **+50 tokens**")
                 
                 if storm['remaining'] == 0:
                     del self.active_storm[channel_id]
