@@ -574,6 +574,9 @@ class GamesCog(commands.Cog):
             return await ctx.reply("🌑 **System Notice**: The streets are too hot. Economy is disabled.", mention_author=False)
 
         cost = 357
+        min_steal = cost - 50
+        max_steal = cost + 300
+
         balance = await get_balance(ctx.author.id)
         if balance < cost:
             return await ctx.reply(f"❌ You aren't geared up for a lick. Need {economy.format_balance(cost)}.", mention_author=False)
@@ -601,9 +604,9 @@ class GamesCog(commands.Cog):
                 return await ctx.reply("❌ Stop robbing yourself, clown.", mention_author=False)
             
             target_bal = await get_balance(target.id)
-            if target_bal < 200:
+            if target_bal < min_steal:
                 await update_balance(ctx.author.id, cost)
-                return await ctx.reply(f"❌ {target.display_name} is too broke to be worth the heat. (Min 200 tokens)", mention_author=False)
+                return await ctx.reply(f"❌ {target.display_name} is too broke to be worth the heat. (Min {min_steal} tokens)", mention_author=False)
         else:
             # Find random target
             potential_victims = []
@@ -613,7 +616,7 @@ class GamesCog(commands.Cog):
                 if m.id == ctx.author.id: continue
                 
                 bal = await get_balance(m.id)
-                if bal >= 200:
+                if bal >= min_steal:
                     potential_victims.append(m)
 
             if not potential_victims:
@@ -636,7 +639,7 @@ class GamesCog(commands.Cog):
         except asyncio.TimeoutError:
             # Robbery success chance
             if random.random() < 0.8:
-                rob_amount = random.randint(200, 500)
+                rob_amount = random.randint(min_steal, max_steal)
                 target_bal = await get_balance(target.id)
                 actual_steal = min(rob_amount, target_bal)
                 
