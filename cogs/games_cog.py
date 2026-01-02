@@ -27,7 +27,9 @@ class GamesCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.active_roulette = []  # Global queue
-        self.roulette_spinning = False # Global lock
+        self.roulette_spinning = False # Execution lock (the actual spin)
+        self.roulette_timer_active = False # Timer lock (the 25s count)
+        self.roulette_start_time = 0 # When the first person joined
 
     def get_ceelo_score(self, dice):
         """Calculate Cee-lo score"""
@@ -440,7 +442,7 @@ class GamesCog(commands.Cog):
         
         # 1. Check if a game is already spinning
         if self.roulette_spinning:
-            return await ctx.reply("🚨 **HOLD UP.** The cylinder is already spinning somewhere else. Relax.", mention_author=False)
+            return await ctx.reply("🚨 **HOLD UP.** The gun is already at someone's head. Wait for the shot.", mention_author=False)
             
         # 2. Prune expired queue members (1 hour limit) and refund them
         expired = [p for p in self.active_roulette if now - p['time'] >= 3600]
@@ -451,10 +453,19 @@ class GamesCog(commands.Cog):
             
         queue = self.active_roulette
         
+        # 1.5 Set start time if first joiner
+        if not queue:
+            self.roulette_start_time = now
+            self.roulette_spinning = False
+            
         # 3. Check if user is already in queue
         if any(p['id'] == user_id for p in queue):
             return await ctx.reply(f"❌ {ctx.author.mention}, you're already in the chamber! Wait for more players.", mention_author=False)
             
+        # 4. Check if Max Players reached
+        if len(queue) >= 6:
+            return await ctx.reply(f"❌ The chamber is full! Wait for this round to end.", mention_author=False)
+
         # 5. Deduct buy-in and join
         buy_in = 20
         balance = await get_balance(user_id)
@@ -464,22 +475,36 @@ class GamesCog(commands.Cog):
         await update_balance(user_id, -buy_in)
         queue.append({'id': user_id, 'time': now})
         
-        players_needed = 3 - len(queue)
-        
-        if players_needed > 0:
-            await ctx.send(f"🔫 **{ctx.author.display_name}** has queued for roulette! [{len(queue)}/3]\nNeed **{players_needed}** more to pull the trigger.")
-        else:
-            # 5. Start Game!
+        # 6. Check for Game Start
+        if len(queue) >= 3 and not self.roulette_timer_active:
+            self.roulette_timer_active = True # Lock to prevent multiple timer tasks
+            
+            elapsed = time.time() - self.roulette_start_time
+            remaining = 25 - elapsed
+            
+            if remaining > 0:
+                await ctx.send(f"🔫 **{ctx.author.display_name}** has joined! [{len(queue)}/6]\n🚨 **CHAMBER MINIMUM REACHED.** Wait for the clock or more fodder... (**{int(remaining)}s** remaining)")
+                await asyncio.sleep(remaining)
+            else:
+                await ctx.send(f"🔫 **{ctx.author.display_name}** has joined! [{len(queue)}/6]\n🚨 **CHAMBER MINIMUM REACHED.** Pulling the trigger!")
+
+            # 7. Start Game!
             self.roulette_spinning = True
-            await ctx.send("🚨 **THE CHAMBER IS FULL. SPINNING THE CYLINDER...** 🚨")
+            self.roulette_timer_active = False
+            
+            await ctx.send("🚨 **SPINNING THE CYLINDER...** 🚨")
             await asyncio.sleep(2.5)
             
-            # 6. Choose loser
-            player_ids = [p['id'] for p in queue]
+            # Choose loser
+            player_ids = [p['id'] for p in self.active_roulette]
             loser_id = random.choice(player_ids)
             winners = [uid for uid in player_ids if uid != loser_id]
             
-            # 7. Check for Wards and Apply Penalty (Ward Twist)
+            # Prep mentions
+            loser_member = self.bot.get_user(loser_id)
+            loser_mention = loser_member.mention if loser_member else f"<@{loser_id}>"
+
+            # 8. Check for Wards and Apply Penalty (Ward Twist)
             warded_players = []
             for uid in player_ids:
                 inv = await get_user_inventory(uid)
@@ -502,15 +527,12 @@ class GamesCog(commands.Cog):
             else:
                 await add_active_effect(loser_id, "uwu", 300)
 
-            # Payout (Increased to 60 tokens each)
+            # Payout (60 tokens each)
             payout = 60
             for win_id in winners:
                 await update_balance(win_id, payout)
             
-            # Announcement
-            loser_member = self.bot.get_user(loser_id)
-            loser_mention = loser_member.mention if loser_member else f"<@{loser_id}>"
-            
+            # Announcement Mentions
             winners_mentions = []
             for uid in winners:
                 m = self.bot.get_user(uid)
@@ -529,6 +551,18 @@ class GamesCog(commands.Cog):
             # Clear queue and lock
             self.active_roulette.clear()
             self.roulette_spinning = False
+        else:
+            # Not enough players yet
+            players_needed = 3 - len(queue)
+            elapsed = time.time() - self.roulette_start_time
+            remaining = 25 - elapsed
+            
+            if players_needed > 0:
+                time_info = f" (Timer: {int(max(0, remaining))}s left)" if remaining > 0 else " (Time's up! Need players)"
+                await ctx.send(f"🔫 **{ctx.author.display_name}** has queued for roulette! [{len(queue)}/6]\nNeed **{players_needed}** more to start.{time_info}")
+            else:
+                # Timer already running, just info
+                await ctx.send(f"🔫 **{ctx.author.display_name}** has joined the chamber! [{len(queue)}/6]\nWaiting for the clock or more fodder... ({int(max(0, remaining))}s)")
 
 
 
