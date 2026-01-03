@@ -150,7 +150,7 @@ class GamesCog(commands.Cog):
             player_rank, player_point = self.get_ceelo_score(player_dice)
             d_str = f"{DICE_EMOJIS[player_dice[0]]}  {DICE_EMOJIS[player_dice[1]]}  {DICE_EMOJIS[player_dice[2]]}"
             if player_rank == 0:
-                await msg.edit(content=f"🎲 🎲 🎲\nBounced. Rollin' again...\n{d_str}")
+                await msg.edit(content=f"🎲 Your roll\n{d_str}\nBounced. Rollin' again...")
                 await asyncio.sleep(0.8)
 
         if player_rank == 4:
@@ -168,7 +168,7 @@ class GamesCog(commands.Cog):
 
         d_str = f"{DICE_EMOJIS[player_dice[0]]}  {DICE_EMOJIS[player_dice[1]]}  {DICE_EMOJIS[player_dice[2]]}"
         await msg.edit(
-            content=f"🎲 🎲 🎲\nYour point is {player_point}. I'm rolling...\n{d_str}"
+            content=f"🎲 Your roll\n{d_str}\nYour point is {player_point}. I'm rolling..."
         )
         await asyncio.sleep(1.5)
 
@@ -186,18 +186,26 @@ class GamesCog(commands.Cog):
             bot_rank, bot_point = self.get_ceelo_score(bot_dice)
 
         win, draw = False, False
+        win_reason = "You win."  # Default
+        
         if bot_rank == 4:
             win = False
         elif bot_rank == 1:
             win = True
+            win_reason = "You win."  # Bot rolled 1-2-3
         elif bot_rank == 3:
             if player_rank == 3 and player_point > bot_point:
                 win = True
+                win_reason = "You win."  # Higher trips
             else:
                 win = False
         elif bot_rank == 2:
-            if player_rank == 3 or player_point > bot_point:
+            if player_rank == 3:
                 win = True
+                win_reason = "You win."  # Trips beats point
+            elif player_point > bot_point:
+                win = True
+                win_reason = f"Win, High {player_point}"  # Beat bot's point
             elif player_point < bot_point:
                 win = False
             else:
@@ -209,7 +217,7 @@ class GamesCog(commands.Cog):
             )
         elif win:
             await self.finalize_dice(
-                ctx, msg, player_dice, "You win.", bet, bet, bot_dice=bot_dice
+                ctx, msg, player_dice, win_reason, bet, bet, bot_dice=bot_dice
             )
         else:
             await self.finalize_dice(
@@ -233,8 +241,7 @@ class GamesCog(commands.Cog):
         if bot_dice:
             bot_d_str = f"{DICE_EMOJIS[bot_dice[0]]}  {DICE_EMOJIS[bot_dice[1]]}  {DICE_EMOJIS[bot_dice[2]]}"
             final_output = (
-                f"🎲 🎲 🎲\n"
-                f"You rolled\n"
+                f"🎲 Your roll\n"
                 f"{player_d_str}\n"
                 f"━━━━━━━━\n"
                 f"{bot_d_str}\n"
@@ -245,8 +252,7 @@ class GamesCog(commands.Cog):
         else:
             # Special cases (4-5-6, 1-2-3, trips) - no bot roll
             final_output = (
-                f"🎲 🎲 🎲\n"
-                f"You rolled\n"
+                f"🎲 Your roll\n"
                 f"{player_d_str}\n"
                 f"{status_text}\n\n"
                 f"{result_header}\n"
