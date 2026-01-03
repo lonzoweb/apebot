@@ -568,82 +568,93 @@ class GamesCog(commands.Cog):
     @commands.cooldown(1, 600, commands.BucketType.user)
     async def lick_command(self, ctx, target: discord.Member = None):
         """Hit a lick on a user or a random non-mod. (Cost: 357 tokens)"""
-        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
-            return await ctx.reply("🌑 **System Notice**: The streets are too hot. Economy is disabled.", mention_author=False)
-
-        cost = 357
-        min_steal = cost - 50
-        max_steal = cost + 300
-
-        balance = await get_balance(ctx.author.id)
-        if balance < cost:
-            return await ctx.reply(f"❌ You aren't geared up for a lick. Need {economy.format_balance(cost)}.", mention_author=False)
-
-        # 1. Deduct cost
-        await update_balance(ctx.author.id, -cost)
-
-        # 2. Assign or Find target
-        if not target and ctx.message.reference:
-            # Check if it's a reply to another message
-            ref_msg = ctx.message.reference.resolved
-            if isinstance(ref_msg, discord.Message):
-                target = ref_msg.author
-
-        if target:
-            # Validate manual target
-            if target.bot:
-                await update_balance(ctx.author.id, cost)
-                return await ctx.reply("❌ You can't rob a machine.", mention_author=False)
-            if target.guild_permissions.administrator:
-                await update_balance(ctx.author.id, cost)
-                return await ctx.reply("❌ You tried to rob a mod? Are you suicidal?", mention_author=False)
-            if target.id == ctx.author.id:
-                await update_balance(ctx.author.id, cost)
-                return await ctx.reply("❌ Stop robbing yourself, clown.", mention_author=False)
-            
-            target_bal = await get_balance(target.id)
-            if target_bal < min_steal:
-                await update_balance(ctx.author.id, cost)
-                return await ctx.reply(f"❌ {target.display_name} is too broke to be worth the heat. (Min {min_steal} tokens)", mention_author=False)
-        else:
-            # Find random target
-            potential_victims = []
-            for m in ctx.guild.members:
-                if m.bot: continue
-                if m.guild_permissions.administrator: continue
-                if m.id == ctx.author.id: continue
-                
-                bal = await get_balance(m.id)
-                if bal >= min_steal:
-                    potential_victims.append(m)
-
-            if not potential_victims:
-                await update_balance(ctx.author.id, cost) # Refund
-                return await ctx.reply("❌ The streets are empty tonight. No licks to hit. (Refunded)", mention_author=False)
-
-            target = random.choice(potential_victims)
-
-        # 3. Announcement
-        await ctx.send(f"🌑 **{ctx.author.display_name}** is hitting a lick on {target.mention}!\n🚨 {target.mention}, you have **20 seconds** to spook them! (Type anything in chat)")
-
-        # 4. Wait for response
-        def check(m):
-            return m.author.id == target.id and m.channel.id == ctx.channel.id
-
         try:
-            await self.bot.wait_for('message', timeout=20.0, check=check)
-            # Spooked!
-            await ctx.send(f"🚔 **SPOOKED!** {target.mention} spotted the thief and made a scene. **{ctx.author.display_name}** ran off, losing the gear fee.")
-        except asyncio.TimeoutError:
-            # Robbery success (100% chance if no response)
-            rob_amount = random.randint(min_steal, max_steal)
-            target_bal = await get_balance(target.id)
-            actual_steal = min(rob_amount, target_bal)
-            
-            await update_balance(target.id, -actual_steal)
-            await update_balance(ctx.author.id, actual_steal)
-            
-            await ctx.send(f"💰 **LICK SUCCESSFUL.** {ctx.author.mention} robbed **{economy.format_balance(actual_steal)}** from {target.mention}. Total silence.")
+            logger.info(f"Lick triggered by {ctx.author.name}")
+            if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+                return await ctx.reply("🌑 **System Notice**: The streets are too hot. Economy is disabled.", mention_author=False)
+
+            cost = 357
+            min_steal = cost - 50
+            max_steal = cost + 300
+
+            balance = await get_balance(ctx.author.id)
+            if balance < cost:
+                return await ctx.reply(f"❌ You aren't geared up for a lick. Need {economy.format_balance(cost)}.", mention_author=False)
+
+            # 1. Deduct cost
+            logger.info("Deducting cost...")
+            await update_balance(ctx.author.id, -cost)
+
+            # 2. Assign or Find target
+            logger.info("Finding target...")
+            if not target and ctx.message.reference:
+                # Check if it's a reply to another message
+                ref_msg = ctx.message.reference.resolved
+                if isinstance(ref_msg, discord.Message):
+                    target = ref_msg.author
+
+            if target:
+                # Validate manual target
+                if target.bot:
+                    await update_balance(ctx.author.id, cost)
+                    return await ctx.reply("❌ You can't rob a machine.", mention_author=False)
+                if target.guild_permissions.administrator:
+                    await update_balance(ctx.author.id, cost)
+                    return await ctx.reply("❌ You tried to rob a mod? Are you suicidal?", mention_author=False)
+                if target.id == ctx.author.id:
+                    await update_balance(ctx.author.id, cost)
+                    return await ctx.reply("❌ Stop robbing yourself, clown.", mention_author=False)
+                
+                target_bal = await get_balance(target.id)
+                if target_bal < min_steal:
+                    await update_balance(ctx.author.id, cost)
+                    return await ctx.reply(f"❌ {target.display_name} is too broke to be worth the heat. (Min {min_steal} tokens)", mention_author=False)
+            else:
+                # Find random target
+                potential_victims = []
+                for m in ctx.guild.members:
+                    if m.bot: continue
+                    if m.guild_permissions.administrator: continue
+                    if m.id == ctx.author.id: continue
+                    
+                    bal = await get_balance(m.id)
+                    if bal >= min_steal:
+                        potential_victims.append(m)
+
+                if not potential_victims:
+                    await update_balance(ctx.author.id, cost) # Refund
+                    return await ctx.reply("❌ The streets are empty tonight. No licks to hit. (Refunded)", mention_author=False)
+
+                target = random.choice(potential_victims)
+
+            # 3. Announcement
+            logger.info(f"Target found: {target.display_name}. Sending announcement.")
+            await ctx.send(f"🌑 **{ctx.author.display_name}** is hitting a lick on {target.mention}!\n🚨 {target.mention}, you have **20 seconds** to spook them! (Type anything in chat)")
+
+            # 4. Wait for response
+            def check(m):
+                return m.author.id == target.id and m.channel.id == ctx.channel.id
+
+            try:
+                await self.bot.wait_for('message', timeout=20.0, check=check)
+                # Spooked!
+                logger.info("Target spooked the thief.")
+                await ctx.send(f"🚔 **SPOOKED!** {target.mention} spotted the thief and made a scene. **{ctx.author.display_name}** ran off, losing the gear fee.")
+            except asyncio.TimeoutError:
+                # Robbery success (100% chance if no response)
+                logger.info("Target silence. Robbing now.")
+                rob_amount = random.randint(min_steal, max_steal)
+                target_bal = await get_balance(target.id)
+                actual_steal = min(rob_amount, target_bal)
+                
+                await update_balance(target.id, -actual_steal)
+                await update_balance(ctx.author.id, actual_steal)
+                
+                await ctx.send(f"💰 **LICK SUCCESSFUL.** {ctx.author.mention} robbed **{economy.format_balance(actual_steal)}** from {target.mention}. Total silence.")
+        
+        except Exception as e:
+            logger.error(f"Error in lick_command: {e}", exc_info=True)
+            await ctx.send("❌ An internal error occurred. Administrators have been notified.")
 
 async def setup(bot):
     await bot.add_cog(GamesCog(bot))
