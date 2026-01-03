@@ -189,6 +189,13 @@ class EconomyCog(commands.Cog):
         except InsufficientTokens as e:
             await ctx.reply(f"❌ Transaction declined. You're flat. Need {e.required} 💎.", mention_author=False)
 
+    @buy_command.error
+    async def buy_command_error(self, ctx, error):
+        if isinstance(error, commands.CommandOnCooldown):
+            return # Silently ignore
+        # If you want to log other errors, do it here. Or let global handler take them.
+        pass
+
     @commands.command(name="inventory", aliases=["inv"])
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def inventory_command(self, ctx):
@@ -375,7 +382,7 @@ class EconomyCog(commands.Cog):
 
             elif item_type == "event":
                 # Handle The Reaping
-                if official_name == "the_reaping":
+                if official_name == "reaping":
                     if await is_reaping_active():
                         return await ctx.send("🌾 **Wait.** The harvest is already underway.")
                     

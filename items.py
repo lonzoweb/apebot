@@ -95,7 +95,7 @@ ITEM_REGISTRY = {
         "shop_desc": "Starts a Crazed Feast. Steal tokens from inactive chatters.",
         "feedback": "🍗🧛 **CRAZED FEAST!** You begin feasting upon the sleeping members of the chat...\n💡 *Speak in chat to block attacks.*",
     },
-    "the_reaping": {
+    "reaping": {
         "cost": 3000,
         "type": "event",
         "shop_desc": "Initiate The Reaping. 30min casino tax event. 4% tithe per game, players get paid.",
@@ -154,9 +154,9 @@ ITEM_ALIASES = {
     "hot potato": "hot_potato",
     "potato": "hot_potato",
     "feast": "feast",
-    "the_reaping": "the_reaping",
-    "reaping": "the_reaping",
-    "harvest": "the_reaping",
+    "the_reaping": "reaping",
+    "reaping": "reaping",
+    "harvest": "reaping",
     "night_vision": "night_vision",
     "night vision": "night_vision",
     "nv": "night_vision",
