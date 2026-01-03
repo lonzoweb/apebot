@@ -483,7 +483,7 @@ class GamesCog(commands.Cog):
             remaining = 25 - elapsed
             
             if remaining > 0:
-                await ctx.send(f"🔫 **{ctx.author.display_name}** has joined! [{len(queue)}/6]\n🚨 **CHAMBER MINIMUM REACHED.** Wait for the clock or more fodder... (**{int(remaining)}s** remaining)")
+                await ctx.send(f"🔫 **{ctx.author.display_name}** has joined! [{len(queue)}/6]\n🚨 **CHAMBER MINIMUM REACHED.** Wait for the clock or more fodder...")
                 await asyncio.sleep(remaining)
             # Time's up message removed
 
@@ -557,11 +557,10 @@ class GamesCog(commands.Cog):
             remaining = 25 - elapsed
             
             if players_needed > 0:
-                time_info = f" (Timer: {int(max(0, remaining))}s left)" if remaining > 0 else " (Time's up! Need players)"
-                await ctx.send(f"🔫 **{ctx.author.display_name}** has queued for roulette! [{len(queue)}/6]\nNeed **{players_needed}** more to start.{time_info}")
+                await ctx.send(f"🔫 **{ctx.author.display_name}** has queued for roulette! [{len(queue)}/6]\nNeed **{players_needed}** more to start.")
             else:
                 # Timer already running, just info
-                await ctx.send(f"🔫 **{ctx.author.display_name}** has joined the chamber! [{len(queue)}/6]\nWaiting for the clock or more fodder... ({int(max(0, remaining))}s)")
+                await ctx.send(f"🔫 **{ctx.author.display_name}** has joined the chamber! [{len(queue)}/6]\nWaiting for the clock or more fodder...")
 
 
 
