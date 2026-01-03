@@ -126,9 +126,9 @@ def setup_tasks(bot, guild_id: int):
         """Helper to process expired curses"""
         try:
             expired_curses = await database.get_all_expired_effects()
-            for target_id_str in expired_curses:
-                await database.remove_active_effect(int(target_id_str))
-                logger.info(f"🧹 Logic: Automatically removed expired curse from {target_id_str}")
+            for user_id, effect_name in expired_curses:
+                await database.remove_active_effect(int(user_id), effect_name)
+                logger.info(f"🧹 Logic: Automatically removed expired {effect_name} from {user_id}")
         except Exception as e:
             logger.error(f"Error in curse cleanup: {e}")
 

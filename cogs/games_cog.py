@@ -176,8 +176,8 @@ class GamesCog(commands.Cog):
         bot_dice = []
         while bot_rank == 0:
             # 🏠 CASINO LOGIC: High Roller Edge
-            # If bet is > 5000, bot has a 15% chance to force a 4-5-6 (Auto-Win)
-            if bet > 5000 and random.random() < 0.15:
+            # If bet is > 1400, bot has a 15% chance to force a 4-5-6 (Auto-Win)
+            if bet > 1400 and random.random() < 0.15:
                 bot_dice = [4, 5, 6]
                 logger.info(f"HOUSE EDGE TRIGGERED: High bet of {bet} detected. Bot forced 4-5-6.")
             else:

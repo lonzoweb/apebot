@@ -461,14 +461,13 @@ async def remove_active_effect(target_id: int, effect_name: str = None):
 
 
 async def get_all_expired_effects() -> list:
-    """Gets list of target_ids whose curses have expired."""
+    """Gets list of (user_id, effect_name) whose effects have expired."""
     async with get_db() as conn:
         now = time.time()
         async with conn.execute(
-            "SELECT target_id FROM active_effects WHERE expiration_time <= ?", (now,)
+            "SELECT user_id, effect_name FROM active_effects WHERE expires_at <= ?", (now,)
         ) as cursor:
-            rows = await cursor.fetchall()
-            return [row[0] for row in rows]
+            return await cursor.fetchall()
 
 
 # ============================================================
