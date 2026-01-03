@@ -394,22 +394,24 @@ class EconomyCog(commands.Cog):
                                 feast = self.active_feasts[channel_id]
                                 # Get potential victims (exclude attacker and the bot)
                                 exclude = [attacker_id, self.bot.user.id]
-                                victims = await get_potential_victims(exclude)
+                                all_victims = await get_potential_victims(exclude)
                                 
-                                if not victims:
+                                if not all_victims:
                                     continue
                                     
-                                target_id = random.choice(victims)
+                                # Priority 1: Idle users (not in active_users)
+                                eligible = [v for v in all_victims if str(v) not in feast['active_users']]
+                                
+                                # Priority 2: Anyone (The feast starves and attacks active chatters!)
+                                is_desperate = False
+                                if not eligible:
+                                    eligible = all_victims
+                                    is_desperate = True
+                                    
+                                target_id = random.choice(eligible)
                                 # Discord IDs from DB are strings
                                 target_member = self.bot.get_user(int(target_id))
                                 
-                                # Check if target is "active" (blocked)
-                                if str(target_id) in feast['active_users']:
-                                    if chan:
-                                        victim_member = target_member if target_member else f"<@{target_id}>"
-                                        await chan.send(f"🛡️ **{victim_member.display_name if isinstance(victim_member, discord.Member) else victim_member}** BLOCKED the attack! No snacks here.")
-                                    continue
-                                    
                                 # Check if target has been eaten 2 times
                                 if feast['victim_counts'].get(target_id, 0) >= 2:
                                     continue
@@ -487,8 +489,8 @@ class EconomyCog(commands.Cog):
                 # Award Passer's Fee (15 tokens)
                 await update_balance(old_holder_id, 15)
                 
-                # Feedback
-                await message.channel.send(f"⚡ **PASSED!** {message.author.mention} takes the heat! (+15 tokens) 🥔🔥")
+                # Feedback (Using display_name to avoid rate limits/spam)
+                await message.channel.send(f"⚡ **PASSED!** **{message.author.display_name}** takes the heat! (+15 tokens) 🥔🔥")
 
         # 🍗 Handle Feast In-Channel Activity (Blocking mechanism)
         if channel_id in self.active_feasts:

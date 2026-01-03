@@ -171,7 +171,14 @@ class GamesCog(commands.Cog):
         bot_rank, bot_point = 0, 0
         bot_dice = []
         while bot_rank == 0:
-            bot_dice = [random.randint(1, 6) for _ in range(3)]
+            # 🏠 CASINO LOGIC: High Roller Edge
+            # If bet is > 5000, bot has a 15% chance to force a 4-5-6 (Auto-Win)
+            if bet > 5000 and random.random() < 0.15:
+                bot_dice = [4, 5, 6]
+                logger.info(f"HOUSE EDGE TRIGGERED: High bet of {bet} detected. Bot forced 4-5-6.")
+            else:
+                bot_dice = [random.randint(1, 6) for _ in range(3)]
+            
             bot_rank, bot_point = self.get_ceelo_score(bot_dice)
 
         win, draw = False, False
@@ -647,15 +654,52 @@ class GamesCog(commands.Cog):
                 await ctx.send(f"🚔 **SPOOKED!** {target.mention} spotted the thief and made a scene. **{ctx.author.display_name}** ran off, losing the gear fee.")
             except asyncio.TimeoutError:
                 # Robbery success (100% chance if no response)
-                logger.info("Target silence. Robbing now.")
-                rob_amount = random.randint(min_steal, max_steal)
-                target_bal = await get_balance(target.id)
-                actual_steal = min(rob_amount, target_bal)
+                logger.info("Target silence. Checking for wards...")
                 
+                target_inv = await get_user_inventory(target.id)
+                # 1. Mirror Ward Check (Reflection)
+                if target_inv.get("echo_ward_max", 0) > 0:
+                    await remove_item_from_inventory(target.id, "echo_ward_max")
+                    
+                    # Reflection Logic: Thief gets robbed by the void
+                    reflect_amt = random.randint(min_steal, max_steal)
+                    thief_bal = await get_balance(ctx.author.id)
+                    actual_loss = min(reflect_amt, thief_bal)
+                    
+                    await update_balance(ctx.author.id, -actual_loss)
+                    await update_balance(target.id, actual_loss) # Victim gets the "reflected" tokens? Or just licker loses them.
+                    
+                    return await ctx.send(
+                        f"🪞 **MIRROR WARD SHATTERED!** {target.mention}'s protection reflected the intent. "
+                        f"**{ctx.author.display_name}** tripped on jagged glass and lost **{economy.format_balance(actual_loss)}** to the shadows."
+                    )
+                
+                # 2. Standard Ward Check
+                if target_inv.get("echo_ward", 0) > 0:
+                    await remove_item_from_inventory(target.id, "echo_ward")
+                    return await ctx.send(f"🛡️ **ECHO WARD SHATTERED.** {target.mention} was protected by a glass barrier. The thief escaped with nothing.")
+
+                # 3. Successful Lick - Dual Tier Returns
+                tier_roll = random.random()
+                target_bal = await get_balance(target.id)
+                
+                if tier_roll < 0.40:
+                    # THE BIG SCORE (40% chance)
+                    logger.info("BIG SCORE rolled.")
+                    # Range: cost+1 to full balance
+                    rob_amount = random.randint(cost + 1, max(cost + 2, target_bal))
+                    flavor = "💸 **JACKPOT!** A clean sweep of the safe."
+                else:
+                    # STANDARD RETURN (60% chance)
+                    logger.info("Standard return rolled.")
+                    rob_amount = random.randint(350, 450)
+                    flavor = "💰 **LICK SUCCESSFUL.**"
+
+                actual_steal = min(rob_amount, target_bal)
                 await update_balance(target.id, -actual_steal)
                 await update_balance(ctx.author.id, actual_steal)
                 
-                await ctx.send(f"💰 **LICK SUCCESSFUL.** {ctx.author.mention} robbed **{economy.format_balance(actual_steal)}** from {target.mention}. Total silence.")
+                await ctx.send(f"{flavor} {ctx.author.mention} robbed **{economy.format_balance(actual_steal)}** from {target.mention}. Total silence.")
         
         except Exception as e:
             logger.error(f"Error in lick_command: {e}", exc_info=True)
