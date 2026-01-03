@@ -96,13 +96,13 @@ ITEM_REGISTRY = {
         "feedback": "🍗🧛 **CRAZED FEAST!** You begin feasting upon the sleeping members of the chat...\n💡 *Speak in chat to block attacks.*",
     },
     "the_reaping": {
-        "cost": 7000,
+        "cost": 3000,
         "type": "event",
         "shop_desc": "Initiate The Reaping. 30min casino tax event. 4% tithe per game, players get paid.",
         "feedback": "🌾 **REAPING IN SESSION**\n\nT.\nAll players pay their tithes.\n\nDuration: 30 minutes",
     },
     "night_vision": {
-        "cost": 1500,
+        "cost": 200,
         "type": "protection",
         "shop_desc": "5-hour overnight shield. Blocks theft but prevents all token gains.",
         "feedback": "🌙 **NIGHT VISION ACTIVATED.**\n\nProtecting your assets until you awaken.\n\n*The void watches its own.*",
