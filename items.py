@@ -67,8 +67,8 @@ ITEM_REGISTRY = {
         "cost": 7,
         "type": "buff",
         "restricted": True,
-        "shop_desc": "ADMIN ONLY. A celestial blessing granting 50% increased earnings for 24 hours.",
-        "feedback": "✨ **LUCK CURSE ACTIVATED.** The stars align for 24 hours. Earnings +50%.",
+        "shop_desc": "You are cursed with good luck. 50% increased earnings for 24 hours.",
+        "feedback": "✨ **LUCK CURSE ACTIVATED.** Enjoy your heightened fortune for 24h. Earnings +50%.",
     },
     "hot_potato": {
         "cost": 520,
