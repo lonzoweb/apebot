@@ -148,9 +148,9 @@ class GamesCog(commands.Cog):
         while player_rank == 0:
             player_dice = [random.randint(1, 6) for _ in range(3)]
             player_rank, player_point = self.get_ceelo_score(player_dice)
-            d_str = f"{DICE_EMOJIS[player_dice[0]]} {DICE_EMOJIS[player_dice[1]]} {DICE_EMOJIS[player_dice[2]]}"
+            d_str = f"{DICE_EMOJIS[player_dice[0]]}  {DICE_EMOJIS[player_dice[1]]}  {DICE_EMOJIS[player_dice[2]]}"
             if player_rank == 0:
-                await msg.edit(content=f"🎲  **{d_str}**\n*Bounced. Rollin' again...*")
+                await msg.edit(content=f"🎲 🎲 🎲\nBounced. Rollin' again...\n{d_str}")
                 await asyncio.sleep(0.8)
 
         if player_rank == 4:
@@ -166,9 +166,9 @@ class GamesCog(commands.Cog):
                 ctx, msg, player_dice, f"TRIPS [{player_point}]!", int(bet * 2), bet, bot_dice=None
             )
 
-        d_str = f"{DICE_EMOJIS[player_dice[0]]} {DICE_EMOJIS[player_dice[1]]} {DICE_EMOJIS[player_dice[2]]}"
+        d_str = f"{DICE_EMOJIS[player_dice[0]]}  {DICE_EMOJIS[player_dice[1]]}  {DICE_EMOJIS[player_dice[2]]}"
         await msg.edit(
-            content=f"🎲  **{d_str}**\n*Your point is {player_point}. I'm rolling...*"
+            content=f"🎲 🎲 🎲\nYour point is {player_point}. I'm rolling...\n{d_str}"
         )
         await asyncio.sleep(1.5)
 
@@ -236,7 +236,7 @@ class GamesCog(commands.Cog):
                 f"🎲 🎲 🎲\n"
                 f"You rolled\n"
                 f"{player_d_str}\n"
-                f"━━━━━━━━━━━\n"
+                f"━━━━━━━━\n"
                 f"{bot_d_str}\n"
                 f"{status_text}\n\n"
                 f"{result_header}\n"
