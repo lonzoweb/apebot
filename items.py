@@ -102,7 +102,7 @@ ITEM_REGISTRY = {
         "feedback": "🌾 **REAPING IN SESSION**\n\nT.\nAll players pay their tithes.\n\nDuration: 30 minutes",
     },
     "night_vision": {
-        "cost": 200,
+        "cost": 400,
         "type": "protection",
         "shop_desc": "5-hour overnight shield. Blocks theft but prevents all token gains.",
         "feedback": "🌙 **NIGHT VISION ACTIVATED.**\n\nProtecting your assets until you awaken.\n\n*The void watches its own.*",
