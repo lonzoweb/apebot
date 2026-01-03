@@ -97,6 +97,13 @@ async def init_db():
             )
 
             # 🌑 NEW: Active Effects Table (Curse/Mute)
+            # Migration check: If table exists with old column names, drop it
+            async with conn.execute("PRAGMA table_info(active_effects)") as cursor:
+                columns = [row[1] for row in await cursor.fetchall()]
+                if columns and "expires_at" not in columns:
+                    logger.info("Outdated active_effects table found. Migrating...")
+                    await conn.execute("DROP TABLE active_effects")
+
             await conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS active_effects (

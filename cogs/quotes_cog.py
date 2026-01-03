@@ -227,10 +227,10 @@ class QuotesCog(commands.Cog):
         except discord.Forbidden:
             await ctx.send("⚠️ Cannot DM you. Check privacy settings.")
 
-    @commands.command(name="daily")
+    @commands.command(name="dailyquote", aliases=["dq", "qotd"])
     @commands.cooldown(1, 5, commands.BucketType.user)
-    async def daily_command(self, ctx):
-        """Show today's quote"""
+    async def dailyquote_command(self, ctx):
+        """Show today's curated quote"""
         if ctx.author.guild_permissions.administrator or any(
             role.name == DAILY_COMMAND_ROLE for role in ctx.author.roles
         ):
