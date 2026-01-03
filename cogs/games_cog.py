@@ -652,14 +652,14 @@ class GamesCog(commands.Cog):
 
             # 3. Announcement
             logger.info(f"Target found: {target.display_name}. Sending announcement.")
-            await ctx.send(f"🌑 **{ctx.author.display_name}** is hitting a lick on {target.mention}!\n🚨 {target.mention}, you have **9 seconds** to spook them! (Type anything in chat)")
+            await ctx.send(f"🌑 **{ctx.author.display_name}** is hitting a lick on {target.mention}!\n🚨 {target.mention}, you have **18 seconds** to spook them! (Type anything in chat)")
 
             # 4. Wait for response
             def check(m):
                 return m.author.id == target.id and m.channel.id == ctx.channel.id
 
             try:
-                await self.bot.wait_for('message', timeout=9.0, check=check)
+                await self.bot.wait_for('message', timeout=18.0, check=check)
                 # Spooked!
                 logger.info("Target spooked the thief.")
                 await ctx.send(f"🚔 **SPOOKED!** {target.mention} spotted the thief and made a scene. **{ctx.author.display_name}** ran off, losing the gear fee.")
