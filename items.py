@@ -95,6 +95,18 @@ ITEM_REGISTRY = {
         "shop_desc": "Starts a Crazed Feast. Steal tokens from inactive chatters.",
         "feedback": "🍗🧛 **CRAZED FEAST!** You begin feasting upon the sleeping members of the chat...\n💡 *Speak in chat to block attacks.*",
     },
+    "the_reaping": {
+        "cost": 7000,
+        "type": "event",
+        "shop_desc": "Initiate The Reaping. 30min casino tax event. 4% tithe per game, random winner gets 80% of pool.",
+        "feedback": "🌾 **THE REAPING HAS BEGUN.**\n\nThe spirits demand their tithe from every wager.\nAll casino players surrender 4% of their wealth per game.\n\nDuration: 30 minutes",
+    },
+    "night_vision": {
+        "cost": 1500,
+        "type": "protection",
+        "shop_desc": "5-hour overnight shield. Blocks theft but prevents all token gains.",
+        "feedback": "🌙 **NIGHT VISION ACTIVATED.**\n\nThe cloak of shadows has been engaged for 5 hours.\nNo theft can reach you, but fortune will not smile upon you either.\n\n*The void protects its own.*",
+    },
 }
 
 # Aliases to make buying/using easier for users
@@ -142,6 +154,15 @@ ITEM_ALIASES = {
     "hot potato": "hot_potato",
     "potato": "hot_potato",
     "feast": "feast",
+    "the_reaping": "the_reaping",
+    "reaping": "the_reaping",
+    "harvest": "the_reaping",
+    "night_vision": "night_vision",
+    "night vision": "night_vision",
+    "nv": "night_vision",
+    "sleep": "night_vision",
+    "night": "night_vision",
+    "vision": "night_vision",
 }
 
 # ============================================================

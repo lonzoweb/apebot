@@ -1,6 +1,7 @@
 import aiosqlite
 import logging
 import time
+import random
 from contextlib import asynccontextmanager
 from config import DB_FILE
 from exceptions import InsufficientTokens, ItemNotFoundError
@@ -146,6 +147,31 @@ async def init_db():
                 )
             """
             )
+
+            # 🌾 NEW: The Reaping State Table
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS reaping_state (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    active INTEGER DEFAULT 0,
+                    pool_amount INTEGER DEFAULT 0,
+                    games_count INTEGER DEFAULT 0,
+                    started_at REAL,
+                    expires_at REAL
+                )
+            """
+            )
+
+            # 🌾 NEW: The Reaping Participants Table
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS reaping_participants (
+                    user_id TEXT PRIMARY KEY,
+                    contribution INTEGER DEFAULT 0
+                )
+            """
+            )
+
             # Add indexes
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_quotes_text ON quotes(quote)")
             await conn.execute(
@@ -229,6 +255,11 @@ async def update_balance(user_id: int, amount: int):
     
     # 🌓 MULTIPLIERS (Positive earnings only)
     if amount > 0:
+        # Night Vision Check (Block income)
+        nv_expires = await get_active_effect(user_id, "night_vision")
+        if nv_expires and nv_expires > time.time():
+            return
+
         # Blood Moon (2x)
         bm_multiplier = await get_blood_moon_multiplier()
         if bm_multiplier > 1:
@@ -739,3 +770,117 @@ async def record_daily_claim(user_id: int, claim_type: str):
             "INSERT OR REPLACE INTO daily_claims (user_id, claim_type, last_claim_date) VALUES (?, ?, ?)",
             (str(user_id), claim_type, today),
         )
+
+
+
+
+
+# ============================================================
+# THE REAPING FUNCTIONS
+# ============================================================
+
+
+async def start_reaping(duration_seconds: int = 1800):
+    """Starts The Reaping event (30 minutes default)."""
+    async with get_db() as conn:
+        end_time = time.time() + duration_seconds
+        await conn.execute(
+            """
+            INSERT OR REPLACE INTO reaping_state (id, active, pool_amount, games_count, started_at, expires_at)
+            VALUES (1, 1, 0, 0, ?, ?)
+        """,
+            (time.time(), end_time),
+        )
+
+
+async def is_reaping_active() -> bool:
+    """Check if The Reaping is currently active."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT active, expires_at FROM reaping_state WHERE id = 1"
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return False
+            active, expires_at = row
+            if active and expires_at and time.time() < expires_at:
+                return True
+            return False
+
+
+async def add_reaping_tithe(user_id: int, amount: int):
+    """Add tokens to the reaping pool and track participant contribution."""
+    user_id_str = str(user_id)
+    async with get_db() as conn:
+        # Update pool
+        await conn.execute(
+            "UPDATE reaping_state SET pool_amount = pool_amount + ?, games_count = games_count + 1 WHERE id = 1",
+            (amount,),
+        )
+        # Track participant
+        await conn.execute(
+            """
+            INSERT INTO reaping_participants (user_id, contribution) VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET contribution = contribution + ?
+        """,
+            (user_id_str, amount, amount),
+        )
+
+
+async def get_reaping_state():
+    """Get current reaping state."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT active, pool_amount, games_count, expires_at FROM reaping_state WHERE id = 1"
+        ) as cursor:
+            return await cursor.fetchone()
+
+
+async def get_reaping_participants():
+    """Get list of all participants (user_ids)."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT user_id FROM reaping_participants"
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [row[0] for row in rows]
+
+
+async def end_reaping():
+    """End The Reaping event, split 80% pool among participants, and clear state."""
+    async with get_db() as conn:
+        # Get pool and participants
+        async with conn.execute("SELECT pool_amount FROM reaping_state WHERE id = 1") as cursor:
+            row = await cursor.fetchone()
+            pool = row[0] if row else 0
+
+        async with conn.execute("SELECT user_id FROM reaping_participants") as cursor:
+            rows = await cursor.fetchall()
+            participants = [row[0] for row in rows]
+
+        winner_count = 0
+        payout_per_person = 0
+        burned = 0
+        
+        count = len(participants)
+        if count > 0 and pool > 0:
+            total_payout = int(pool * 0.8)
+            payout_per_person = total_payout // count
+            burned = pool - (payout_per_person * count) # Remainder goes to void
+            winner_count = count
+
+            if payout_per_person > 0:
+                for uid in participants:
+                    await conn.execute(
+                        """
+                        INSERT INTO balances (user_id, balance) VALUES (?, ?) 
+                        ON CONFLICT(user_id) DO UPDATE SET balance = balance + ?
+                        """,
+                        (str(uid), payout_per_person, payout_per_person)
+                    )
+
+        # Cleanup
+        await conn.execute("UPDATE reaping_state SET active = 0, pool_amount = 0, games_count = 0 WHERE id = 1")
+        await conn.execute("DELETE FROM reaping_participants")
+
+        return winner_count, payout_per_person, burned

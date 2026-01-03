@@ -8,6 +8,7 @@ from discord.ext import commands
 import logging
 import asyncio
 import random
+import time
 import economy
 from database import (
     get_balance, update_balance, atomic_purchase, get_user_inventory, 
@@ -15,7 +16,7 @@ from database import (
     get_all_active_effects,
     set_balance, get_potential_victims, get_global_cooldown, 
     set_global_cooldown, is_economy_on, can_claim_daily, record_daily_claim,
-    set_blood_moon
+    set_blood_moon, start_reaping, is_reaping_active
 )
 from exceptions import InsufficientTokens, InsufficientInventory, ActiveCurseError, ItemNotFoundError
 from items import ITEM_REGISTRY, ITEM_ALIASES
@@ -120,7 +121,30 @@ class EconomyCog(commands.Cog):
                 await ctx.send(f"❌ {ctx.author.mention}, Please open your DMs.")
             return
 
-        official_name = ITEM_ALIASES.get(item_name.lower())
+            return
+
+        # Smart Parsing Strategy (Consistent with .use)
+        # 1. Try exact match first
+        # 2. Try partial match (longest prefix)
+        
+        args = item_name # Alias for readability
+        item_input_clean = args.strip('"').strip("'").lower()
+        official_name = ITEM_ALIASES.get(item_input_clean)
+        
+        if not official_name:
+            words = args.split()
+            # Try 3 words, then 2, then 1
+            for i in range(min(3, len(words)), 0, -1):
+                potential_name = " ".join(words[:i]).strip('"').strip("'").lower()
+                if potential_name in ITEM_ALIASES:
+                    official_name = ITEM_ALIASES[potential_name]
+                    break
+        
+        if not official_name:
+             # Fallback check first word
+             if words and words[0].lower() in ITEM_ALIASES:
+                 official_name = ITEM_ALIASES[words[0].lower()]
+
         if not official_name:
             return await ctx.reply(
                 f"❌ '{item_name}' isn't on the shelf. Type `.buy` to see the menu.", mention_author=False
@@ -188,34 +212,67 @@ class EconomyCog(commands.Cog):
 
     @commands.command(name="use")
     @commands.cooldown(1, 5, commands.BucketType.user)
-    async def use_command(self, ctx, item_input: str = None, target: discord.Member = None, *, message: str = None):
+    async def use_command(self, ctx, *, args: str = None):
         """
-        Uses an item.
-        Usage: .use muzzle @user (Curses) OR .use kush (Consumables) OR .use global <message> (Broadcast)
+        Uses an item. Supports multi-word names (e.g. .use night vision).
+        Usage: .use muzzle @user | .use night vision | .use everyone <msg>
         """
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: Artifacts are inert while the economy is disabled.", mention_author=False)
 
-        if not item_input:
+        if not args:
             embed = discord.Embed(title="🎒 Item Usage Guide", color=discord.Color.blue())
             embed.add_field(
                 name="Curses (Target @User)",
                 value="`.use muzzle @user`\n`.use uwu @user`",
                 inline=False,
             )
-            embed.add_field(name="Consumables (Self)", value="`.use kush`\n`.use npass`", inline=False)
+            embed.add_field(name="Consumables (Self)", value="`.use night vision`\n`.use kush`", inline=False)
             embed.add_field(name="Broadcast", value="`.use everyone <message>`", inline=False)
-            embed.add_field(
-                name="Info", value="Check your `.inv` to see what you own.", inline=False
-            )
             return await ctx.send(embed=embed)
 
-        item_input = item_input.strip('"').strip("'")
-        official_name = ITEM_ALIASES.get(item_input.lower())
+        # Basic Parsing Strategy:
+        # 1. Split args into words
+        # 2. Try to match longest possible alias from the start
+        # 3. Remainder is target/message
+        
+        words = args.split()
+        official_name = None
+        target_str = ""
+        
+        # Try 3 words, then 2, then 1
+        for i in range(min(3, len(words)), 0, -1):
+            potential_name = " ".join(words[:i]).strip('"').strip("'").lower()
+            if potential_name in ITEM_ALIASES:
+                official_name = ITEM_ALIASES[potential_name]
+                target_str = " ".join(words[i:])
+                break
+        
+        if not official_name:
+             # Fallback: maybe first word is alias
+             potential = words[0].lower()
+             if potential in ITEM_ALIASES:
+                 official_name = ITEM_ALIASES[potential]
+                 target_str = " ".join(words[1:])
+        
         item_info = ITEM_REGISTRY.get(official_name)
 
         if not official_name or not item_info:
-            return await ctx.reply(f"❌ '{item_input}' isn't in your stash. Check `.inv`.", mention_author=False)
+            return await ctx.reply(f"❌ '{args}' isn't in your stash. Check `.inv`.", mention_author=False)
+            
+        # Parse Target if needed
+        target = None
+        message = None
+        
+        if target_str:
+            if item_info.get("type") == "broadcast":
+                message = target_str
+            else:
+                try:
+                    target = await commands.MemberConverter().convert(ctx, target_str)
+                except commands.BadArgument:
+                    # Maybe it's not a target, just extra junk, ignore if not needed
+                     pass
 
         try:
             inventory = await get_user_inventory(ctx.author.id)
@@ -288,6 +345,43 @@ class EconomyCog(commands.Cog):
                 await ctx.send(
                     f"👹 **HEX APPLIED!** {item_info['feedback']}\nTarget: {target.mention}"
                 )
+
+            elif item_type == "protection":
+                # Night Vision logic
+                if official_name == "night_vision":
+                    # Check 10h cooldown (36000 seconds)
+                    cooldown_key = f"nv_{ctx.author.id}"
+                    expires_at = await get_global_cooldown(cooldown_key)
+                    
+                    if expires_at and expires_at > time.time():
+                        remaining = expires_at - time.time()
+                        hours = int(remaining // 3600)
+                        minutes = int((remaining % 3600) // 60)
+                        return await ctx.reply(
+                            f"⏳ **PATIENCE.** The shadows need time to gather. You can engage Night Vision again in `{hours}h {minutes}m`.",
+                            mention_author=False
+                        )
+                    
+                    # Apply effect
+                    duration = item_info.get("duration_sec", 18000) # 5 hours
+                    await add_active_effect(ctx.author.id, official_name, duration)
+                    
+                    # Set 10h cooldown (36000 sec)
+                    await set_global_cooldown(cooldown_key, 36000)
+                    
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    # Public announcement
+                    return await ctx.send(f"{item_info['feedback']}")
+
+            elif item_type == "event":
+                # Handle The Reaping
+                if official_name == "the_reaping":
+                    if await is_reaping_active():
+                        return await ctx.send("🌾 **Wait.** The harvest is already underway.")
+                    
+                    await start_reaping()
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    return await ctx.send(item_info["feedback"])
 
             elif item_type == "defense":
                 await ctx.send(

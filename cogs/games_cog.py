@@ -12,7 +12,8 @@ import time
 from database import (
     get_balance, update_balance, add_active_effect, is_economy_on, 
     get_user_inventory, remove_item_from_inventory, get_blood_moon_multiplier,
-    get_potential_victims
+    get_potential_victims, is_reaping_active, add_reaping_tithe, get_active_effect,
+    get_reaping_state, end_reaping
 )
 import economy
 import torture
@@ -34,6 +35,51 @@ class GamesCog(commands.Cog):
         self.roulette_spinning = False # Execution lock (the actual spin)
         self.roulette_timer_active = False # Timer lock (the 25s count)
         self.roulette_start_time = 0 # When the first person joined
+
+    async def process_reaping(self, ctx):
+        """Handle Reaping lifecycle: End if expired, else tax user."""
+        state = await get_reaping_state()
+        if not state: 
+            return
+
+        active, pool, games_count, expires_at = state
+        now = time.time()
+        user_id = ctx.author.id
+
+        # 1. Check Expiration
+        if active and expires_at and now >= expires_at:
+            winner_count, payout_per_person, burned = await end_reaping()
+            
+            if winner_count > 0:
+                formatted_payout = economy.format_balance(payout_per_person)
+                formatted_burned = economy.format_balance(burned)
+                await ctx.send(
+                    f"🌾 **THE HARVEST IS COMPLETE.**\n"
+                    f"The gathered souls have been judged.\n\n"
+                    f"👥 **Participants:** {winner_count}\n"
+                    f"💰 **Payout:** {formatted_payout} each\n"
+                    f"🔥 **Burned:** {formatted_burned}"
+                )
+            else:
+                await ctx.send("🌾 **The Harvest Ends.** No souls were claimed.")
+            return
+
+        # 2. Apply Tax if Active
+        if active:
+            bal = await get_balance(user_id)
+            if bal > 0:
+                tithe = int(bal * 0.04)
+                if tithe > 0:
+                    await update_balance(user_id, -tithe)
+                    await add_reaping_tithe(user_id, tithe)
+                    
+                    # Batch Announcement (Every 4 games)
+                    # We need to know if we crossed the threshold. 
+                    # State has OLD games_count. add_reaping_tithe increments it.
+                    # Simple hack: check (games_count + 1) % 4 == 0
+                    if (games_count + 1) % 4 == 0:
+                         new_pool = pool + tithe
+                         await ctx.send(f"🌾 **Harvest Update:** {games_count + 1} sacrifices made. Pool: {economy.format_balance(new_pool)}")
 
     def get_ceelo_score(self, dice):
         """Calculate Cee-lo score"""
@@ -227,6 +273,10 @@ class GamesCog(commands.Cog):
     async def finalize_dice(self, ctx, msg, dice, status_text, winnings, bet, bot_dice=None):
         """Finalize dice game and update balance"""
         await update_balance(ctx.author.id, winnings)
+
+        # 🌾 THE REAPING TAX
+        # 🌾 THE REAPING Logic
+        await self.process_reaping(ctx)
 
         player_d_str = f"{DICE_EMOJIS[dice[0]]}  {DICE_EMOJIS[dice[1]]}  {DICE_EMOJIS[dice[2]]}"
 
@@ -425,6 +475,9 @@ class GamesCog(commands.Cog):
         if winnings > 0:
             await update_balance(ctx.author.id, winnings)
 
+            # 🌾 THE REAPING Logic
+            await self.process_reaping(ctx)
+
             formatted_winnings = economy.format_balance(winnings)
             final_msg += f"\n\nYou received {formatted_winnings}!"
 
@@ -502,6 +555,10 @@ class GamesCog(commands.Cog):
             return await ctx.reply(f"❌ You're flat. Need {economy.format_balance(buy_in)} to buy in.", mention_author=False)
             
         await update_balance(user_id, -buy_in)
+
+        # 🌾 THE REAPING Logic
+        await self.process_reaping(ctx)
+
         queue.append({'id': user_id, 'time': now})
         
         # 6. Check for Game Start
@@ -667,6 +724,13 @@ class GamesCog(commands.Cog):
                 target = random.choice(potential_victims)
 
             # 3. Announcement
+            # Check for Night Vision
+            nv_expiry = await get_active_effect(target.id, "night_vision")
+            if nv_expiry and nv_expiry > time.time():
+                 logger.info(f"Lick blocked by Night Vision on {target.display_name}")
+                 await update_balance(ctx.author.id, cost) # Refund
+                 return await ctx.reply(f"🌙 **Theft Blocked.** {target.mention} is shrouded in Night Vision. You can't see them to rob them. (Refunded)", mention_author=False)
+
             logger.info(f"Target found: {target.display_name}. Sending announcement.")
             await ctx.send(f"🌑 **{ctx.author.display_name}** is hitting a lick on {target.mention}!\n🚨 {target.mention}, you have **18 seconds** to spook them! (Type anything in chat)")
 
