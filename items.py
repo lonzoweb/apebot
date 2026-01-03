@@ -16,53 +16,63 @@ ITEM_REGISTRY = {
         "cost": 900,
         "duration_sec": 1800,  # 30 mins
         "type": "curse",
+        "shop_desc": "Silences a target for 30 minutes. No words, no commands.",
         "feedback": "🤐 Muzzle applied. Target cannot speak or use commands for 30m",
     },
     "uwu": {
         "cost": 400,
         "duration_sec": 600,  # 10 mins
         "type": "curse",
+        "shop_desc": "Forces target to speak in uwu-speak for 10 minutes.",
         "feedback": "🎀 Dawww~, cute for 10m",
     },
     "echo_ward": {
         "cost": 500,
         "type": "defense",
+        "shop_desc": "Blocks the next curse/hex directed at you. One-time use.",
         "feedback": "🛡️ Echo Ward added to inventory. Blocks next hex on you.",
     },
     "echo_ward_max": {
         "cost": 700,
         "type": "defense",
+        "shop_desc": "Reflects the next curse back at the sender. One-time use.",
         "feedback": "🔮 **ECHO WARD MAX!** Reverses the next hex back at the sender!",
     },
     "kush_pack": {
         "cost": 60,
         "type": "fun",
+        "shop_desc": "OG APEIRON KUSH WITH AUTO SHIELD.",
         "feedback": "Sparking Apeiron Kush Pack. Shields active.",
     },
     "ping_everyone": {
         "cost": 2400,
         "type": "broadcast",
+        "shop_desc": "Pings @everyone with your message. 24h cooldown.",
         "feedback": "📡 Global Apeiron Ping. 24h cooldown.",
     },
     "npass": {
         "cost": 2500,
         "type": "role_grant",
         "role_id": 1168965931918176297,
+        "shop_desc": "Grants the N-Pass role. Freedom of speech.",
         "feedback": "🎫 Nigga pass obtained! Real freedom of speech.",
     },
     "storm": {
         "cost": 1100,
         "type": "event",
+        "shop_desc": "Triggers a Token Storm. Next 10 speakers get bonus tokens.",
         "feedback": "⛈️ **TOKEN STORM!** The next 10 unique users to talk in this channel earn 50 bonus tokens!",
     },
     "hot_potato": {
         "cost": 520,
         "type": "event",
+        "shop_desc": "Spawns a Hot Potato. Holder explodes (muzzled) after 3m.",
         "feedback": "🥔🔥 **HOT POTATO!** A ticking muzzle is loose in the chat! Talk to pass it. Every pass earns you 15 tokens!",
     },
     "feast": {
         "cost": 330,
         "type": "event",
+        "shop_desc": "Starts a Crazed Feast. Steal tokens from inactive chatters.",
         "feedback": "🍗🧛 **CRAZED FEAST!** You begin feasting upon the sleeping members of the chat...\n💡 *Speak in chat to block attacks.*",
     },
 }

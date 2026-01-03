@@ -485,8 +485,7 @@ class GamesCog(commands.Cog):
             if remaining > 0:
                 await ctx.send(f"🔫 **{ctx.author.display_name}** has joined! [{len(queue)}/6]\n🚨 **CHAMBER MINIMUM REACHED.** Wait for the clock or more fodder... (**{int(remaining)}s** remaining)")
                 await asyncio.sleep(remaining)
-            else:
-                await ctx.send(f"🔫 **{ctx.author.display_name}** has joined! [{len(queue)}/6]\n🚨 **CHAMBER MINIMUM REACHED.** Pulling the trigger!")
+            # Time's up message removed
 
             # 7. Start Game!
             self.roulette_spinning = True
@@ -637,18 +636,15 @@ class GamesCog(commands.Cog):
             # Spooked!
             await ctx.send(f"🚔 **SPOOKED!** {target.mention} spotted the thief and made a scene. **{ctx.author.display_name}** ran off, losing the gear fee.")
         except asyncio.TimeoutError:
-            # Robbery success chance
-            if random.random() < 0.8:
-                rob_amount = random.randint(min_steal, max_steal)
-                target_bal = await get_balance(target.id)
-                actual_steal = min(rob_amount, target_bal)
-                
-                await update_balance(target.id, -actual_steal)
-                await update_balance(ctx.author.id, actual_steal)
-                
-                await ctx.send(f"💰 **LICK SUCCESSFUL.** {ctx.author.mention} robbed **{economy.format_balance(actual_steal)}** from {target.mention}. Total silence.")
-            else:
-                await ctx.send(f"🌑 **LICK FAILED.** {ctx.author.display_name} got spooked by the shadows and ran off. Lost the fee.")
+            # Robbery success (100% chance if no response)
+            rob_amount = random.randint(min_steal, max_steal)
+            target_bal = await get_balance(target.id)
+            actual_steal = min(rob_amount, target_bal)
+            
+            await update_balance(target.id, -actual_steal)
+            await update_balance(ctx.author.id, actual_steal)
+            
+            await ctx.send(f"💰 **LICK SUCCESSFUL.** {ctx.author.mention} robbed **{economy.format_balance(actual_steal)}** from {target.mention}. Total silence.")
 
 async def setup(bot):
     await bot.add_cog(GamesCog(bot))

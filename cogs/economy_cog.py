@@ -88,9 +88,14 @@ class EconomyCog(commands.Cog):
 
             for item, data in sorted_items:
                 price = f"{data['cost']} 💎"
+                if data.get('shop_desc'):
+                    desc = data['shop_desc']
+                else:
+                    desc = data.get('feedback', 'No description.')
+                    
                 embed.add_field(
                     name=f"{item.replace('_', ' ').title()} — {price}",
-                    value=f"*{data.get('feedback', 'No description.')}*",
+                    value=f"*{desc}*",
                     inline=False,
                 )
 
@@ -374,61 +379,67 @@ class EconomyCog(commands.Cog):
 
                     # Start Feast Loop
                     async def feast_loop(channel_id, attacker_id, total_duration):
-                        start_time = asyncio.get_event_loop().time()
-                        attacker = self.bot.get_user(attacker_id)
-                        while asyncio.get_event_loop().time() - start_time < total_duration:
-                            # Wait random interval (30-45s) to get ~7-8 rounds
-                            await asyncio.sleep(random.randint(30, 45))
-                            
-                            if channel_id not in self.active_feasts:
-                                break
-                            
-                            feast = self.active_feasts[channel_id]
-                            # Get potential victims (exclude attacker and the bot)
-                            exclude = [attacker_id, self.bot.user.id]
-                            victims = await get_potential_victims(exclude)
-                            
-                            if not victims:
-                                continue
+                        try:
+                            start_time = asyncio.get_event_loop().time()
+                            attacker = self.bot.get_user(attacker_id)
+                            while asyncio.get_event_loop().time() - start_time < total_duration:
+                                # Wait random interval (30-45s) to get ~7-8 rounds
+                                await asyncio.sleep(random.randint(30, 45))
                                 
-                            target_id = random.choice(victims)
-                            # Discord IDs from DB are strings
-                            target_member = self.bot.get_user(int(target_id))
-                            
-                            # Check if target is "active" (blocked)
-                            if str(target_id) in feast['active_users']:
-                                chan = self.bot.get_channel(channel_id)
+                                if channel_id not in self.active_feasts:
+                                    break
+                                
+                                feast = self.active_feasts[channel_id]
+                                # Get potential victims (exclude attacker and the bot)
+                                exclude = [attacker_id, self.bot.user.id]
+                                victims = await get_potential_victims(exclude)
+                                
+                                if not victims:
+                                    continue
+                                    
+                                target_id = random.choice(victims)
+                                # Discord IDs from DB are strings
+                                target_member = self.bot.get_user(int(target_id))
+                                
+                                # Check if target is "active" (blocked)
+                                if str(target_id) in feast['active_users']:
+                                    chan = self.bot.get_channel(channel_id)
+                                    if chan:
+                                        victim_member = target_member if target_member else f"<@{target_id}>"
+                                        await chan.send(f"🛡️ **{victim_member.display_name if isinstance(victim_member, discord.Member) else victim_member}** BLOCKED the attack! No snacks here.")
+                                    continue
+                                    
+                                # Check if target has been eaten 2 times
+                                if feast['victim_counts'].get(target_id, 0) >= 2:
+                                    continue
+                                    
+                                # Successful Eat (15-75 range aimed at ~330 total steal)
+                                amount = random.randint(15, 75)
+                                current_bal = await get_balance(int(target_id))
+                                if current_bal <= 0:
+                                    continue
+                                    
+                                actual_steal = min(amount, current_bal)
+                                await update_balance(int(target_id), -actual_steal)
+                                await update_balance(attacker_id, actual_steal)
+                                
+                                feast['victim_counts'][target_id] = feast['victim_counts'].get(target_id, 0) + 1
+                                
                                 if chan:
                                     victim_member = target_member if target_member else f"<@{target_id}>"
-                                    await chan.send(f"🛡️ **{victim_member.display_name if isinstance(victim_member, discord.Member) else victim_member}** BLOCKED the attack! No snacks here.")
-                                continue
-                                
-                            # Check if target has been eaten 2 times
-                            if feast['victim_counts'].get(target_id, 0) >= 2:
-                                continue
-                                
-                            # Successful Eat (15-75 range aimed at ~330 total steal)
-                            amount = random.randint(15, 75)
-                            current_bal = await get_balance(int(target_id))
-                            if current_bal <= 0:
-                                continue
-                                
-                            actual_steal = min(amount, current_bal)
-                            await update_balance(int(target_id), -actual_steal)
-                            await update_balance(attacker_id, actual_steal)
-                            
-                            feast['victim_counts'][target_id] = feast['victim_counts'].get(target_id, 0) + 1
-                            
-                            if chan:
-                                victim_member = target_member if target_member else f"<@{target_id}>"
-                                await chan.send(f"🍗 **{attacker.display_name}** ate **{actual_steal} tokens** from {victim_member.mention if isinstance(victim_member, discord.Member) else victim_member}. Delicious.")
+                                    await chan.send(f"🍗 **{attacker.display_name}** ate **{actual_steal} tokens** from {victim_member.mention if isinstance(victim_member, discord.Member) else victim_member}. Delicious.")
 
-                        # End Feast
-                        if channel_id in self.active_feasts:
-                            del self.active_feasts[channel_id]
+                            # Cleanup on natural finish
                             chan = self.bot.get_channel(channel_id)
                             if chan:
                                 await chan.send("🌅 **The Feast has concluded. The sun rises...**")
+
+                        except Exception as e:
+                            logger.error(f"Feast error: {e}")
+                        finally:
+                            # Force cleanup
+                            if channel_id in self.active_feasts:
+                                del self.active_feasts[channel_id]
 
                     task = asyncio.create_task(feast_loop(ctx.channel.id, ctx.author.id, duration))
                     self.active_feasts[ctx.channel.id]['task'] = task
