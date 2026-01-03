@@ -98,14 +98,14 @@ ITEM_REGISTRY = {
     "the_reaping": {
         "cost": 7000,
         "type": "event",
-        "shop_desc": "Initiate The Reaping. 30min casino tax event. 4% tithe per game, random winner gets 80% of pool.",
-        "feedback": "🌾 **THE REAPING HAS BEGUN.**\n\nThe spirits demand their tithe from every wager.\nAll casino players surrender 4% of their wealth per game.\n\nDuration: 30 minutes",
+        "shop_desc": "Initiate The Reaping. 30min casino tax event. 4% tithe per game, players get paid.",
+        "feedback": "🌾 **REAPING IN SESSION**\n\nT.\nAll players pay their tithes.\n\nDuration: 30 minutes",
     },
     "night_vision": {
         "cost": 1500,
         "type": "protection",
         "shop_desc": "5-hour overnight shield. Blocks theft but prevents all token gains.",
-        "feedback": "🌙 **NIGHT VISION ACTIVATED.**\n\nThe cloak of shadows has been engaged for 5 hours.\nNo theft can reach you, but fortune will not smile upon you either.\n\n*The void protects its own.*",
+        "feedback": "🌙 **NIGHT VISION ACTIVATED.**\n\nProtecting your assets until you awaken.\n\n*The void watches its own.*",
     },
 }
 
