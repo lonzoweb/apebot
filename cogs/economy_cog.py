@@ -488,9 +488,20 @@ class EconomyCog(commands.Cog):
                                 if not victim: 
                                     continue
                                     
-                                # Steal logic here? Or just trigger effect? 
-                                # Simplified for now: 5% steal
-                                success = await economy.handle_robbery_logic(attacker, victim, chan, force_success=True)
+                                # Direct Steal for Feast: 5% of balance
+                                victim_bal = await get_balance(victim_id)
+                                if victim_bal <= 10:
+                                    continue
+                                    
+                                steal_amount = int(victim_bal * 0.05)
+                                if steal_amount < 5: steal_amount = 5
+                                
+                                if steal_amount > 0:
+                                    await update_balance(victim_id, -steal_amount)
+                                    await update_balance(attacker_id, steal_amount)
+                                    
+                                    if chan:
+                                        await chan.send(f"🍗 **{attacker.display_name}** ate **{steal_amount} tokens** from {victim.mention}. Delicious.")
                                 
                         except Exception as e:
                             logger.error(f"Feast error: {e}")

@@ -274,9 +274,9 @@ async def update_balance(user_id: int, amount: int):
         await conn.execute(
             """
             INSERT INTO balances (user_id, balance) VALUES (?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET balance = balance + ?
+            ON CONFLICT(user_id) DO UPDATE SET balance = MAX(0, balance + ?)
         """,
-            (user_id_str, amount, amount),
+            (user_id_str, max(0, amount), amount),
         )
 
 async def get_blood_moon_multiplier() -> int:

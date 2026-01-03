@@ -813,16 +813,16 @@ class GamesCog(commands.Cog):
 
                 # 3. Successful Lick - Dual Tier Returns
                 tier_roll = random.random()
-                target_bal = await get_balance(target.id)
+                target_bal = await get_balance(target.id) # Fresh check after 18s wait
                 
-                if tier_roll < 0.40:
-                    # THE BIG SCORE (40% chance)
+                if tier_roll < 0.30:
+                    # THE BIG SCORE (30% chance)
                     logger.info("BIG SCORE rolled.")
                     # Range: cost+1 to full balance
                     rob_amount = random.randint(cost + 1, max(cost + 2, target_bal))
                     flavor = "💸 **JACKPOT!** A clean sweep of the safe."
                 else:
-                    # STANDARD RETURN (60% chance)
+                    # STANDARD RETURN (70% chance)
                     logger.info("Standard return rolled.")
                     rob_amount = random.randint(350, 450)
                     flavor = "💰 **LICK SUCCESSFUL.**"
