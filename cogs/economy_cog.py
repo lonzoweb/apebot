@@ -389,6 +389,121 @@ class EconomyCog(commands.Cog):
                     await start_reaping()
                     await remove_item_from_inventory(ctx.author.id, official_name)
                     return await ctx.send(item_info["feedback"])
+                
+                elif official_name == "storm":
+                    if ctx.channel.id in self.active_storm:
+                        return await ctx.send("❌ A Token Storm is already active in this channel!")
+                    
+                    self.active_storm[ctx.channel.id] = {'remaining': 10, 'participants': set()}
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    await ctx.send(item_info['feedback'])
+
+                elif official_name == "hot_potato":
+                    if ctx.channel.id in self.active_potato:
+                        return await ctx.send("❌ A Hot Potato is already active in this channel!")
+                    
+                    if target is None:
+                        return await ctx.send("❌ You must target someone to start the Hot Potato! `.use potato @user`")
+                    
+                    if target.guild_permissions.administrator or target.bot:
+                        return await ctx.send(f"❌ {target.display_name} won't play your games.")
+
+                    # Start the event
+                    duration = 180 # 3 minutes
+                    
+                    # Potato logic: muzzle whoever is holding it at the end
+                    async def potato_timer(channel_id):
+                        await asyncio.sleep(duration)
+                        if channel_id in self.active_potato:
+                            p = self.active_potato[channel_id]
+                            loser_id = p['holder_id']
+                            del self.active_potato[channel_id]
+                            
+                            # Muzzle the loser
+                            try:
+                                await add_active_effect(loser_id, "muzzle", 600)
+                                await ctx.send(f"💥 **BOOM!** The potato exploded on <@{loser_id}>! They are now muzzled.")
+                            except Exception as e:
+                                logger.error(f"Failed to muzzle potato loser: {e}")
+
+                    self.active_potato[ctx.channel.id] = {
+                        'holder_id': target.id,
+                        'expires_at': time.time() + duration,
+                        'task': self.bot.loop.create_task(potato_timer(ctx.channel.id))
+                    }
+                    
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    await ctx.send(f"🥔🔥 **HOT POTATO!** {ctx.author.mention} tossed it to {target.mention}!")
+
+                elif official_name == "blood_altar":
+                    await set_blood_moon(3600) # 1 hour persistent
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    await ctx.send(item_info['feedback'])
+
+                elif official_name == "feast":
+                    if ctx.channel.id in self.active_feasts:
+                        return await ctx.send("❌ A Feast is already occurring in this channel!")
+                    
+                    # 4-5 minutes duration
+                    duration = random.randint(240, 300)
+                    
+                    self.active_feasts[ctx.channel.id] = {
+                        'attacker_id': ctx.author.id,
+                        'active_users': {str(ctx.author.id)}, # Attacker is active
+                        'victim_counts': {}, # user_id -> count (max 2)
+                        'task': None
+                    }
+
+                    # Start Feast Loop
+                    async def feast_loop(channel_id, attacker_id, total_duration):
+                        try:
+                            start_time = asyncio.get_event_loop().time()
+                            attacker = self.bot.get_user(attacker_id)
+                            chan = self.bot.get_channel(channel_id) # Define once
+
+                            while asyncio.get_event_loop().time() - start_time < total_duration:
+                                # Wait random interval (30-45s) to get ~7-8 rounds
+                                await asyncio.sleep(random.randint(30, 45))
+                                
+                                if channel_id not in self.active_feasts:
+                                    break
+                                
+                                feast = self.active_feasts[channel_id]
+                                # Get potential victims (exclude attacker and the bot)
+                                exclude = [attacker_id, self.bot.user.id]
+                                all_victims = await get_potential_victims(exclude)
+                                
+                                if not all_victims:
+                                    continue
+                                    
+                                # Priority 1: Idle users (not in active_users)
+                                eligible = [v for v in all_victims if str(v) not in feast['active_users']]
+                                # Priority 2: Anyone else if needed
+                                if not eligible:
+                                    eligible = all_victims
+                                    
+                                victim_id = random.choice(eligible)
+                                victim = self.bot.get_user(victim_id)
+                                
+                                if not victim: 
+                                    continue
+                                    
+                                # Steal logic here? Or just trigger effect? 
+                                # Simplified for now: 5% steal
+                                success = await economy.handle_robbery_logic(attacker, victim, chan, force_success=True)
+                                
+                        except Exception as e:
+                            logger.error(f"Feast error: {e}")
+                        finally:
+                           if channel_id in self.active_feasts:
+                               del self.active_feasts[channel_id]
+                               if chan: await chan.send("🍗 **THE FEAST ENDS.** Satiated.")
+
+                    task = self.bot.loop.create_task(feast_loop(ctx.channel.id, ctx.author.id, duration))
+                    self.active_feasts[ctx.channel.id]['task'] = task
+                    
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    await ctx.send(item_info['feedback'])
 
             elif item_type == "defense":
                 await ctx.send(
@@ -456,157 +571,30 @@ class EconomyCog(commands.Cog):
                 await ctx.send(transmission_text)
                 await ctx.send(item_info['feedback'])
 
-            elif item_type == "event":
-                if official_name == "storm":
-                    if ctx.channel.id in self.active_storm:
-                        return await ctx.send("❌ A Token Storm is already active in this channel!")
-                    
-                    self.active_storm[ctx.channel.id] = {'remaining': 10, 'participants': set()}
-                    await remove_item_from_inventory(ctx.author.id, official_name)
-                    await ctx.send(item_info['feedback'])
-
-                elif official_name == "hot_potato":
-                    if ctx.channel.id in self.active_potato:
-                        return await ctx.send("❌ A Hot Potato is already active in this channel!")
-                    
-                    if target is None:
-                        return await ctx.send("❌ You must target someone to start the Hot Potato! `.use potato @user`")
-                    
-                    if target.guild_permissions.administrator or target.bot:
-                        return await ctx.send(f"❌ {target.display_name} won't play your games.")
-
-                    # Start the event
-                    duration = 180 # 3 minutes (shortened)
-                    
-                    # Potato logic: muzzle whoever is holding it at the end
-                    async def potato_timer(channel_id):
-                        await asyncio.sleep(duration)
-                        if channel_id in self.active_potato:
-                            p = self.active_potato[channel_id]
-                            loser_id = p['holder_id']
-                            del self.active_potato[channel_id]
-                            
-                            # Apply Muzzle (30 mins)
-                            await add_active_effect(loser_id, "muzzle", 1800)
-                            
-                            chan = self.bot.get_channel(channel_id)
-                            if chan:
-                                await chan.send(f"💥 **BOOM!** The potato exploded in <@!{loser_id}>'s hands! They are now muzzled for 30 minutes. 🤐")
-
-                    task = asyncio.create_task(potato_timer(ctx.channel.id))
-                    self.active_potato[ctx.channel.id] = {
-                        'holder_id': target.id,
-                        'task': task
-                    }
-
-                    await remove_item_from_inventory(ctx.author.id, official_name)
-                    await ctx.send(f"{item_info['feedback']}\nTarget: {target.mention}")
-
-                elif item_type == "buff":
-                    # Buffs like Luck Curse (Self or Target?) 
-                    # User said send it to others, then they use it.
-                    duration = item_info.get("duration_sec", 86400) # Default 24h
-                    await add_active_effect(ctx.author.id, official_name, duration)
-                    await remove_item_from_inventory(ctx.author.id, official_name)
-                    await ctx.send(item_info['feedback'])
-
-                elif official_name == "blood_altar":
-                    await set_blood_moon(3600) # 1 hour persistent
-                    await remove_item_from_inventory(ctx.author.id, official_name)
-                    await ctx.send(item_info['feedback'])
-
-                elif official_name == "feast":
-                    if ctx.channel.id in self.active_feasts:
-                        return await ctx.send("❌ A Feast is already occurring in this channel!")
-                    
-                    # 4-5 minutes duration
-                    duration = random.randint(240, 300)
-                    
-                    self.active_feasts[ctx.channel.id] = {
-                        'attacker_id': ctx.author.id,
-                        'active_users': {str(ctx.author.id)}, # Attacker is active
-                        'victim_counts': {}, # user_id -> count (max 2)
-                        'task': None
-                    }
-
-                    # Start Feast Loop
-                    async def feast_loop(channel_id, attacker_id, total_duration):
-                        try:
-                            start_time = asyncio.get_event_loop().time()
-                            attacker = self.bot.get_user(attacker_id)
-                            chan = self.bot.get_channel(channel_id) # Define once
-
-                            while asyncio.get_event_loop().time() - start_time < total_duration:
-                                # Wait random interval (30-45s) to get ~7-8 rounds
-                                await asyncio.sleep(random.randint(30, 45))
-                                
-                                if channel_id not in self.active_feasts:
-                                    break
-                                
-                                feast = self.active_feasts[channel_id]
-                                # Get potential victims (exclude attacker and the bot)
-                                exclude = [attacker_id, self.bot.user.id]
-                                all_victims = await get_potential_victims(exclude)
-                                
-                                if not all_victims:
-                                    continue
-                                    
-                                # Priority 1: Idle users (not in active_users)
-                                eligible = [v for v in all_victims if str(v) not in feast['active_users']]
-                                
-                                # Priority 2: Anyone (The feast starves and attacks active chatters!)
-                                is_desperate = False
-                                if not eligible:
-                                    eligible = all_victims
-                                    is_desperate = True
-                                    
-                                target_id = random.choice(eligible)
-                                # Discord IDs from DB are strings
-                                target_member = self.bot.get_user(int(target_id))
-                                
-                                # Check if target has been eaten 2 times
-                                if feast['victim_counts'].get(target_id, 0) >= 2:
-                                    continue
-                                    
-                                # Successful Eat (15-75 range aimed at ~330 total steal)
-                                amount = random.randint(15, 75)
-                                current_bal = await get_balance(int(target_id))
-                                if current_bal <= 0:
-                                    continue
-                                    
-                                actual_steal = min(amount, current_bal)
-                                await update_balance(int(target_id), -actual_steal)
-                                await update_balance(attacker_id, actual_steal)
-                                
-                                feast['victim_counts'][target_id] = feast['victim_counts'].get(target_id, 0) + 1
-                                
-                                if chan:
-                                    victim_mention = target_member.mention if target_member else f"<@{target_id}>"
-                                    await chan.send(f"🍗 **{attacker.display_name}** ate **{actual_steal} tokens** from {victim_mention}. Delicious.")
-
-                            # Cleanup on natural finish
-                            if chan:
-                                await chan.send("🌅 **The Feast has concluded. The sun rises...**")
-
-                        except Exception as e:
-                            logger.error(f"Feast error: {e}")
-                        finally:
-                            # Force cleanup
-                            if channel_id in self.active_feasts:
-                                del self.active_feasts[channel_id]
-
-                    task = asyncio.create_task(feast_loop(ctx.channel.id, ctx.author.id, duration))
-                    self.active_feasts[ctx.channel.id]['task'] = task
-                    
-                    await remove_item_from_inventory(ctx.author.id, official_name)
-                    await ctx.send(item_info['feedback'])
+            elif item_type == "buff":
+                # Buffs like Luck Curse (Self or Target?) 
+                # User said send it to others, then they use it.
+                duration = item_info.get("duration_sec", 86400) # Default 24h
+                await add_active_effect(ctx.author.id, official_name, duration)
+                await remove_item_from_inventory(ctx.author.id, official_name)
+                await ctx.send(item_info['feedback'])
 
         except InsufficientInventory:
             await ctx.send(f"❌ You don't have any **{official_name.replace('_', ' ').title()}**s!")
         except Exception as e:
             logger.error(f"Error using item {official_name}: {e}")
-            await ctx.send("❌ An unexpected error occurred.")
 
+
+    @use_command.error
+    async def use_command_error(self, ctx, error):
+        if isinstance(error, commands.CommandOnCooldown):
+            return # Silently ignore
+        # Propagate other errors? Or log them?
+        # The main command has a try/except, but this catches stuff before that (like cooldowns/converters)
+        # Given usage so far, letting others propagate (or be ignored if not critical) is fine.
+        # But if we don't handle them, they might print to console. 
+        # Let's just pass for Cooldowns.
+        pass
 
     @commands.Cog.listener()
     async def on_message(self, message):

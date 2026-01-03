@@ -65,21 +65,45 @@ class GamesCog(commands.Cog):
             return
 
         # 2. Apply Tax if Active
+        # 2. Apply Tax if Active
         if active:
+            # Always increment game count for the event progression
+            await add_reaping_tithe(user_id, 0) # Helper needs to support 0 amount just for increment
+            
+            # Now calculate tax separately 
             bal = await get_balance(user_id)
+            tithe = 0
             if bal > 0:
                 tithe = int(bal * 0.04)
                 if tithe > 0:
                     await update_balance(user_id, -tithe)
-                    await add_reaping_tithe(user_id, tithe)
-                    
-                    # Batch Announcement (Every 4 games)
-                    # We need to know if we crossed the threshold. 
-                    # State has OLD games_count. add_reaping_tithe increments it.
-                    # Simple hack: check (games_count + 1) % 4 == 0
-                    if (games_count + 1) % 4 == 0:
-                         new_pool = pool + tithe
-                         await ctx.send(f"🌾 **Harvest Update:** {games_count + 1} sacrifices made. Pool: {economy.format_balance(new_pool)}")
+                    # We already incremented game count, so just add to pool?
+                    # Actually add_reaping_tithe increments game count.
+                    # We should probably split the helper or just call it once with the amount.
+            
+            # Let's fix this properly. 
+            # We want to increment games_count + 1 ALWAYS.
+            # We want to add tithe to pool IF tithe > 0.
+            
+            # Refactored Logic:
+            tithe = 0
+            if bal > 0:
+                tithe = int(bal * 0.04)
+            
+            if tithe > 0:
+                await update_balance(user_id, -tithe)
+            
+            # Update DB state (Game +1, Pool + tithe)
+            await add_reaping_tithe(user_id, tithe)
+            
+            # Batch Announcement (Every 4 games)
+            # games_count in 'state' is the OLD count. 
+            # add_reaping_tithe made it games_count + 1.
+            current_games = games_count + 1
+            
+            if current_games % 4 == 0:
+                 new_pool = pool + tithe
+                 await ctx.send(f"🌾 **Harvest:** {current_games} sacrifices made. Pool: {economy.format_balance(new_pool)}")
 
     def get_ceelo_score(self, dice):
         """Calculate Cee-lo score"""

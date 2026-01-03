@@ -99,7 +99,7 @@ ITEM_REGISTRY = {
         "cost": 3000,
         "type": "event",
         "shop_desc": "Initiate The Reaping. 30min casino tax event. 4% tithe per game, players get paid.",
-        "feedback": "🌾 **REAPING IN SESSION**\n\nT.\nAll players pay their tithes.\n\nDuration: 30 minutes",
+        "feedback": "🌾 **REAPING IN SESSION**\n\nAll players pay their tithes and get rewarded at the end.\n\nDuration: 30 minutes",
     },
     "night_vision": {
         "cost": 400,
