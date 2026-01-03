@@ -100,9 +100,10 @@ async def init_db():
             await conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS active_effects (
-                    user_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
                     effect_name TEXT NOT NULL,
-                    expires_at REAL NOT NULL
+                    expires_at REAL NOT NULL,
+                    PRIMARY KEY (user_id, effect_name)
                 )
             """
             )
@@ -403,31 +404,53 @@ async def transfer_item(sender_id: int, receiver_id: int, item_name: str) -> boo
 
 
 async def add_active_effect(target_id: int, effect_name: str, duration_sec: float):
-    """Applies a curse. PRIMARY KEY on target_id enforces one curse at a time."""
+    """Applies an effect. PRIMARY KEY (user_id, effect_name) allows multiple different effects."""
     target_id_str = str(target_id)
     expiration = time.time() + duration_sec
     async with get_db() as conn:
         await conn.execute(
-            "INSERT OR REPLACE INTO active_effects (target_id, effect_name, expiration_time) VALUES (?, ?, ?)",
-            (target_id_str, effect_name, expiration),
+            """
+            INSERT INTO active_effects (user_id, effect_name, expires_at) VALUES (?, ?, ?)
+            ON CONFLICT(user_id, effect_name) DO UPDATE SET expires_at = ?
+        """,
+            (target_id_str, effect_name, expiration, expiration),
         )
 
 
-async def get_active_effect(target_id: int) -> tuple:
-    """Returns (effect_name, expiration_time) or None."""
+async def get_active_effect(target_id: int, effect_name: str) -> float:
+    """Returns the expiration timestamp of a specific effect, or None."""
     target_id_str = str(target_id)
     async with get_db() as conn:
         async with conn.execute(
-            "SELECT effect_name, expiration_time FROM active_effects WHERE target_id = ?",
-            (target_id_str,),
+            "SELECT expires_at FROM active_effects WHERE user_id = ? AND effect_name = ?",
+            (target_id_str, effect_name),
         ) as cursor:
-            return await cursor.fetchone()
+            row = await cursor.fetchone()
+            return row[0] if row else None
 
 
-async def remove_active_effect(target_id: int):
+async def get_all_active_effects(target_id: int) -> list:
+    """Returns a list of (effect_name, expires_at) for a user."""
     target_id_str = str(target_id)
     async with get_db() as conn:
-        await conn.execute("DELETE FROM active_effects WHERE target_id = ?", (target_id_str,))
+        async with conn.execute(
+            "SELECT effect_name, expires_at FROM active_effects WHERE user_id = ?",
+            (target_id_str,),
+        ) as cursor:
+            return await cursor.fetchall()
+
+
+async def remove_active_effect(target_id: int, effect_name: str = None):
+    """Clears effects. If effect_name is provided, clears only that one."""
+    target_id_str = str(target_id)
+    async with get_db() as conn:
+        if effect_name:
+            await conn.execute(
+                "DELETE FROM active_effects WHERE user_id = ? AND effect_name = ?",
+                (target_id_str, effect_name),
+            )
+        else:
+            await conn.execute("DELETE FROM active_effects WHERE user_id = ?", (target_id_str,))
 
 
 async def get_all_expired_effects() -> list:

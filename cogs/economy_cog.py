@@ -12,6 +12,7 @@ import economy
 from database import (
     get_balance, update_balance, atomic_purchase, get_user_inventory, 
     remove_item_from_inventory, add_active_effect, get_active_effect, 
+    get_all_active_effects,
     set_balance, get_potential_victims, get_global_cooldown, 
     set_global_cooldown, is_economy_on, can_claim_daily, record_daily_claim,
     set_blood_moon
@@ -238,8 +239,8 @@ class EconomyCog(commands.Cog):
                         f"❌ {target.display_name} is immune to your nonsense."
                     )
 
-                existing_effect = await get_active_effect(target.id)
-                if existing_effect:
+                effects = await get_all_active_effects(target.id)
+                if any(e[0] in ["muzzle", "uwu"] for e in effects):
                     return await ctx.send(
                         f"❌ {target.display_name} is already suffering from an active curse."
                     )

@@ -26,6 +26,7 @@ from config import TOKEN, COMMAND_PREFIX, AUTHORIZED_ROLES
 from database import (
     init_db,
     get_active_effect,
+    get_all_active_effects,
     remove_active_effect,
     get_user_timezone,
     increment_gif_count
@@ -184,56 +185,52 @@ async def on_message(message):
         await bot.process_commands(message)
         return
 
-    # Check if user has an active Muzzle or UwU effect
-    effect_data = await get_active_effect(message.author.id)
+    # Check for active Muzzle or UwU effects
+    effects = await get_all_active_effects(message.author.id)
+    is_muzzled = False
+    is_uwu = False
 
-    if effect_data:
-        effect_name, expiration_time = effect_data
-
-        # If expired, remove from DB and let message through
+    for effect_name, expiration_time in effects:
         if time.time() > expiration_time:
-            await remove_active_effect(message.author.id)
-        else:
-            # MUZZLE EFFECT
-            if effect_name == "muzzle":
-                try:
-                    await message.delete()
-                except discord.Forbidden:
-                    pass
-                return  # Block further processing
+            await remove_active_effect(message.author.id, effect_name)
+            continue
+        
+        if effect_name == "muzzle":
+            is_muzzled = True
+        elif effect_name == "uwu":
+            is_uwu = True
 
-            # UWU EFFECT
-            elif effect_name == "uwu":
-                try:
-                    await message.delete()
-                except discord.Forbidden:
-                    pass
+    if is_muzzled:
+        try:
+            await message.delete()
+        except discord.Forbidden:
+            pass
+        return
 
-                transformed_text = aggressive_uwu(message.content)
+    if is_uwu:
+        try:
+            await message.delete()
+        except discord.Forbidden:
+            pass
 
-                try:
-                    if transformed_text:
-                        webhook = await get_or_create_webhook(message.channel)
-                        if webhook:
-                            await webhook.send(
-                                content=transformed_text,
-                                username=message.author.display_name,
-                                avatar_url=message.author.display_avatar.url,
-                                allowed_mentions=discord.AllowedMentions.none(),
-                            )
-                        else:
-                            await message.channel.send(
-                                f"**{message.author.display_name}**: {transformed_text}"
-                            )
-
-                except discord.Forbidden:
-                    await message.channel.send(
-                        f"**ERROR: Bot lacks permission.** {message.author.display_name}: {transformed_text}"
+        transformed_text = aggressive_uwu(message.content)
+        try:
+            if transformed_text:
+                webhook = await get_or_create_webhook(message.channel)
+                if webhook:
+                    await webhook.send(
+                        content=transformed_text,
+                        username=message.author.display_name,
+                        avatar_url=message.author.display_avatar.url,
+                        allowed_mentions=discord.AllowedMentions.none(),
                     )
-                except Exception as e:
-                    logger.error(f"Error in UwU mirroring: {e}")
-
-                return  # Block further processing
+                else:
+                    await message.channel.send(
+                        f"**{message.author.display_name}**: {transformed_text}"
+                    )
+        except Exception as e:
+            logger.error(f"Error in UwU webhook: {e}")
+        return
 
     # Log activity
     now = datetime.now(ZoneInfo("America/Los_Angeles"))
