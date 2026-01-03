@@ -216,7 +216,21 @@ async def get_balance(user_id: int) -> int:
 
 
 async def update_balance(user_id: int, amount: int):
+    """Update user's balance. Amount can be positive (earnings) or negative (costs)."""
     user_id_str = str(user_id)
+    
+    # 🌓 MULTIPLIERS (Positive earnings only)
+    if amount > 0:
+        # Blood Moon (2x)
+        bm_multiplier = await get_blood_moon_multiplier()
+        if bm_multiplier > 1:
+            amount = int(amount * bm_multiplier)
+            
+        # Luck Curse (1.5x)
+        luck_expires = await get_active_effect(user_id, "luck_curse")
+        if luck_expires and luck_expires > time.time():
+            amount = int(amount * 1.5)
+
     async with get_db() as conn:
         await conn.execute(
             """
@@ -224,6 +238,26 @@ async def update_balance(user_id: int, amount: int):
             ON CONFLICT(user_id) DO UPDATE SET balance = balance + ?
         """,
             (user_id_str, amount, amount),
+        )
+
+async def get_blood_moon_multiplier() -> int:
+    """Returns 2 if Blood Moon is active, else 1."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT value FROM system_settings WHERE key = 'blood_moon_end'"
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row and float(row[0]) > time.time():
+                return 2
+    return 1
+
+async def set_blood_moon(duration_sec: int):
+    """Set the blood moon end timestamp."""
+    end_time = time.time() + duration_sec
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO system_settings (key, value) VALUES ('blood_moon_end', ?)",
+            (str(end_time),)
         )
 
 
@@ -281,7 +315,7 @@ async def transfer_tokens(sender_id: int, recipient_id: int, amount: int) -> boo
         return True
 
 
-async def atomic_purchase(user_id: int, item_name: str, cost: int) -> bool:
+async def atomic_purchase(user_id: int, item_name: str, cost: int, quantity: int = 1) -> bool:
     """Handles token deduction and item addition in ONE transaction."""
     user_id_str = str(user_id)
     async with get_db() as conn:
@@ -300,10 +334,10 @@ async def atomic_purchase(user_id: int, item_name: str, cost: int) -> bool:
         # Add to inventory
         await conn.execute(
             """
-            INSERT INTO user_inventory (user_id, item_name, quantity) VALUES (?, ?, 1)
-            ON CONFLICT(user_id, item_name) DO UPDATE SET quantity = quantity + 1
+            INSERT INTO user_inventory (user_id, item_name, quantity) VALUES (?, ?, ?)
+            ON CONFLICT(user_id, item_name) DO UPDATE SET quantity = quantity + ?
         """,
-            (user_id_str, item_name),
+            (user_id_str, item_name, quantity, quantity),
         )
         return True
 
@@ -328,7 +362,39 @@ async def remove_item_from_inventory(user_id: int, item_name: str) -> bool:
             "UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_name = ? AND quantity > 0",
             (user_id_str, item_name),
         ) as cursor:
-            return cursor.rowcount > 0
+            if cursor.rowcount > 0:
+                await conn.execute("DELETE FROM user_inventory WHERE quantity <= 0")
+                return True
+            return False
+
+
+async def transfer_item(sender_id: int, receiver_id: int, item_name: str) -> bool:
+    """Move 1 item from sender's inventory to receiver's."""
+    sender_id_str = str(sender_id)
+    receiver_id_str = str(receiver_id)
+    
+    async with get_db() as conn:
+        # 1. Deduct from sender if quantity > 0
+        async with conn.execute(
+            "UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_name = ? AND quantity > 0",
+            (sender_id_str, item_name),
+        ) as cursor:
+            if cursor.rowcount == 0:
+                return False
+
+        # 2. Add to receiver
+        await conn.execute(
+            """
+            INSERT INTO user_inventory (user_id, item_name, quantity) VALUES (?, ?, 1)
+            ON CONFLICT(user_id, item_name) DO UPDATE SET quantity = quantity + 1
+        """,
+            (receiver_id_str, item_name),
+        )
+        
+        # 3. Clean up sender's empty slot
+        await conn.execute("DELETE FROM user_inventory WHERE quantity <= 0")
+        
+        return True
 
 
 # ============================================================

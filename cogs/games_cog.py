@@ -9,7 +9,11 @@ import logging
 import random
 import asyncio
 import time
-from database import get_balance, update_balance, add_active_effect, is_economy_on, get_user_inventory, remove_item_from_inventory
+from database import (
+    get_balance, update_balance, add_active_effect, is_economy_on, 
+    get_user_inventory, remove_item_from_inventory, get_blood_moon_multiplier,
+    get_potential_victims
+)
 import economy
 import torture
 
@@ -510,28 +514,31 @@ class GamesCog(commands.Cog):
             loser_member = self.bot.get_user(loser_id)
             loser_mention = loser_member.mention if loser_member else f"<@{loser_id}>"
 
-            # 8. Check for Wards and Apply Penalty (Ward Twist)
-            warded_players = []
-            for uid in player_ids:
-                inv = await get_user_inventory(uid)
-                if inv.get("echo_ward", 0) > 0 or inv.get("echo_ward_max", 0) > 0:
-                    warded_players.append(uid)
-            
-            penalty_msg = f"🎀 {loser_mention} is **uwuud** for **5 minutes**."
-            
-            if loser_id in warded_players:
-                # Twist: If ALL players are warded, one still gets hit
-                if len(warded_players) == len(player_ids):
-                    penalty_msg = f"🛡️ **WARD NULLIFIED.** You all tried to hide behind glass? The spirits laugh. {loser_mention} is hit anyway."
-                    await add_active_effect(loser_id, "uwu", 300)
-                else:
-                    # Normal block - consume ward
-                    inv = await get_user_inventory(loser_id)
-                    ward_to_remove = "echo_ward_max" if inv.get("echo_ward_max", 0) > 0 else "echo_ward"
-                    await remove_item_from_inventory(loser_id, ward_to_remove)
-                    penalty_msg = f"🛡️ **WARD CONSUMED.** {loser_mention} was hit, but their ward shattered the curse."
+            # 8. Check for Wards and Apply Penalty
+            target_inv = await get_user_inventory(loser_id)
+            has_ward = False
+            ward_used = None
+
+            # Priority: Black Mirror -> Echo Max -> Echo Ward
+            if target_inv.get("black_mirror", 0) > 0:
+                has_ward = True
+                ward_used = "black_mirror"
+            elif target_inv.get("echo_ward_max", 0) > 0:
+                has_ward = True
+                ward_used = "echo_ward_max"
+            elif target_inv.get("echo_ward", 0) > 0:
+                has_ward = True
+                ward_used = "echo_ward"
+
+            if has_ward:
+                await remove_item_from_inventory(loser_id, ward_used)
+                duration = 100 # 1/3 of 5 minutes (Approx 1m 40s)
+                await add_active_effect(loser_id, "uwu", duration)
+                penalty_msg = f"🛡️ **WARD SHATTERED.** {loser_mention}'s protection absorbed most of the blast. (uwu for 1m 40s)"
             else:
-                await add_active_effect(loser_id, "uwu", 300)
+                duration = 300 # 5 minutes (Standard)
+                await add_active_effect(loser_id, "uwu", duration)
+                penalty_msg = f"🎀 {loser_mention} took the full shot. **uwu for 5m** applied."
 
             # Payout (60 tokens each)
             payout = 60
@@ -588,6 +595,10 @@ class GamesCog(commands.Cog):
             if balance < cost:
                 return await ctx.reply(f"❌ You aren't geared up for a lick. Need {economy.format_balance(cost)}.", mention_author=False)
 
+            # 🌒 Blood Moon Check
+            if await get_blood_moon_multiplier() > 1:
+                return await ctx.reply("🩸 **THE BLOOD MOON IS UP.** Robbery is forbidden while the spirits feast.", mention_author=False)
+
             # 1. Deduct cost
             logger.info("Deducting cost...")
             await update_balance(ctx.author.id, -cost)
@@ -641,23 +652,40 @@ class GamesCog(commands.Cog):
 
             # 3. Announcement
             logger.info(f"Target found: {target.display_name}. Sending announcement.")
-            await ctx.send(f"🌑 **{ctx.author.display_name}** is hitting a lick on {target.mention}!\n🚨 {target.mention}, you have **20 seconds** to spook them! (Type anything in chat)")
+            await ctx.send(f"🌑 **{ctx.author.display_name}** is hitting a lick on {target.mention}!\n🚨 {target.mention}, you have **9 seconds** to spook them! (Type anything in chat)")
 
             # 4. Wait for response
             def check(m):
                 return m.author.id == target.id and m.channel.id == ctx.channel.id
 
             try:
-                await self.bot.wait_for('message', timeout=20.0, check=check)
+                await self.bot.wait_for('message', timeout=9.0, check=check)
                 # Spooked!
                 logger.info("Target spooked the thief.")
                 await ctx.send(f"🚔 **SPOOKED!** {target.mention} spotted the thief and made a scene. **{ctx.author.display_name}** ran off, losing the gear fee.")
             except asyncio.TimeoutError:
                 # Robbery success (100% chance if no response)
                 logger.info("Target silence. Checking for wards...")
-                
                 target_inv = await get_user_inventory(target.id)
-                # 1. Mirror Ward Check (Reflection)
+
+                # 0. Black Mirror Check (Multi-charge reflection)
+                if target_inv.get("black_mirror", 0) > 0:
+                    await remove_item_from_inventory(target.id, "black_mirror")
+                    
+                    # Reflection Logic
+                    reflect_amt = random.randint(min_steal, max_steal)
+                    thief_bal = await get_balance(ctx.author.id)
+                    actual_loss = min(reflect_amt, thief_bal)
+                    
+                    await update_balance(ctx.author.id, -actual_loss)
+                    await update_balance(target.id, actual_loss) # Victim gets the tokens
+                    
+                    return await ctx.send(
+                        f"🪞 **BLACK MIRROR INTERCEPTED!** {target.mention}'s obsidian barrier reflected the intent. "
+                        f"**{ctx.author.display_name}** lost **{economy.format_balance(actual_loss)}** to the void."
+                    )
+
+                # 1. Mirror Ward Check (Single-use Reflection)
                 if target_inv.get("echo_ward_max", 0) > 0:
                     await remove_item_from_inventory(target.id, "echo_ward_max")
                     
@@ -667,7 +695,7 @@ class GamesCog(commands.Cog):
                     actual_loss = min(reflect_amt, thief_bal)
                     
                     await update_balance(ctx.author.id, -actual_loss)
-                    await update_balance(target.id, actual_loss) # Victim gets the "reflected" tokens? Or just licker loses them.
+                    await update_balance(target.id, actual_loss) # Victim gets the tokens 
                     
                     return await ctx.send(
                         f"🪞 **MIRROR WARD SHATTERED!** {target.mention}'s protection reflected the intent. "

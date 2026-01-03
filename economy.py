@@ -1,8 +1,12 @@
 # --- economy.py ---
 import discord
 import logging
-from database import get_balance, update_balance, transfer_tokens, set_balance, is_economy_on
+from database import (
+    get_balance, update_balance, transfer_tokens, set_balance, is_economy_on,
+    transfer_item
+)
 from exceptions import InsufficientTokens
+from items import ITEM_ALIASES, ITEM_REGISTRY
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +77,26 @@ async def handle_send_command(ctx, member: discord.Member, amount: int):
         await ctx.reply(
             f"❌ Transaction declined. You're flat. Need **{format_balance(amount)}**.", mention_author=False
         )
+
+async def handle_gift_command(ctx, member: discord.Member, item_query: str):
+    """Handles parsing and sending an item to another user."""
+    if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+        return await ctx.reply("🌑 **System Notice**: The exchange of gifts is forbidden during the blackout.", mention_author=False)
+
+    if member.bot:
+        return await ctx.reply("❌ The machine spirits have no use for physical trinkets.", mention_author=False)
+    if member.id == ctx.author.id:
+        return await ctx.reply("❌ Gifting yourself? How lonely. Seek help.", mention_author=False)
+
+    official_name = ITEM_ALIASES.get(item_query.strip().lower())
+    if not official_name:
+        return await ctx.reply(f"❌ '{item_query}' isn't something you can wrap in a bow.", mention_author=False)
+
+    success = await transfer_item(ctx.author.id, member.id, official_name)
+    if success:
+        await ctx.send(f"🎁 **{ctx.author.display_name}** handed a **{official_name.replace('_', ' ').title()}** to {member.mention}!")
+    else:
+        await ctx.reply(f"❌ You don't possess a **{official_name.replace('_', ' ').title()}** to give.", mention_author=False)
 
 
 async def handle_admin_modify_command(

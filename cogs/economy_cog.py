@@ -13,7 +13,8 @@ from database import (
     get_balance, update_balance, atomic_purchase, get_user_inventory, 
     remove_item_from_inventory, add_active_effect, get_active_effect, 
     set_balance, get_potential_victims, get_global_cooldown, 
-    set_global_cooldown, is_economy_on, can_claim_daily, record_daily_claim
+    set_global_cooldown, is_economy_on, can_claim_daily, record_daily_claim,
+    set_blood_moon
 )
 from exceptions import InsufficientTokens, InsufficientInventory, ActiveCurseError, ItemNotFoundError
 from items import ITEM_REGISTRY, ITEM_ALIASES
@@ -46,10 +47,19 @@ class EconomyCog(commands.Cog):
 
         await economy.handle_balance_command(ctx, member)
 
-    @commands.command(name="send")
-    async def send_command(self, ctx, member: discord.Member, amount: int):
-        """Transfer tokens to another user. Usage: .send @user <amount>"""
-        await economy.handle_send_command(ctx, member, amount)
+    @commands.command(name="send", aliases=["gift", "give", "transfer"])
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    async def send_command(self, ctx, member: discord.Member, *, content: str):
+        """Transfer tokens or items to another user. Usage: .send @user <amount/item>"""
+        content = content.strip()
+        
+        # Try numeric (tokens)
+        try:
+            amount = int(content)
+            return await economy.handle_send_command(ctx, member, amount)
+        except ValueError:
+            # Not a number, try gifting item
+            return await economy.handle_gift_command(ctx, member, content)
 
     @commands.command(name="baladd")
     @commands.has_permissions(administrator=True)
@@ -133,11 +143,21 @@ class EconomyCog(commands.Cog):
                         f"❌ You already have the **Npass** role! No need to buy it again."
                     )
 
-        try:
-            await atomic_purchase(ctx.author.id, official_name, cost)
-            await ctx.send(
-                f"💰 **{ctx.author.display_name}** grabbed a **{official_name.replace('_', ' ').title()}** for {cost} 💎. Pleasure doing business."
+        # Restriction Check
+        if item_data.get("restricted") and not ctx.author.guild_permissions.administrator:
+            return await ctx.reply(
+                "❌ **ACCESS DENIED.** This relic is reserved for the Architect roles.", mention_author=False
             )
+
+        try:
+            qty = 5 if official_name == "black_mirror" else 1
+            await atomic_purchase(ctx.author.id, official_name, cost, qty)
+            
+            payout_msg = f"💰 **{ctx.author.display_name}** grabbed a **{official_name.replace('_', ' ').title()}** for {cost} 💎."
+            if qty > 1:
+                payout_msg += f" ({qty} charges added to vault)"
+            
+            await ctx.send(f"{payout_msg} Pleasure doing business.")
         except InsufficientTokens as e:
             await ctx.reply(f"❌ Transaction declined. You're flat. Need {e.required} 💎.", mention_author=False)
 
@@ -223,6 +243,20 @@ class EconomyCog(commands.Cog):
 
                 target_inv = await get_user_inventory(target.id)
                 
+                # 0. Check for Black Mirror (Multi-charge Reflection)
+                if target_inv.get("black_mirror", 0) > 0:
+                    await remove_item_from_inventory(target.id, "black_mirror")
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    
+                    # Reflect!
+                    duration = item_info.get("duration_sec", 600)
+                    await add_active_effect(ctx.author.id, official_name, duration)
+                    
+                    return await ctx.send(
+                        f"🪞 **BLACK MIRROR INTERCEPTED!** {target.mention}'s obsidian barrier reflected the intent. "
+                        f"{ctx.author.mention} is hit with their own **{official_name}**!"
+                    )
+
                 # 1. Check for Echo Ward Max (Reflection)
                 if target_inv.get("echo_ward_max", 0) > 0:
                     await remove_item_from_inventory(target.id, "echo_ward_max")
@@ -362,6 +396,19 @@ class EconomyCog(commands.Cog):
 
                     await remove_item_from_inventory(ctx.author.id, official_name)
                     await ctx.send(f"{item_info['feedback']}\nTarget: {target.mention}")
+
+                elif item_type == "buff":
+                    # Buffs like Luck Curse (Self or Target?) 
+                    # User said send it to others, then they use it.
+                    duration = item_info.get("duration_sec", 86400) # Default 24h
+                    await add_active_effect(ctx.author.id, official_name, duration)
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    await ctx.send(item_info['feedback'])
+
+                elif official_name == "blood_altar":
+                    await set_blood_moon(3600) # 1 hour persistent
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    await ctx.send(item_info['feedback'])
 
                 elif official_name == "feast":
                     if ctx.channel.id in self.active_feasts:
