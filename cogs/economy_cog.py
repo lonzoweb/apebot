@@ -382,6 +382,8 @@ class EconomyCog(commands.Cog):
                         try:
                             start_time = asyncio.get_event_loop().time()
                             attacker = self.bot.get_user(attacker_id)
+                            chan = self.bot.get_channel(channel_id) # Define once
+
                             while asyncio.get_event_loop().time() - start_time < total_duration:
                                 # Wait random interval (30-45s) to get ~7-8 rounds
                                 await asyncio.sleep(random.randint(30, 45))
@@ -403,7 +405,6 @@ class EconomyCog(commands.Cog):
                                 
                                 # Check if target is "active" (blocked)
                                 if str(target_id) in feast['active_users']:
-                                    chan = self.bot.get_channel(channel_id)
                                     if chan:
                                         victim_member = target_member if target_member else f"<@{target_id}>"
                                         await chan.send(f"🛡️ **{victim_member.display_name if isinstance(victim_member, discord.Member) else victim_member}** BLOCKED the attack! No snacks here.")
@@ -430,7 +431,6 @@ class EconomyCog(commands.Cog):
                                     await chan.send(f"🍗 **{attacker.display_name}** ate **{actual_steal} tokens** from {victim_member.mention if isinstance(victim_member, discord.Member) else victim_member}. Delicious.")
 
                             # Cleanup on natural finish
-                            chan = self.bot.get_channel(channel_id)
                             if chan:
                                 await chan.send("🌅 **The Feast has concluded. The sun rises...**")
 
