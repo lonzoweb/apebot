@@ -291,9 +291,15 @@ async def on_command_error(ctx, error):
     if hasattr(ctx.command, "on_error"):
         return
 
-    # Silently ignore cooldown errors
+    # Cooldown feedback
     if isinstance(error, commands.CommandOnCooldown):
-        return
+        minutes, seconds = divmod(error.retry_after, 60)
+        time_hint = f"{int(minutes)}m {int(seconds)}s" if minutes > 0 else f"{int(seconds)}s"
+        return await ctx.reply(
+            f"⏳ **PATIENCE.** The shadows need time to settle. Try again in `{time_hint}`.",
+            mention_author=False,
+            delete_after=10
+        )
 
     # Ignore unknown commands
     elif isinstance(error, commands.CommandNotFound):

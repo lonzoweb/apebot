@@ -282,16 +282,16 @@ async def set_balance(user_id: int, new_balance: int):
         )
 
 
-async def get_potential_victims(exclude_ids: list):
-    """Get user IDs with positive balance, excluding specific IDs."""
+async def get_potential_victims(exclude_ids: list, min_balance: int = 1):
+    """Get user IDs with at least min_balance, excluding specific IDs."""
     async with get_db() as conn:
         if not exclude_ids:
-            query = "SELECT user_id FROM balances WHERE balance > 0"
-            params = ()
+            query = "SELECT user_id FROM balances WHERE balance >= ?"
+            params = (min_balance,)
         else:
             placeholders = ", ".join(["?"] * len(exclude_ids))
-            query = f"SELECT user_id FROM balances WHERE balance > 0 AND user_id NOT IN ({placeholders})"
-            params = tuple(str(uid) for uid in exclude_ids)
+            query = f"SELECT user_id FROM balances WHERE balance >= ? AND user_id NOT IN ({placeholders})"
+            params = (min_balance,) + tuple(str(uid) for uid in exclude_ids)
 
         async with conn.execute(query, params) as cursor:
             rows = await cursor.fetchall()

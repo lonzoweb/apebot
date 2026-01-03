@@ -631,22 +631,20 @@ class GamesCog(commands.Cog):
                 # Find random target
                 logger.info("Scouring the streets for victims...")
                 exclude = [ctx.author.id, self.bot.user.id]
-                victim_ids = await get_potential_victims(exclude)
+                
+                # OPTIMIZED: Database now filters by balance for us
+                victim_ids = await get_potential_victims(exclude, min_balance=min_steal)
                 
                 potential_victims = []
                 for vid in victim_ids:
                     m = ctx.guild.get_member(int(vid))
                     if not m: continue
                     if m.bot or m.guild_permissions.administrator: continue
-                    
-                    # Need to check if they have enough for MIN_STEAL specifically
-                    bal = await get_balance(int(vid))
-                    if bal >= min_steal:
-                        potential_victims.append(m)
+                    potential_victims.append(m)
 
                 if not potential_victims:
                     await update_balance(ctx.author.id, cost) # Refund
-                    return await ctx.reply("❌ The streets are empty tonight. No licks to hit. (Refunded)", mention_author=False)
+                    return await ctx.reply(f"❌ The streets are empty tonight (Min {min_steal} tokens). No licks to hit. (Refunded)", mention_author=False)
 
                 target = random.choice(potential_victims)
 
