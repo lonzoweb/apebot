@@ -155,15 +155,15 @@ class GamesCog(commands.Cog):
 
         if player_rank == 4:
             return await self.finalize_dice(
-                ctx, msg, player_dice, "4-5-6! CLEAN SWEEP.", int(bet * 1.5), bet
+                ctx, msg, player_dice, "4-5-6! CLEAN SWEEP.", int(bet * 1.5), bet, bot_dice=None
             )
         if player_rank == 1:
             return await self.finalize_dice(
-                ctx, msg, player_dice, "1-2-3... You got got mane.", -bet, bet
+                ctx, msg, player_dice, "1-2-3... You got got mane.", -bet, bet, bot_dice=None
             )
         if player_rank == 3:
             return await self.finalize_dice(
-                ctx, msg, player_dice, f"TRIPS [{player_point}]!", int(bet * 2), bet
+                ctx, msg, player_dice, f"TRIPS [{player_point}]!", int(bet * 2), bet, bot_dice=None
             )
 
         d_str = f"{DICE_EMOJIS[player_dice[0]]} {DICE_EMOJIS[player_dice[1]]} {DICE_EMOJIS[player_dice[2]]}"
@@ -203,29 +203,24 @@ class GamesCog(commands.Cog):
             else:
                 draw = True
 
-        bot_d_str = f"{DICE_EMOJIS[bot_dice[0]]} {DICE_EMOJIS[bot_dice[1]]} {DICE_EMOJIS[bot_dice[2]]}"
-        bot_status = f"I rolled {bot_d_str}"
-
         if draw:
             await self.finalize_dice(
-                ctx, msg, player_dice, f"{bot_status} | Push.", 0, bet
+                ctx, msg, player_dice, "Push.", 0, bet, bot_dice=bot_dice
             )
         elif win:
             await self.finalize_dice(
-                ctx, msg, player_dice, f"{bot_status} | You win.", bet, bet
+                ctx, msg, player_dice, "You win.", bet, bet, bot_dice=bot_dice
             )
         else:
             await self.finalize_dice(
-                ctx, msg, player_dice, f"{bot_status} | I win.", -bet, bet
+                ctx, msg, player_dice, "I win.", -bet, bet, bot_dice=bot_dice
             )
 
-    async def finalize_dice(self, ctx, msg, dice, status_text, winnings, bet):
+    async def finalize_dice(self, ctx, msg, dice, status_text, winnings, bet, bot_dice=None):
         """Finalize dice game and update balance"""
         await update_balance(ctx.author.id, winnings)
 
-        d_str = (
-            f"{DICE_EMOJIS[dice[0]]}  {DICE_EMOJIS[dice[1]]}  {DICE_EMOJIS[dice[2]]}"
-        )
+        player_d_str = f"{DICE_EMOJIS[dice[0]]}  {DICE_EMOJIS[dice[1]]}  {DICE_EMOJIS[dice[2]]}"
 
         if winnings > 0:
             result_header = f"### ✅ +{economy.format_balance(winnings)}"
@@ -234,12 +229,29 @@ class GamesCog(commands.Cog):
         else:
             result_header = f"### 🤝 PUSH (Money Back)"
 
-        final_output = (
-            f"🎲  **{d_str}**\n"
-            f"*{status_text}*\n\n"
-            f"{result_header}\n"
-            f"{ctx.author.mention}"
-        )
+        # Build output based on whether we have a bot roll
+        if bot_dice:
+            bot_d_str = f"{DICE_EMOJIS[bot_dice[0]]}  {DICE_EMOJIS[bot_dice[1]]}  {DICE_EMOJIS[bot_dice[2]]}"
+            final_output = (
+                f"🎲 🎲 🎲\n"
+                f"You rolled\n"
+                f"{player_d_str}\n"
+                f"━━━━━━━━━━━\n"
+                f"{bot_d_str}\n"
+                f"{status_text}\n\n"
+                f"{result_header}\n"
+                f"{ctx.author.mention}"
+            )
+        else:
+            # Special cases (4-5-6, 1-2-3, trips) - no bot roll
+            final_output = (
+                f"🎲 🎲 🎲\n"
+                f"You rolled\n"
+                f"{player_d_str}\n"
+                f"{status_text}\n\n"
+                f"{result_header}\n"
+                f"{ctx.author.mention}"
+            )
         await msg.edit(content=final_output)
 
     @commands.command(name="pull")
