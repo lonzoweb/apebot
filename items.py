@@ -67,6 +67,7 @@ ITEM_REGISTRY = {
         "cost": 7,
         "type": "buff",
         "restricted": True,
+        "hidden": True,
         "shop_desc": "You are cursed with good luck. 50% increased earnings for 24 hours.",
         "feedback": "✨ **LUCK CURSE ACTIVATED.** Enjoy your heightened fortune for 24h. Earnings +50%.",
     },

@@ -97,6 +97,9 @@ class EconomyCog(commands.Cog):
             sorted_items = sorted(ITEM_REGISTRY.items(), key=lambda x: x[1]["cost"])
 
             for item, data in sorted_items:
+                if data.get('hidden'):
+                    continue
+                    
                 price = f"{data['cost']} 💎"
                 if data.get('shop_desc'):
                     desc = data['shop_desc']
