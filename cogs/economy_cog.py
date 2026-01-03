@@ -427,8 +427,8 @@ class EconomyCog(commands.Cog):
                                 feast['victim_counts'][target_id] = feast['victim_counts'].get(target_id, 0) + 1
                                 
                                 if chan:
-                                    victim_member = target_member if target_member else f"<@{target_id}>"
-                                    await chan.send(f"🍗 **{attacker.display_name}** ate **{actual_steal} tokens** from {victim_member.mention if isinstance(victim_member, discord.Member) else victim_member}. Delicious.")
+                                    victim_mention = target_member.mention if target_member else f"<@{target_id}>"
+                                    await chan.send(f"🍗 **{attacker.display_name}** ate **{actual_steal} tokens** from {victim_mention}. Delicious.")
 
                             # Cleanup on natural finish
                             if chan:
@@ -492,7 +492,7 @@ class EconomyCog(commands.Cog):
 
         # 🍗 Handle Feast In-Channel Activity (Blocking mechanism)
         if channel_id in self.active_feasts:
-            self.active_feasts[channel_id]['active_users'].add(user_id)
+            self.active_feasts[channel_id]['active_users'].add(str(user_id))
 
 
 
