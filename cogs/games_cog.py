@@ -578,7 +578,7 @@ class GamesCog(commands.Cog):
 
 
 
-    @commands.command(name="lick", aliases=["hit_a_lick", "rob"])
+    @commands.command(name="jugg")
     @commands.cooldown(1, 600, commands.BucketType.user)
     async def lick_command(self, ctx, target: discord.Member = None):
         """Hit a lick on a user or a random non-mod. (Cost: 357 tokens)"""
