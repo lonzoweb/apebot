@@ -71,7 +71,7 @@ class EconomyCog(commands.Cog):
 
     @commands.command(name="buy", aliases=["shop"])
     @commands.cooldown(1, 5, commands.BucketType.user)
-    async def buy_command(self, ctx, item_name: str = None):
+    async def buy_command(self, ctx, *, item_name: str = None):
         """View the shop menu (via DM) or purchase an item."""
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: The spirits have locked the exchange. Economy is currently disabled.", mention_author=False)

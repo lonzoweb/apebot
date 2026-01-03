@@ -611,13 +611,18 @@ class GamesCog(commands.Cog):
                     return await ctx.reply(f"❌ {target.display_name} is too broke to be worth the heat. (Min {min_steal} tokens)", mention_author=False)
             else:
                 # Find random target
+                logger.info("Scouring the streets for victims...")
+                exclude = [ctx.author.id, self.bot.user.id]
+                victim_ids = await get_potential_victims(exclude)
+                
                 potential_victims = []
-                for m in ctx.guild.members:
-                    if m.bot: continue
-                    if m.guild_permissions.administrator: continue
-                    if m.id == ctx.author.id: continue
+                for vid in victim_ids:
+                    m = ctx.guild.get_member(int(vid))
+                    if not m: continue
+                    if m.bot or m.guild_permissions.administrator: continue
                     
-                    bal = await get_balance(m.id)
+                    # Need to check if they have enough for MIN_STEAL specifically
+                    bal = await get_balance(int(vid))
                     if bal >= min_steal:
                         potential_victims.append(m)
 

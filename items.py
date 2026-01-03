@@ -105,7 +105,9 @@ ITEM_ALIASES = {
     "pass": "npass",
     "storm": "storm",
     "token_storm": "storm",
+    "token storm": "storm",
     "hot_potato": "hot_potato",
+    "hot potato": "hot_potato",
     "potato": "hot_potato",
     "feast": "feast",
 }
