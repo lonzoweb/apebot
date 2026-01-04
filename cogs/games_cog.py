@@ -790,7 +790,7 @@ class GamesCog(commands.Cog):
             deck = []
             for r_idx, r in enumerate(ranks):
                 for s_idx, s in enumerate(suits):
-                    deck.append({'label': f"{s} {r}", 'score': r_idx * 10 + s_idx})
+                    deck.append({'label': f"**{r}** {s}", 'score': r_idx * 10 + s_idx})
             
             # 2. Draw for each player
             random.shuffle(deck)
@@ -808,9 +808,9 @@ class GamesCog(commands.Cog):
             others = results[1:-1]
             
             # 4. Payouts
-            # 50% to King, 50% split among others
-            king_share = int(total_pot * 0.50)
-            survivor_total_share = int(total_pot * 0.50)
+            # 60% of total pot to King, 40% split among survivors
+            king_share = int(total_pot * 0.60)
+            survivor_total_share = int(total_pot * 0.40)
             
             await update_balance(winner['id'], king_share)
             
@@ -828,17 +828,20 @@ class GamesCog(commands.Cog):
             for r in results:
                 if r == winner:
                     prefix = "👑"
-                    # Net Winning: king_share is the total tokens added back. 
-                    # Subtracting the ante shows the profit.
-                    change = f"**+{economy.format_balance(king_share - r['ante'])}**"
+                    payout = king_share
+                    # Show Total Payout as primary, Profit as secondary
+                    profit = payout - r['ante']
+                    change = f"**{economy.format_balance(payout)}** ({'+' if profit >= 0 else ''}{economy.format_balance(profit)} net)"
                 elif r == loser:
                     prefix = "💀"
-                    change = f"**-{economy.format_balance(r['ante'])}**"
+                    change = f"**0** (-{economy.format_balance(r['ante'])} net)"
                 else:
                     prefix = "🃏"
-                    change = f"**+{economy.format_balance(survivor_payout - r['ante'])}**"
+                    payout = survivor_payout
+                    profit = payout - r['ante']
+                    change = f"**{economy.format_balance(payout)}** ({'+' if profit >= 0 else ''}{economy.format_balance(profit)} net)"
                 
-                lines.append(f"{prefix} **{r['display_name']}**: {r['card']['label']} ({change})")
+                lines.append(f"{prefix} **{r['display_name']}**: {r['card']['label']} — {change}")
             
             embed = discord.Embed(
                 title="🃏 THE CUT: RESULTS",
