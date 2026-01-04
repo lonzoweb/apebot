@@ -13,18 +13,18 @@ import unicodedata  # <--- REQUIRED FOR FONT NORMALIZATION
 
 ITEM_REGISTRY = {
     "muzzle": {
-        "cost": 900,
+        "cost": 2500,
         "duration_sec": 1800,  # 30 mins
         "type": "curse",
         "shop_desc": "Silences a target for 30 minutes. No words, no commands.",
         "feedback": "🤐 Muzzle applied. Target cannot speak or use commands for 30m",
     },
     "uwu": {
-        "cost": 400,
-        "duration_sec": 600,  # 10 mins
+        "cost": 2000,
+        "duration_sec": 3600,  # 60 mins
         "type": "curse",
-        "shop_desc": "Forces target to speak in uwu-speak for 10 minutes.",
-        "feedback": "🎀 Dawww~, cute for 10m",
+        "shop_desc": "Forces target to speak in uwu-speak for 60 minutes.",
+        "feedback": "🎀 Dawww~, cute for 60m",
     },
     "echo_ward": {
         "cost": 500,
@@ -45,7 +45,7 @@ ITEM_REGISTRY = {
         "feedback": "Sparking Apeiron Kush Pack. Shields active.",
     },
     "ping_everyone": {
-        "cost": 2400,
+        "cost": 3400,
         "type": "broadcast",
         "shop_desc": "Pings @everyone with your message. 24h cooldown.",
         "feedback": "📡 Global Apeiron Ping. 24h cooldown.",
@@ -90,7 +90,7 @@ ITEM_REGISTRY = {
         "feedback": "🩸 **THE ALTAR IS PREPARED.** A sacrifice has been made. The Blood Moon rises for 1 hour!",
     },
     "feast": {
-        "cost": 250,
+        "cost": 350,
         "type": "event",
         "shop_desc": "Starts a Crazed Feast. Steal tokens from inactive chatters.",
         "feedback": "🍗🧛 **CRAZED FEAST!** You begin feasting upon the sleeping members of the chat...\n💡 *Speak in chat to block attacks.*",

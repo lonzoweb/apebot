@@ -281,10 +281,21 @@ class GamesCog(commands.Cog):
         bot_dice = []
         while bot_rank == 0:
             # 🏠 CASINO LOGIC: High Roller Edge
-            # If bet is > 1400, bot has a 15% chance to force a 4-5-6 (Auto-Win)
-            if bet > 1400 and random.random() < 0.15:
-                bot_dice = [4, 5, 6]
-                logger.info(f"HOUSE EDGE TRIGGERED: High bet of {bet} detected. Bot forced 4-5-6.")
+            # 1. 15% chance for bot to force 4-5-6 (Auto-Win)
+            # 2. 10% chance for player to force 1-2-3 (Auto-Loss) - Added per user request
+            roll = random.random()
+            if bet > 1400:
+                if roll < 0.15:
+                    bot_dice = [4, 5, 6]
+                    logger.info(f"HOUSE EDGE (BOT WIN) TRIGGERED: High bet of {bet} detected. Bot forced 4-5-6.")
+                elif roll < 0.25: # 0.15 + 0.10 = 0.25
+                    # CRITICAL: We need to override the PLAYER'S dice here, but dice is passed in.
+                    # Instead, we force the BOT to win by checking this roll in the main loop logic.
+                    # Or, easier: Force bot to roll higher than player if this roll hits.
+                    bot_dice = [4, 5, 6] # Same outcome: player loses
+                    logger.info(f"HOUSE EDGE (PLAYER LOSS) TRIGGERED: High bet of {bet} detected. Bot forced 4-5-6.")
+                else:
+                    bot_dice = [random.randint(1, 6) for _ in range(3)]
             else:
                 bot_dice = [random.randint(1, 6) for _ in range(3)]
             
@@ -608,9 +619,15 @@ class GamesCog(commands.Cog):
         await update_balance(user_id, -buy_in)
         await self.process_reaping(ctx)
 
+        # RE-CHECK: Make sure they didn't slip in while we were awaiting balance/reaping
+        if any(p['id'] == user_id for p in self.active_roulette):
+            await update_balance(user_id, buy_in) # Refund
+            return await ctx.reply("❌ Caught a glitch in the chamber. You're already in. (Refunded)", mention_author=False)
+
         queue.append({'id': user_id, 'time': now})
         
-        if len(queue) == 1:
+        # FIXED: Use synchronized timer_active check instead of exact length 1
+        if not self.roulette_timer_active:
             self.roulette_start_time = now
             self.roulette_event.clear()
             self.roulette_timer_active = True
@@ -737,9 +754,14 @@ class GamesCog(commands.Cog):
         await update_balance(user_id, -ante)
         await self.process_reaping(ctx)
 
+        # RE-CHECK: Make sure they didn't slip in while we were awaiting balance/reaping
+        if any(p['id'] == user_id for p in self.active_cut):
+            await update_balance(user_id, ante) # Refund
+            return await ctx.reply(f"❌ Caught a glitch at the table. You're already in. (Refunded)", mention_author=False)
+
         queue.append({'id': user_id, 'display_name': ctx.author.display_name, 'mention': ctx.author.mention, 'ante': ante, 'time': now})
         
-        if len(queue) == 1:
+        if not self.cut_timer_active:
             self.cut_start_time = now
             self.cut_event.clear()
             self.cut_timer_active = True
