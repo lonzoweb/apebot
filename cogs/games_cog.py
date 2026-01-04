@@ -13,7 +13,7 @@ from database import (
     get_balance, update_balance, add_active_effect, is_economy_on, 
     get_user_inventory, remove_item_from_inventory, get_blood_moon_multiplier,
     get_potential_victims, is_reaping_active, add_reaping_tithe, get_active_effect,
-    get_reaping_state, end_reaping
+    get_reaping_state, end_reaping, transfer_tokens
 )
 import economy
 import torture
