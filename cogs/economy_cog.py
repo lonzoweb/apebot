@@ -482,12 +482,13 @@ class EconomyCog(commands.Cog):
                                 if not eligible:
                                     eligible = all_victims
                                     
-                                victim_id = random.choice(eligible)
+                                victim_id = int(random.choice(eligible))
                                 victim = self.bot.get_user(victim_id)
                                 
-                                if not victim: 
-                                    continue
-                                    
+                                # Use mention fallback if user not in cache (common for idle users)
+                                victim_mention = f"<@{victim_id}>"
+                                victim_name = victim.display_name if victim else f"User#{str(victim_id)[:4]}"
+                                
                                 # Direct Steal for Feast: 5% of balance
                                 victim_bal = await get_balance(victim_id)
                                 if victim_bal <= 10:
@@ -501,7 +502,8 @@ class EconomyCog(commands.Cog):
                                     await update_balance(attacker_id, steal_amount)
                                     
                                     if chan:
-                                        await chan.send(f"🍗 **{attacker.display_name}** ate **{steal_amount} tokens** from {victim.mention}. Delicious.")
+                                        # Use the fallback name/mention to avoid None errors
+                                        await chan.send(f"🍗 **{attacker.display_name if attacker else 'Thief'}** ate **{steal_amount} tokens** from {victim_mention}. Delicious.")
                                 
                         except Exception as e:
                             logger.error(f"Feast error: {e}")
