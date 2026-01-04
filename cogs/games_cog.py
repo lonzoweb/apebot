@@ -35,6 +35,15 @@ class GamesCog(commands.Cog):
         self.roulette_spinning = False # Execution lock (the actual spin)
         self.roulette_timer_active = False # Timer lock (the 25s count)
         self.roulette_start_time = 0 # When the first person joined
+        self.roulette_event = asyncio.Event()
+        self.roulette_task = None
+
+        self.active_cut = []
+        self.cut_spinning = False
+        self.cut_timer_active = False
+        self.cut_start_time = 0
+        self.cut_event = asyncio.Event()
+        self.cut_task = None
 
     async def process_reaping(self, ctx):
         """Handle Reaping lifecycle: End if expired, else tax user."""
@@ -45,6 +54,32 @@ class GamesCog(commands.Cog):
         active, pool, games_count, expires_at = state
         now = time.time()
         user_id = ctx.author.id
+
+    async def apply_minigame_penalty(self, user_id, mention):
+        """Standardized 5m UwU penalty with ward protection check."""
+        target_inv = await get_user_inventory(user_id)
+        has_ward = False
+        ward_used = None
+        
+        if target_inv.get("black_mirror", 0) > 0:
+            has_ward = True
+            ward_used = "black_mirror"
+        elif target_inv.get("echo_ward_max", 0) > 0:
+            has_ward = True
+            ward_used = "echo_ward_max"
+        elif target_inv.get("echo_ward", 0) > 0:
+            has_ward = True
+            ward_used = "echo_ward"
+
+        if has_ward:
+            await remove_item_from_inventory(user_id, ward_used)
+            duration = 100
+            await add_active_effect(user_id, "uwu", duration)
+            return f"🛡️ **WARD SHATTERED.** {mention}'s protection absorbed most of the blast. (uwu for 1m 40s)"
+        else:
+            duration = 300
+            await add_active_effect(user_id, "uwu", duration)
+            return f"🎀 {mention} took the full shot. **uwu for 5m** applied."
 
         # 1. Check Expiration
         if active and expires_at and now >= expires_at:
@@ -543,14 +578,14 @@ class GamesCog(commands.Cog):
         """Join the Russian Roulette queue (20 buyout)"""
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: The chamber is locked while the economy is disabled.", mention_author=False)
+        
         user_id = ctx.author.id
         now = time.time()
         
-        # 1. Check if a game is already spinning
         if self.roulette_spinning:
             return await ctx.reply("🚨 **HOLD UP.** The gun is already at someone's head. Wait for the shot.", mention_author=False)
             
-        # 2. Prune expired queue members (1 hour limit) and refund them
+        # Prune expired queue members (1 hour limit) and refund them
         expired = [p for p in self.active_roulette if now - p['time'] >= 3600]
         if expired:
             for p in expired:
@@ -559,121 +594,267 @@ class GamesCog(commands.Cog):
             
         queue = self.active_roulette
         
-        # 1.5 Set start time if first joiner
-        if not queue:
-            self.roulette_start_time = now
-            self.roulette_spinning = False
-            
-        # 3. Check if user is already in queue
         if any(p['id'] == user_id for p in queue):
-            return await ctx.reply(f"❌ {ctx.author.mention}, you're already in the chamber! Wait for more players.", mention_author=False)
+            return await ctx.reply(f"❌ {ctx.author.mention}, you're already in the chamber!", mention_author=False)
             
-        # 4. Check if Max Players reached
         if len(queue) >= 6:
             return await ctx.reply(f"❌ The chamber is full! Wait for this round to end.", mention_author=False)
 
-        # 5. Deduct buy-in and join
         buy_in = 20
         balance = await get_balance(user_id)
         if balance < buy_in:
             return await ctx.reply(f"❌ You're flat. Need {economy.format_balance(buy_in)} to buy in.", mention_author=False)
             
         await update_balance(user_id, -buy_in)
-
-        # 🌾 THE REAPING Logic
         await self.process_reaping(ctx)
 
         queue.append({'id': user_id, 'time': now})
         
-        # 6. Check for Game Start
-        if len(queue) >= 3 and not self.roulette_timer_active:
-            self.roulette_timer_active = True # Lock to prevent multiple timer tasks
-            
-            elapsed = time.time() - self.roulette_start_time
-            remaining = 25 - elapsed
-            
-            if remaining > 0:
-                await ctx.send(f"🔫 **{ctx.author.display_name}** has joined! [{len(queue)}/6]\n🚨 **CHAMBER MINIMUM REACHED.** Wait for the clock or more fodder...")
-                await asyncio.sleep(remaining)
-            # Time's up message removed
+        if len(queue) == 1:
+            self.roulette_start_time = now
+            self.roulette_event.clear()
+            self.roulette_timer_active = True
+            # Start the background timer task
+            self.roulette_task = asyncio.create_task(self.roulette_timer_loop(ctx))
+            await ctx.send(f"🔫 **{ctx.author.display_name}** has entered the chamber! [{len(queue)}/6]\n🚨 **THE CLOCK IS TICKING.** 25 seconds to join.")
+        elif len(queue) == 6:
+            # Instant start
+            self.roulette_event.set()
+            await ctx.send(f"🔫 **{ctx.author.display_name}** joined! [6/6]\n⚠️ **CHAMBER FULL.** Starting immediately...")
+        else:
+            elapsed = now - self.roulette_start_time
+            remaining = max(0, 25 - int(elapsed))
+            await ctx.send(f"🔫 **{ctx.author.display_name}** joined! [{len(queue)}/6]\n(Starts in {remaining}s or at 6 players)")
 
-            # 7. Start Game!
-            self.roulette_spinning = True
+    async def roulette_timer_loop(self, ctx):
+        """Background task for roulette countdown."""
+        try:
+            # Wait 25s OR until event set (6 players)
+            try:
+                await asyncio.wait_for(self.roulette_event.wait(), timeout=25.0)
+            except asyncio.TimeoutError:
+                pass 
+
+            # Wait for minimum 3 players if timer expired with fewer
+            if len(self.active_roulette) < 3:
+                await ctx.send("⏳ **NOT ENOUGH FODDER.** Waiting for at least 3 souls to begin the ritual...")
+                while len(self.active_roulette) < 3:
+                    await asyncio.sleep(1)
+
+            await self.execute_roulette(ctx)
+        except Exception as e:
+            logger.error(f"Roulette timer loop error: {e}")
+        finally:
             self.roulette_timer_active = False
-            
+            self.roulette_task = None
+
+    async def execute_roulette(self, ctx):
+        """Perform the actual roulette resolution."""
+        self.roulette_spinning = True
+        try:
             await ctx.send("🚨 **SPINNING THE CYLINDER...** 🚨")
             await asyncio.sleep(2.5)
             
-            # Choose loser
             player_ids = [p['id'] for p in self.active_roulette]
             loser_id = random.choice(player_ids)
             winners = [uid for uid in player_ids if uid != loser_id]
             
-            # Prep mentions
             loser_member = self.bot.get_user(loser_id)
             loser_mention = loser_member.mention if loser_member else f"<@{loser_id}>"
 
-            # 8. Check for Wards and Apply Penalty
-            target_inv = await get_user_inventory(loser_id)
-            has_ward = False
-            ward_used = None
+            penalty_msg = await self.apply_minigame_penalty(loser_id, loser_mention)
 
-            # Priority: Black Mirror -> Echo Max -> Echo Ward
-            if target_inv.get("black_mirror", 0) > 0:
-                has_ward = True
-                ward_used = "black_mirror"
-            elif target_inv.get("echo_ward_max", 0) > 0:
-                has_ward = True
-                ward_used = "echo_ward_max"
-            elif target_inv.get("echo_ward", 0) > 0:
-                has_ward = True
-                ward_used = "echo_ward"
-
-            if has_ward:
-                await remove_item_from_inventory(loser_id, ward_used)
-                duration = 100 # 1/3 of 5 minutes (Approx 1m 40s)
-                await add_active_effect(loser_id, "uwu", duration)
-                penalty_msg = f"🛡️ **WARD SHATTERED.** {loser_mention}'s protection absorbed most of the blast. (uwu for 1m 40s)"
-            else:
-                duration = 300 # 5 minutes (Standard)
-                await add_active_effect(loser_id, "uwu", duration)
-                penalty_msg = f"🎀 {loser_mention} took the full shot. **uwu for 5m** applied."
-
-            # Payout (60 tokens each)
             payout = 60
             for win_id in winners:
                 await update_balance(win_id, payout)
             
-            # Announcement Mentions
             winners_mentions = []
             for uid in winners:
                 m = self.bot.get_user(uid)
                 winners_mentions.append(m.display_name if m else f"User#{str(uid)[:4]}")
                 
-            embed = discord.Embed(
-                title="💀💀💀 WHO GOT GOT?",
-                color=discord.Color.red()
-            )
-            embed.description = f"**CLICK... CLICK... CLICK... BANG!**\n\n{loser_mention} took the bullet. Hold that L 😵"
-            embed.add_field(name="Outcome", value=f"{penalty_msg}\n💰 The winners receive a **{economy.format_balance(payout)}** reward!", inline=False)
-            embed.add_field(name="Survivors (+60 tokens)", value=", ".join(winners_mentions), inline=False)
+            embed = discord.Embed(title="💀💀💀 WHO GOT GOT?", color=discord.Color.red())
+            embed.description = f"**CLICK... CLICK... CLICK... BANG!**\n\n{loser_mention} took the bullet. Hold that L 😵\n\n"
+            
+            outcome_lines = []
+            for uid in player_ids:
+                m = self.bot.get_user(uid)
+                name = m.display_name if m else f"User#{str(uid)[:4]}"
+                if uid == loser_id:
+                    outcome_lines.append(f"💀 **{name}**: (-20)")
+                else:
+                    outcome_lines.append(f"🔫 **{name}**: (+60)")
+            
+            embed.description += "\n".join(outcome_lines)
+            embed.add_field(name="Outcome", value=penalty_msg, inline=False)
             
             await ctx.send(embed=embed)
-            
-            # Clear queue and lock
+
+        finally:
             self.active_roulette.clear()
             self.roulette_spinning = False
-        else:
-            # Not enough players yet
-            players_needed = 3 - len(queue)
-            elapsed = time.time() - self.roulette_start_time
-            remaining = 25 - elapsed
+
+    @commands.command(name="cut")
+    async def cut_command(self, ctx):
+        """High-stakes card draw (15% balance ante). Min 3, Max 6 players."""
+        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+            return await ctx.reply("🌑 **System Notice**: The deck is sealed while the economy is disabled.", mention_author=False)
+        
+        user_id = ctx.author.id
+        now = time.time()
+        
+        if self.cut_spinning:
+            return await ctx.reply("🃏 **PATIENCE.** The dealer is already flipping cards.", mention_author=False)
             
-            if players_needed > 0:
-                await ctx.send(f"🔫 **{ctx.author.display_name}** has queued for roulette! [{len(queue)}/6]\nNeed **{players_needed}** more to start.")
-            else:
-                # Timer already running, just info
-                await ctx.send(f"🔫 **{ctx.author.display_name}** has joined the chamber! [{len(queue)}/6]\nWaiting for the clock or more fodder...")
+        # Prune expired queue members (1 hour limit)
+        expired = [p for p in self.active_cut if now - p['time'] >= 3600]
+        if expired:
+            for p in expired:
+                await update_balance(p['id'], p['ante'])
+            self.active_cut = [p for p in self.active_cut if now - p['time'] < 3600]
+
+        queue = self.active_cut
+        
+        # Prune expired queue members (1 hour limit)
+        expired = [p for p in queue if now - p['time'] >= 3600]
+        if expired:
+            for p in expired:
+                await update_balance(p['id'], p.get('ante', 0))
+            self.active_cut = [p for p in queue if now - p['time'] < 3600]
+            queue = self.active_cut
+        if any(p['id'] == user_id for p in queue):
+            return await ctx.reply(f"❌ {ctx.author.mention}, you've already bought into this cut!", mention_author=False)
+            
+        if len(queue) >= 6:
+            return await ctx.reply(f"❌ The table is full! Wait for the reveal.", mention_author=False)
+
+        balance = await get_balance(user_id)
+        ante = int(balance * 0.15)
+        
+        if balance < 100 or ante < 15:
+            return await ctx.reply(f"❌ You're too broke for this table. Need at least 100 tokens.", mention_author=False)
+            
+        await update_balance(user_id, -ante)
+        await self.process_reaping(ctx)
+
+        queue.append({'id': user_id, 'display_name': ctx.author.display_name, 'mention': ctx.author.mention, 'ante': ante, 'time': now})
+        
+        if len(queue) == 1:
+            self.cut_start_time = now
+            self.cut_event.clear()
+            self.cut_timer_active = True
+            # Start the background timer task
+            self.cut_task = asyncio.create_task(self.cut_timer_loop(ctx))
+            await ctx.send(f"🃏 **{ctx.author.display_name}** tossed **{economy.format_balance(ante)}** into the pot! [{len(queue)}/6]\n🚨 **THE CLOCK IS TICKING.** 25 seconds to join.")
+        elif len(queue) == 6:
+            # Instant start
+            self.cut_event.set()
+            await ctx.send(f"🃏 **{ctx.author.display_name}** joined! [6/6]\n⚠️ **TABLE FULL.** Dealing immediately...")
+        else:
+            elapsed = now - self.cut_start_time
+            remaining = max(0, 25 - int(elapsed))
+            await ctx.send(f"🃏 **{ctx.author.display_name}** tossed **{economy.format_balance(ante)}** in! [{len(queue)}/6]\n(Starts in {remaining}s or at 6 players)")
+
+    async def cut_timer_loop(self, ctx):
+        """Background task for cut countdown."""
+        try:
+            # Wait 25s OR until event set (6 players)
+            try:
+                await asyncio.wait_for(self.cut_event.wait(), timeout=25.0)
+            except asyncio.TimeoutError:
+                pass 
+
+            # Wait for minimum 3 players if timer expired with fewer
+            if len(self.active_cut) < 3:
+                await ctx.send("⏳ **NOT ENOUGH FODDER.** Waiting for at least 3 souls to begin the cut...")
+                while len(self.active_cut) < 3:
+                    await asyncio.sleep(1)
+
+            await self.execute_cut(ctx)
+        except Exception as e:
+            logger.error(f"Cut timer loop error: {e}")
+        finally:
+            self.cut_timer_active = False
+            self.cut_task = None
+
+    async def execute_cut(self, ctx):
+        """Perform the actual cut resolution."""
+        self.cut_spinning = True
+        try:
+            await ctx.send("🌑 **SHUFFLING THE COLD DECK...** 🃏")
+            await asyncio.sleep(2.5)
+            
+            # 1. Deck Generation
+            suits = ["♣️", "♦️", "❤️", "♠️"]
+            ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
+            deck = []
+            for r_idx, r in enumerate(ranks):
+                for s_idx, s in enumerate(suits):
+                    deck.append({'label': f"{s} {r}", 'score': r_idx * 10 + s_idx})
+            
+            # 2. Draw for each player
+            random.shuffle(deck)
+            results = []
+            total_pot = 0
+            for i, p in enumerate(self.active_cut):
+                card = deck.pop()
+                results.append({**p, 'card': card})
+                total_pot += p['ante']
+            
+            # 3. Determine Winner and Loser
+            results.sort(key=lambda x: x['card']['score'], reverse=True)
+            winner = results[0]
+            loser = results[-1]
+            others = results[1:-1]
+            
+            # 4. Payouts
+            # 50% to King, 50% split among others
+            king_share = int(total_pot * 0.50)
+            survivor_total_share = int(total_pot * 0.50)
+            
+            await update_balance(winner['id'], king_share)
+            
+            survivor_payout = 0
+            if others:
+                survivor_payout = int(survivor_total_share / len(others))
+                for s in others:
+                    await update_balance(s['id'], survivor_payout)
+
+            # 5. Loser Penalty
+            penalty_msg = await self.apply_minigame_penalty(loser['id'], loser['mention'])
+
+            # 6. Final Optics
+            lines = []
+            for r in results:
+                if r == winner:
+                    prefix = "👑"
+                    # Net Winning: king_share is the total tokens added back. 
+                    # Subtracting the ante shows the profit.
+                    change = f"**+{economy.format_balance(king_share - r['ante'])}**"
+                elif r == loser:
+                    prefix = "💀"
+                    change = f"**-{economy.format_balance(r['ante'])}**"
+                else:
+                    prefix = "🃏"
+                    change = f"**+{economy.format_balance(survivor_payout - r['ante'])}**"
+                
+                lines.append(f"{prefix} **{r['display_name']}**: {r['card']['label']} ({change})")
+            
+            embed = discord.Embed(
+                title="🃏 THE CUT: RESULTS",
+                description="\n".join(lines),
+                color=discord.Color.dark_purple()
+            )
+            embed.set_footer(text=f"Total Pot: {economy.format_balance(total_pot)}")
+            
+            embed.add_field(name="Judgment", value=penalty_msg, inline=False)
+            
+            await ctx.send(embed=embed)
+
+        finally:
+            # Reset
+            self.active_cut.clear()
+            self.cut_spinning = False
 
 
 
