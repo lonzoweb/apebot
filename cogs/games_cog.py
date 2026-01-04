@@ -904,16 +904,15 @@ class GamesCog(commands.Cog):
                     return await ctx.reply("❌ Stop robbing yourself, clown.", mention_author=False)
                 
                 target_bal = await get_balance(target.id)
-                if target_bal < min_steal:
-                    await update_balance(ctx.author.id, cost)
-                    return await ctx.reply(f"❌ {target.display_name} is too broke to be worth the heat. (Min {min_steal} tokens)", mention_author=False)
+
             else:
                 # Find random target
                 logger.info("Scouring the streets for victims...")
                 exclude = [ctx.author.id, self.bot.user.id]
                 
-                # OPTIMIZED: Database now filters by balance for us
-                victim_ids = await get_potential_victims(exclude, min_balance=min_steal)
+                # Database now allows anyone with at least 1 token
+                victim_ids = await get_potential_victims(exclude, min_balance=1)
+
                 
                 potential_victims = []
                 for vid in victim_ids:
@@ -924,7 +923,8 @@ class GamesCog(commands.Cog):
 
                 if not potential_victims:
                     await update_balance(ctx.author.id, cost) # Refund
-                    return await ctx.reply(f"❌ The streets are empty tonight (Min {min_steal} tokens). No licks to hit. (Refunded)", mention_author=False)
+                    return await ctx.reply(f"❌ The streets are empty tonight. No licks to hit. (Refunded)", mention_author=False)
+
 
                 target = random.choice(potential_victims)
 
