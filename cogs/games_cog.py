@@ -999,20 +999,35 @@ class GamesCog(commands.Cog):
                 if tier_roll < 0.30:
                     # THE BIG SCORE (30% chance)
                     logger.info("BIG SCORE rolled.")
-                    # Range: cost+1 to full balance
+                    # Range: cost+1 to full balance (or at least cost+2)
                     rob_amount = random.randint(cost + 1, max(cost + 2, target_bal))
-                    flavor = "💸 **JACKPOT!** A clean sweep of the safe."
+                    flavor_prefix = "💸 **JACKPOT!** A clean sweep of the safe."
                 else:
                     # STANDARD RETURN (70% chance)
                     logger.info("Standard return rolled.")
                     rob_amount = random.randint(350, 450)
-                    flavor = "💰 **LICK SUCCESSFUL.**"
+                    flavor_prefix = "💰 **LICK SUCCESSFUL.**"
 
                 actual_steal = min(rob_amount, target_bal)
-                await update_balance(target.id, -actual_steal)
-                await update_balance(ctx.author.id, actual_steal)
                 
-                await ctx.send(f"{flavor} {ctx.author.mention} robbed **{economy.format_balance(actual_steal)}** from {target.mention}. Total silence.")
+                if actual_steal <= 0:
+                    # THE BUST
+                    await ctx.send(
+                        f"🚔 **BUST.** {ctx.author.mention} cornered {target.mention} only to find their pockets were completely empty. "
+                        f"The thief slinks away, losing the gear fee for nothing."
+                    )
+                    return
+                
+                # CRITICAL: Use transfer_tokens to ENSURE zero-inflation (No multipliers)
+                # and to link the deduction directly to the reward.
+                await transfer_tokens(target.id, ctx.author.id, actual_steal)
+                
+                if actual_steal < 100:
+                    flavor = f"📉 **SLOPPY WORK.** {ctx.author.mention} only managed to scrape **{economy.format_balance(actual_steal)}** from {target.mention}. Hardly worth the effort."
+                else:
+                    flavor = f"{flavor_prefix} {ctx.author.mention} robbed **{economy.format_balance(actual_steal)}** from {target.mention}. Total silence."
+                
+                await ctx.send(flavor)
         
         except Exception as e:
             logger.error(f"Error in lick_command: {e}", exc_info=True)
