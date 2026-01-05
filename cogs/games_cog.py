@@ -1170,23 +1170,21 @@ class GamesCog(commands.Cog):
 
         # Penalty
         await add_active_effect(loser.id, "uwu", 60)
-        penalty_msg = f"🎀 {loser.mention} uwud, do better"
 
         outcomes = [
-            f"🦷  {loser.display_name} got they teeth busted in.",
-            f"🚑  {loser.display_name} got their jaw broke.",
-            f"🚑  {loser.display_name} getting a black eye fasho.",
-            f"🚑  {loser.display_name} got curbstomped.",
-            f"👊  {loser.display_name} got MURKED NIGGA.",
-            f"🚑  {loser.display_name} is bleeding out, somebody call 911."
+            f"🦷  {loser.mention} got they teeth busted in and uwud, do better 🎀",
+            f"🚑  {loser.mention} got their jaw broken and uwud, do better 🎀",
+            f"🚑  {loser.mention} getting a black eye and an uwud, graped 🎀",
+            f"🚑  {loser.mention} got curbstomped and uwud, do better 🎀",
+            f"👊  {loser.mention} got MURKED NIGGA, hold this uwu, 🎀",
+            f"🚑  {loser.mention} is bleeding out and uwud, tragic kid 🎀"
         ]
         outcome = random.choice(outcomes)
 
         desc = (
             f"✅ **{winner.display_name}**: {win_roll} | ❌ **{loser.display_name}**: {loss_roll}\n\n"
             f"**{winner.display_name} took the W**\n"
-            f"{outcome}\n\n"
-            f"{penalty_msg}"
+            f"{outcome}"
         )
 
         embed = discord.Embed(
