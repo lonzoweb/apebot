@@ -24,15 +24,6 @@ logger = logging.getLogger(__name__)
 # Dice emoji mapping
 DICE_EMOJIS = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️⃣", 6: "6️⃣"}
 
-PIT_FLAVOR = [
-    "🌑 The shadows reach for {user}... Consumed.",
-    "🌑 A wail echoes from below. {user} is gone.",
-    "🌑 The pit has eaten {user}. One less champion.",
-    "🌑 {user} got no hands, murked their ass.",
-    "🌑 {user} has been dragged into the wet void, bitch",
-    "🌑 A hollow snap—{user} is broke."
-]
-
 # Tracking
 user_dice_usage = {}
 user_pull_usage = {}
@@ -54,13 +45,6 @@ class GamesCog(commands.Cog):
         self.cut_start_time = 0
         self.cut_event = asyncio.Event()
         self.cut_task = None
-
-        self.active_pit = []
-        self.pit_spinning = False
-        self.pit_timer_active = False
-        self.pit_start_time = 0
-        self.pit_event = asyncio.Event()
-        self.pit_task = None
 
     async def process_reaping(self, ctx):
         """Handle Reaping lifecycle: End if expired, else tax user."""
@@ -451,14 +435,14 @@ class GamesCog(commands.Cog):
             await ctx.send(random.choice(messages))
             return
 
-        if len(user_data["timestamps"]) < 6:
+        if len(user_data["timestamps"]) < 11:
             user_data["last_used"] = now
             user_data["timestamps"].append(now)
             await self.execute_pull(ctx)
             return
 
         if user_data["next_cooldown"] is None:
-            user_data["next_cooldown"] = random.triangular(8, 22, 15)
+            user_data["next_cooldown"] = random.triangular(5, 15, 10)
 
         cooldown = user_data["next_cooldown"]
         time_since_last = now - user_data["last_used"]
@@ -916,113 +900,6 @@ class GamesCog(commands.Cog):
             # Reset
             self.active_cut.clear()
             self.cut_spinning = False
-
-
-    @commands.command(name="pit")
-    async def pit_command(self, ctx):
-        """Multiplayer elimination survival game."""
-        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
-            return await ctx.reply("🌑 **System Notice**: Pit is sealed. Economy disabled.", mention_author=False)
-
-        user_id = ctx.author.id
-        buy_in = 50
-        now = time.time()
-
-        if self.pit_spinning:
-            return await ctx.reply("🌑 **Pit is currently active.** Wait for the slaughter to end.", mention_author=False)
-
-        if any(p['id'] == user_id for p in self.active_pit):
-            return await ctx.reply("❌ You're already at the edge of the pit.", mention_author=False)
-
-        bal = await get_balance(user_id)
-        if bal < buy_in:
-            return await ctx.reply(f"❌ You can't afford the pit. (Need {buy_in} tokens)", mention_author=False)
-
-        # Process Reaping/Tithe
-        await update_balance(user_id, -buy_in)
-        await self.process_reaping(ctx)
-
-        # Race Condition Re-check
-        if any(p['id'] == user_id for p in self.active_pit):
-            await update_balance(user_id, buy_in) # Refund
-            return await ctx.reply("❌ Caught a glitch. You are already in the pit. (Refunded)", mention_author=False)
-
-        self.active_pit.append({'id': user_id, 'display_name': ctx.author.display_name, 'mention': ctx.author.mention, 'time': now})
-        queue = self.active_pit
-
-        if not self.pit_timer_active:
-            self.pit_start_time = now
-            self.pit_event.clear()
-            self.pit_timer_active = True
-            self.pit_task = asyncio.create_task(self.pit_timer_loop(ctx))
-            await ctx.send(f"🚨 **THE DESCENT BEGINS.** {ctx.author.display_name} tossed 50 tokens to enter the game. [{len(queue)}/12]\n(Starts in 15s or at 12 players)")
-        elif len(queue) == 12:
-            self.pit_event.set()
-            await ctx.send(f"🚨 **{ctx.author.display_name}** joined! [12/12]\n🔐 **THE GATES CLOSE.** No more souls allowed.")
-        else:
-            elapsed = now - self.pit_start_time
-            remaining = max(0, 15 - int(elapsed))
-            await ctx.send(f"💀 **{ctx.author.display_name}** has joined the ranks! [{len(queue)}/12]\n(Starts in {remaining}s)")
-
-    async def pit_timer_loop(self, ctx):
-        """Background task for pit countdown."""
-        try:
-            try:
-                await asyncio.wait_for(self.pit_event.wait(), timeout=15.0)
-            except asyncio.TimeoutError:
-                pass
-
-            if len(self.active_pit) < 3:
-                await ctx.send("⏳ **IS THAT ALL?** The pit demands at least 3 meals. Waiting...")
-                while len(self.active_pit) < 3:
-                    await asyncio.sleep(1)
-
-            await self.execute_pit(ctx)
-        except Exception as e:
-            logger.error(f"Pit timer loop error: {e}")
-        finally:
-            self.pit_timer_active = False
-            self.pit_task = None
-
-    async def execute_pit(self, ctx):
-        """Perform the actual pit elimination resolution."""
-        self.pit_spinning = True
-        try:
-            total_pot = len(self.active_pit) * 100
-            await ctx.send(f"🔐 **THE GATES CLOSE.** {len(self.active_pit)} souls trapped in the depths.\n**Booty: {economy.format_balance(total_pot)}**")
-            await asyncio.sleep(3)
-
-            while len(self.active_pit) > 1:
-                # Elimination Interval - 22s per user request
-                await asyncio.sleep(22)
-                
-                loser = random.choice(self.active_pit)
-                self.active_pit.remove(loser)
-                
-                # Apply Penalty
-                penalty_msg = await self.apply_minigame_penalty(loser['id'], loser['mention'])
-                
-                flavor = random.choice(PIT_FLAVOR).format(user=loser['mention'])
-                await ctx.send(f"{flavor}\n{penalty_msg}")
-
-            # Winner Announcement
-            winner = self.active_pit[0]
-            # 100 tokens bonus included in the final booty
-            final_payout = total_pot + 100
-            await update_balance(winner['id'], final_payout)
-            
-            embed = discord.Embed(
-                title="🌑 THE PIT: ASCENSION",
-                description=f"👑 **{winner['display_name']}** climbs out over the bodies. \nThey claim the booty, **{economy.format_balance(final_payout)}** tokens!",
-                color=discord.Color.dark_red()
-            )
-            await ctx.send(embed=embed)
-
-        except Exception as e:
-            logger.error(f"Error in execute_pit: {e}", exc_info=True)
-        finally:
-            self.active_pit.clear()
-            self.pit_spinning = False
 
 
     @commands.command(name="jugg")
