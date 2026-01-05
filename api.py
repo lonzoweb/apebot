@@ -205,61 +205,37 @@ import urllib.parse
 async def pollinations_generate_image(prompt: str):
     """
     Generate an image based on a prompt using Pollinations.ai.
-    Returns the URL immediately for faster Discord rendering.
+    Fetches raw bytes to ensure reliability in Discord.
     """
-    # 1. URL Sanitization
+    import aiohttp
+    
+    # URL Sanitization
     encoded_prompt = urllib.parse.quote(prompt)
-    
-    # Random seed for variety
     seed = random.randint(1, 999999)
-    width = 1024
-    height = 1024
-    model = "flux" 
     
-    # Correct endpoint for direct image rendering: image.pollinations.ai/prompt/
-    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model={model}&nologo=true"
+    # gen.pollinations.ai is the newer direct endpoint
+    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={seed}&model=flux&nologo=true"
     
-    return image_url
-
-
-# ============================================================
-# GOOGLE IMAGEN (VERTEX AI / AI STUDIO)
-# ============================================================
-
-async def google_generate_image(prompt: str):
-    """
-    Generate an image using Google's Imagen 3 model via google-genai.
-    Returns (image_bytes, error_message).
-    """
-    if not GOOGLE_API_KEY:
-        return None, "GOOGLE_API_KEY is missing from environment."
+    session = bot_session
+    created_session = False
+    if session is None:
+        session = aiohttp.ClientSession()
+        created_session = True
 
     try:
-        try:
-            from google import genai
-            from google.genai import types
-        except ImportError:
-            return None, "Required libraries (`google-genai`, `pillow`) not installed on server."
-        
-        client = genai.Client(api_key=GOOGLE_API_KEY)
-        
-        def generate():
-            response = client.models.generate_images(
-                model='imagen-3.0-generate-001',
-                prompt=prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    include_rai_reason=True,
-                    output_mime_type='image/png'
-                )
-            )
-            return response.generated_images[0].image_bytes
-
-        loop = asyncio.get_event_loop()
-        image_bytes = await loop.run_in_executor(None, generate)
-        return image_bytes, None
-
+        async with session.get(image_url, timeout=60) as resp:
+            if resp.status != 200:
+                logger.error(f"Pollinations error {resp.status}")
+                return None, f"Mirror error: {resp.status}"
+            
+            image_bytes = await resp.read()
+            if not image_bytes or len(image_bytes) < 1000:
+                return None, "Received invalid image data."
+                
+            return image_bytes, None
     except Exception as e:
-        err_msg = str(e)
-        logger.error(f"Error in google_generate_image: {err_msg}", exc_info=True)
-        return None, f"API Error: {err_msg[:100]}"
+        logger.error(f"Pollinations fetch failed: {e}")
+        return None, f"Connection failed: {str(e)[:50]}"
+    finally:
+        if created_session:
+            await session.close()
