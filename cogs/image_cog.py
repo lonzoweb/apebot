@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import io
 import time
+import asyncio
 import logging
 from api import pollinations_generate_image
 from database import get_balance, update_balance, is_economy_on
@@ -29,36 +30,36 @@ class ImageCog(commands.Cog):
         if not ctx.author.guild_permissions.administrator:
             bal = await get_balance(user_id)
             if bal < cost:
-                return await ctx.reply(f"❌ You lack the tokens to manifest this. (Cost: {cost})", mention_author=False)
+                return await ctx.reply(f"❌ (Cost: {cost})", mention_author=False)
             
             # Deduct cost
             await update_balance(user_id, -cost)
 
-        # 2. Manifesting message
-        loading_msg = await ctx.send("🌑 **Manifesting...** The spirits are painting your vision.")
+        # 2. Status message
+        status_msg = await ctx.send(f"🌑 **Generating {prompt}...**")
         
-        # 3. Get Image URL
+        # 3. Get Image URL & Simulated delay for "optics"
         try:
+            await asyncio.sleep(2.5) # The spirits need a moment to focus
             image_url = await pollinations_generate_image(prompt)
             
             if not image_url:
                 # Refund on failure
                 if not ctx.author.guild_permissions.administrator:
                     await update_balance(user_id, cost)
-                await loading_msg.edit(content="❌ **The vision collapsed.** Try again later. (Refunded)")
+                await status_msg.edit(content="❌ **The vision collapsed.** Try again later. (Refunded)")
                 return
 
             # 4. Prepare Embed
             embed = discord.Embed(
-                title="🔮 Manifestation Complete",
                 description=f"**Vision**: {prompt}",
                 color=discord.Color.dark_purple()
             )
             embed.set_image(url=image_url)
             embed.set_footer(text=f"Requested by {ctx.author.display_name} | {cost} Tokens sacrificed")
             
-            await loading_msg.delete()
-            await ctx.send(embed=embed)
+            # 5. Edit Original Message
+            await status_msg.edit(content=f"🌑 **Completed {prompt}:**", embed=embed)
 
         except Exception as e:
             logger.error(f"Error in .img command: {e}", exc_info=True)
