@@ -8,6 +8,7 @@ import asyncio
 import logging
 import random
 import os
+import json
 import urllib.parse
 from config import SERPAPI_KEY, OPENCAGE_KEY, GOOGLE_API_KEY, GOOGLE_CREDENTIALS_PATH
 
@@ -246,26 +247,33 @@ async def pollinations_generate_image(prompt: str):
 
 async def google_generate_image(prompt: str):
     """
-    Generate an image using Google's Imagen 3 model via AI Studio.
-    Uses the GA imagen-3.0-generate-002 model which supports API keys.
+    Generate an image using Google's Imagen 3 model.
+    Pivots between Vertex AI (Service Account) or AI Studio (API Key).
     """
-    if not GOOGLE_API_KEY:
-        return None, "GOOGLE_API_KEY is missing from environment."
+    if not GOOGLE_API_KEY and not os.path.exists(GOOGLE_CREDENTIALS_PATH):
+        return None, "Google credentials (JSON or API Key) are missing."
 
     try:
         from google import genai
         from google.genai import types
+        from google.oauth2 import service_account
         
         if os.path.exists(GOOGLE_CREDENTIALS_PATH):
-            # Vertex AI Mode (Requires Service Account JSON)
+            # Explicit Service Account loading for Vertex AI
+            with open(GOOGLE_CREDENTIALS_PATH, 'r') as f:
+                creds_info = json.load(f)
+                project_id = creds_info.get('project_id')
+            
+            creds = service_account.Credentials.from_service_account_info(creds_info)
             client = genai.Client(
                 vertexai=True,
-                project='gen-lang-client-0220233520',
+                project=project_id,
+                credentials=creds,
                 location='us-central1'
             )
             model_name = 'imagen-3.0-generate-001'
         else:
-            # AI Studio Mode (API Key)
+            # Fallback to AI Studio Mode
             client = genai.Client(api_key=GOOGLE_API_KEY)
             model_name = 'imagen-3.0-generate-002'
             
@@ -292,7 +300,8 @@ async def google_generate_image(prompt: str):
     except Exception as e:
         err_msg = str(e)
         logger.error(f"Error in google_generate_image: {err_msg}", exc_info=True)
-        # If 401, it's likely still an auth/region issue
         if "401" in err_msg:
-            return None, "Google API Key is restricted for Imagen. Use Vertex JSON."
+            return None, "Google Auth Error (401). Ensure Vertex AI API is enabled in project."
+        if "403" in err_msg:
+            return None, "Google Permission Error (403). Check Service Account roles."
         return None, f"Google Error: {err_msg[:100]}"
