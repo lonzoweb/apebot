@@ -905,7 +905,7 @@ class GamesCog(commands.Cog):
             return await ctx.reply("🌑 **System Notice**: Pit is sealed. Economy disabled.", mention_author=False)
 
         user_id = ctx.author.id
-        buy_in = 100
+        buy_in = 50
         now = time.time()
 
         if self.pit_spinning:
@@ -935,7 +935,7 @@ class GamesCog(commands.Cog):
             self.pit_event.clear()
             self.pit_timer_active = True
             self.pit_task = asyncio.create_task(self.pit_timer_loop(ctx))
-            await ctx.send(f"🚨 **THE DESCENT BEGINS.** {ctx.author.display_name} tossed 100 tokens to enter the ritual. [{len(queue)}/12]\n(Starts in 15s or at 12 players)")
+            await ctx.send(f"🚨 **THE DESCENT BEGINS.** {ctx.author.display_name} tossed 50 tokens to enter the ritual. [{len(queue)}/12]\n(Starts in 15s or at 12 players)")
         elif len(queue) == 12:
             self.pit_event.set()
             await ctx.send(f"🚨 **{ctx.author.display_name}** joined! [12/12]\n🔐 **THE GATES CLOSE.** No more souls allowed.")
@@ -973,8 +973,8 @@ class GamesCog(commands.Cog):
             await asyncio.sleep(3)
 
             while len(self.active_pit) > 1:
-                # Elimination Interval
-                await asyncio.sleep(random.randint(8, 12))
+                # Elimination Interval - 22s per user request
+                await asyncio.sleep(22)
                 
                 loser = random.choice(self.active_pit)
                 self.active_pit.remove(loser)
@@ -987,11 +987,13 @@ class GamesCog(commands.Cog):
 
             # Winner Announcement
             winner = self.active_pit[0]
-            await update_balance(winner['id'], total_pot)
+            # 100 tokens bonus included in the final booty
+            final_payout = total_pot + 100
+            await update_balance(winner['id'], final_payout)
             
             embed = discord.Embed(
                 title="🌑 THE PIT: ASCENSION",
-                description=f"👑 **{winner['display_name']}** climbs out over the bodies. \nThey claim the booty, **{economy.format_balance(total_pot)}** tokens!",
+                description=f"👑 **{winner['display_name']}** climbs out over the bodies. \nThey claim the booty, **{economy.format_balance(final_payout)}** tokens!",
                 color=discord.Color.dark_red()
             )
             await ctx.send(embed=embed)

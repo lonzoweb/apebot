@@ -122,6 +122,7 @@ async def on_ready():
         "cogs.games_cog",
         "cogs.tarot_cog",
         "cogs.admin_cog",
+        "cogs.image_cog",
         "activitycog",
     ]
 
