@@ -301,7 +301,12 @@ async def google_generate_image(prompt: str):
             )
             if not response.generated_images:
                 return None
-            return response.generated_images[0].image_bytes
+            
+            # The SDK nests image_bytes inside an 'image' object for Vertex AI
+            gen_img = response.generated_images[0]
+            if hasattr(gen_img, 'image') and hasattr(gen_img.image, 'image_bytes'):
+                return gen_img.image.image_bytes
+            return getattr(gen_img, 'image_bytes', None)
 
         loop = asyncio.get_event_loop()
         image_bytes = await loop.run_in_executor(None, generate)
