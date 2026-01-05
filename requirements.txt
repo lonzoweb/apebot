@@ -4,3 +4,5 @@ discord.py
 colorlog
 ephem
 aiosqlite
+google-genai
+pillow

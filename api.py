@@ -7,7 +7,7 @@ import aiohttp
 import asyncio
 import logging
 import random
-from config import SERPAPI_KEY, OPENCAGE_KEY
+from config import SERPAPI_KEY, OPENCAGE_KEY, GOOGLE_API_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -220,3 +220,47 @@ async def pollinations_generate_image(prompt: str):
     image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model={model}&nologo=true"
     
     return image_url
+
+
+# ============================================================
+# GOOGLE IMAGEN (VERTEX AI / AI STUDIO)
+# ============================================================
+
+async def google_generate_image(prompt: str):
+    """
+    Generate an image using Google's Imagen 3 model via google-genai.
+    Requires GOOGLE_API_KEY.
+    """
+    if not GOOGLE_API_KEY:
+        logger.error("GOOGLE_API_KEY not set")
+        return None
+
+    try:
+        from google import genai
+        from google.genai import types
+        
+        # Use a separate thread for the synchronous SDK call if needed, 
+        # but google-genai might have an async client.
+        # For now, we'll use the sync client in a thread.
+        client = genai.Client(api_key=GOOGLE_API_KEY)
+        
+        # Run in thread pool to avoid blocking
+        def generate():
+            response = client.models.generate_image(
+                model='imagen-3.0-generate-001',
+                prompt=prompt,
+                config=types.GenerateImageConfig(
+                    number_of_images=1,
+                    include_rai_reason=True,
+                    output_mime_type='image/png'
+                )
+            )
+            return response.generated_images[0].image_bytes
+
+        loop = asyncio.get_event_loop()
+        image_bytes = await loop.run_in_executor(None, generate)
+        return image_bytes
+
+    except Exception as e:
+        logger.error(f"Error in google_generate_image: {e}", exc_info=True)
+        return None

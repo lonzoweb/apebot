@@ -12,6 +12,7 @@ import os
 TOKEN = os.getenv("DISCORD_TOKEN")
 OPENCAGE_KEY = os.getenv("OPENCAGE_KEY")
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not TOKEN:
     raise ValueError("DISCORD_TOKEN environment variable is missing!")
