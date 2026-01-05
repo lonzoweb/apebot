@@ -258,11 +258,18 @@ async def google_generate_image(prompt: str):
         from google.genai import types
         from google.oauth2 import service_account
         
-        if os.path.exists(GOOGLE_CREDENTIALS_PATH):
+        # DEBUG: Check exactly where we are looking
+        logger.info(f"Checking for credentials at: {GOOGLE_CREDENTIALS_PATH}")
+        file_exists = os.path.exists(GOOGLE_CREDENTIALS_PATH)
+        logger.info(f"Credentials file exists: {file_exists}")
+
+        if file_exists:
             # Explicit Service Account loading for Vertex AI
             with open(GOOGLE_CREDENTIALS_PATH, 'r') as f:
                 creds_info = json.load(f)
                 project_id = creds_info.get('project_id')
+            
+            logger.info(f"Manifesting via Vertex AI (Project: {project_id})")
             
             creds = service_account.Credentials.from_service_account_info(creds_info)
             client = genai.Client(
@@ -274,6 +281,7 @@ async def google_generate_image(prompt: str):
             model_name = 'imagen-3.0-generate-001'
         else:
             # Fallback to AI Studio Mode
+            logger.warning("No Service Account found. Falling back to AI Studio (API Key).")
             client = genai.Client(api_key=GOOGLE_API_KEY)
             model_name = 'imagen-3.0-generate-002'
             
