@@ -1092,7 +1092,7 @@ class GamesCog(commands.Cog):
         # Check if user is accepting a fade
         challenger_id = None
         for cid, data in self.active_fades.items():
-            if data['target_id'] == user_id and (now - data['time']) < 60:
+            if data['target_id'] == user_id and (now - data['time']) < 300:
                 # Potential acceptance
                 if target is None or target.id == int(cid):
                     challenger_id = int(cid)
@@ -1134,7 +1134,7 @@ class GamesCog(commands.Cog):
 
         # Record challenge
         self.active_fades[str(user_id)] = {'target_id': target.id, 'time': now}
-        await ctx.send(f"⚔️ **FADE!** {ctx.author.mention} wants to run the fade with {target.mention}\n💡 {target.display_name}, type `.fade @{ctx.author.display_name}` to accept. (Expires in 60s)")
+        await ctx.send(f"⚔️ **FADE!** {ctx.author.mention} wants to run the fade with {target.mention}\n💡 {target.display_name}, type `.fade @{ctx.author.display_name}` to accept. (Expires in 5m)")
 
     async def execute_fade(self, ctx, p1, p2):
         """Perform the actual 1v1 dice battle."""
@@ -1170,7 +1170,7 @@ class GamesCog(commands.Cog):
 
         # Penalty
         await add_active_effect(loser.id, "uwu", 60)
-        penalty_msg = f"🎀 {loser.mention} got pieced up, bucked, and uwud ..."
+        penalty_msg = f"🎀 {loser.mention} uwud, do better"
 
         outcomes = [
             f"🦷  {loser.display_name} got they teeth busted in.",
@@ -1183,10 +1183,9 @@ class GamesCog(commands.Cog):
         outcome = random.choice(outcomes)
 
         desc = (
-            f"### {outcome}\n\n"
-            f"🏆 **{winner.display_name}** wins (**{win_roll}**)\n"
-            f"💀 {loser.display_name} falls (**{loss_roll}**)\n\n"
-            f"💰 **{winner.display_name}** takes **{economy.format_balance(payout)}**\n"
+            f"✅ **{winner.display_name}**: {win_roll} | ❌ **{loser.display_name}**: {loss_roll}\n\n"
+            f"**{winner.display_name} took the W**\n"
+            f"{outcome}\n\n"
             f"{penalty_msg}"
         )
 
@@ -1195,6 +1194,7 @@ class GamesCog(commands.Cog):
             description=desc,
             color=discord.Color.dark_red()
         )
+        embed.set_footer(text=f"💰 {winner.display_name} secured {economy.format_balance(payout)}")
         await msg.edit(content=None, embed=embed)
 
 
