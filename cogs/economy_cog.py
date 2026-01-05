@@ -495,6 +495,8 @@ class EconomyCog(commands.Cog):
                                     continue
                                     
                                 steal_amount = int(victim_bal * 0.05)
+                                # CAP: Limit steal to 2,500 tokens per round to prevent whale-drain
+                                if steal_amount > 2500: steal_amount = 2500
                                 if steal_amount < 5: steal_amount = 5
                                 
                                 if steal_amount > 0:

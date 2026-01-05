@@ -44,6 +44,12 @@ ITEM_REGISTRY = {
         "shop_desc": "OG APEIRON KUSH WITH AUTO SHIELD.",
         "feedback": "Sparking Apeiron Kush Pack. Shields active.",
     },
+    "fire_og_cart": {
+        "cost": 60,
+        "type": "fun",
+        "shop_desc": "APEIRON FIRE OG CART. Keyword: cart, pen, fire.",
+        "feedback": "💨 Ripping the Fire OG Cart. The flavor is heavy.",
+    },
     "ping_everyone": {
         "cost": 3400,
         "type": "broadcast",
@@ -138,6 +144,10 @@ ITEM_ALIASES = {
     "kush": "kush_pack",
     "weed": "kush_pack",
     "pack": "kush_pack",
+    "cart": "fire_og_cart",
+    "fire": "fire_og_cart",
+    "pen": "fire_og_cart",
+    "fire_og": "fire_og_cart",
     "everyone": "ping_everyone",
     "ping": "ping_everyone",
     "broadcast": "ping_everyone",
