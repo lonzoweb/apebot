@@ -8,7 +8,7 @@ import asyncio
 import logging
 import random
 import urllib.parse
-from config import SERPAPI_KEY, OPENCAGE_KEY, GOOGLE_API_KEY
+from config import SERPAPI_KEY, OPENCAGE_KEY, GOOGLE_API_KEY, GOOGLE_CREDENTIALS_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -255,13 +255,22 @@ async def google_generate_image(prompt: str):
         from google import genai
         from google.genai import types
         
-        # Initialize client for AI Studio (vertexai=False is default)
-        client = genai.Client(api_key=GOOGLE_API_KEY)
-        
+        if os.path.exists(GOOGLE_CREDENTIALS_PATH):
+            # Vertex AI Mode (Requires Service Account JSON)
+            client = genai.Client(
+                vertexai=True,
+                project='gen-lang-client-0220233520',
+                location='us-central1'
+            )
+            model_name = 'imagen-3.0-generate-001'
+        else:
+            # AI Studio Mode (API Key)
+            client = genai.Client(api_key=GOOGLE_API_KEY)
+            model_name = 'imagen-3.0-generate-002'
+            
         def generate():
-            # imagen-3.0-generate-002 is the GA model in AI Studio
             response = client.models.generate_images(
-                model='imagen-3.0-generate-002',
+                model=model_name,
                 prompt=prompt,
                 config=types.GenerateImagesConfig(
                     number_of_images=1,
