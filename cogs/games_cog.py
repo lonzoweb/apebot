@@ -1141,36 +1141,28 @@ class GamesCog(commands.Cog):
         msg = await ctx.send(f"⚔️ **STREET FADE: {p1.display_name} vs {p2.display_name}**\nWho's getting murked?")
         await asyncio.sleep(2)
 
-        # Check for Packing Heat (Gun Item)
+        # Check for Packing Heat (Gun Item) - Stealth Advantage
         p1_inv = await get_user_inventory(p1.id)
         p2_inv = await get_user_inventory(p2.id)
         p1_has_gun = p1_inv.get("gun", 0) > 0
         p2_has_gun = p2_inv.get("gun", 0) > 0
 
-        use_dice = True
-        gun_str = ""
-
-        if p1_has_gun and not p2_has_gun:
-            winner, loser = p1, p2
-            win_roll, loss_roll = 100, random.randint(1, 40)
-            use_dice = False
-            gun_str = f"🔫 **{p1.display_name} pulled the strap.** It wasn't even close."
-        elif p2_has_gun and not p1_has_gun:
-            winner, loser = p2, p1
-            win_roll, loss_roll = 100, random.randint(1, 40)
-            use_dice = False
-            gun_str = f"🔫 **{p2.display_name} pulled the strap.** It wasn't even close."
-        
-        if use_dice:
-            p1_roll, p2_roll = 0, 0
-            while p1_roll == p2_roll:
+        p1_roll, p2_roll = 0, 0
+        while p1_roll == p2_roll:
+            if p1_has_gun and not p2_has_gun:
+                p1_roll = random.randint(60, 100)
+                p2_roll = random.randint(1, 59)
+            elif p2_has_gun and not p1_has_gun:
+                p2_roll = random.randint(60, 100)
+                p1_roll = random.randint(1, 59)
+            else:
                 p1_roll = random.randint(1, 100)
                 p2_roll = random.randint(1, 100)
 
-            winner = p1 if p1_roll > p2_roll else p2
-            loser = p2 if p1_roll > p2_roll else p1
-            win_roll = max(p1_roll, p2_roll)
-            loss_roll = min(p1_roll, p2_roll)
+        winner = p1 if p1_roll > p2_roll else p2
+        loser = p2 if p1_roll > p2_roll else p1
+        win_roll = max(p1_roll, p2_roll)
+        loss_roll = min(p1_roll, p2_roll)
 
         # Rewards (Pot 60 + 100 bonus)
         payout = 160
@@ -1185,17 +1177,14 @@ class GamesCog(commands.Cog):
             "The streets claims their due."
         ]
 
-        desc = f"{gun_str}\n" if gun_str else ""
-        desc += (
-            f"🏆 **{winner.display_name}** wins with **{win_roll}**!\n"
-            f"💀 **{loser.display_name}** dogwater roll **{loss_roll}**.\n\n"
-            f"💰 **{winner.display_name}** gets the bag with **{economy.format_balance(payout)}**!\n"
-            f"{penalty_msg}"
-        )
-
         embed = discord.Embed(
             title="⚔️ FADED",
-            description=desc,
+            description=(
+                f"🏆 **{winner.display_name}** wins with **{win_roll}**!\n"
+                f"💀 **{loser.display_name}** dogwater roll **{loss_roll}**.\n\n"
+                f"💰 **{winner.display_name}** gets the bag with **{economy.format_balance(payout)}**!\n"
+                f"{penalty_msg}"
+            ),
             color=discord.Color.dark_red()
         )
         embed.set_footer(text=random.choice(flavor))

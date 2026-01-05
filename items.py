@@ -78,7 +78,7 @@ ITEM_REGISTRY = {
         "feedback": "✨ **LUCK CURSE ACTIVATED.** Fortune favors the bold. Earnings +50%.",
     },
     "insider": {
-        "cost": 5555,
+        "cost": 11,
         "type": "passive",
         "restricted": True,
         "hidden": True,
@@ -86,7 +86,7 @@ ITEM_REGISTRY = {
         "feedback": "👁️ **INSIDER STATUS GRANTED.** You move with the house now.",
     },
     "gun": {
-        "cost": 6666,
+        "cost": 6,
         "type": "passive",
         "restricted": True,
         "hidden": True,
@@ -192,6 +192,9 @@ ITEM_ALIASES = {
     "insider": "insider",
     "insider_status": "insider",
     "advantage": "insider",
+    "gun": "gun",
+    "strap": "gun",
+    "heat": "gun",
 }
 
 # ============================================================
