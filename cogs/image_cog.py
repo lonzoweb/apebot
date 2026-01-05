@@ -56,7 +56,7 @@ class ImageCog(commands.Cog):
                 color=discord.Color.dark_purple()
             )
             embed.set_image(url=image_url)
-            embed.set_footer(text=f"Requested by {ctx.author.display_name} | {cost} Tokens sacrificed")
+            embed.set_footer(text=f"Requested by {ctx.author.display_name}")
             
             # 5. Edit Original Message
             await status_msg.edit(content=f"🌑 **Completed {prompt}:**", embed=embed)
@@ -65,7 +65,7 @@ class ImageCog(commands.Cog):
             logger.error(f"Error in .img command: {e}", exc_info=True)
             if not ctx.author.guild_permissions.administrator:
                 await update_balance(user_id, cost)
-            await loading_msg.edit(content="❌ (Refunded)")
+            await loading_msg.edit(content="❌ **The ritual failed.** Check the logs. (Refunded)")
 
 async def setup(bot):
     await bot.add_cog(ImageCog(bot))
