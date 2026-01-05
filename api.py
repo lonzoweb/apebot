@@ -271,7 +271,10 @@ async def google_generate_image(prompt: str):
         if creds_info:
             # Vertex AI Mode (Explicit Service Account Loading)
             project_id = creds_info.get('project_id')
-            creds = service_account.Credentials.from_service_account_info(creds_info)
+            creds = service_account.Credentials.from_service_account_info(
+                creds_info, 
+                scopes=['https://www.googleapis.com/auth/cloud-platform']
+            )
             client = genai.Client(
                 vertexai=True,
                 project=project_id,
