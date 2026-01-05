@@ -1170,24 +1170,31 @@ class GamesCog(commands.Cog):
 
         # Penalty
         await add_active_effect(loser.id, "uwu", 60)
-        penalty_msg = f"🎀 {loser.mention} caught the hands. **uwu for 1m** applied."
+        penalty_msg = f"🎀 {loser.mention} got pieced up. **uwu for 1m** applied."
 
-        flavor = [
-            "Blood on that money.",
-            "The streets claims their due."
+        outcomes = [
+            f"🦷  {loser.display_name} got they teeth busted in.",
+            f"🚑  {loser.display_name} got their jaw broke.",
+            f"🚑  {loser.display_name} getting a black eye fasho.",
+            f"🚑  {loser.display_name} got curbstomped.",
+            f"👊  {loser.display_name} got MURKED NIGGA.",
+            f"🚑  {loser.display_name} is bleeding out, somebody call 911."
         ]
+        outcome = random.choice(outcomes)
+
+        desc = (
+            f"### {outcome}\n\n"
+            f"🏆 **{winner.display_name}** wins (**{win_roll}**)\n"
+            f"💀 **{loser.display_name}** falls (**{loss_roll}**)\n\n"
+            f"💰 **{winner.display_name}** takes **{economy.format_balance(payout)}**\n"
+            f"{penalty_msg}"
+        )
 
         embed = discord.Embed(
             title="⚔️ FADED",
-            description=(
-                f"🏆 **{winner.display_name}** wins with **{win_roll}**!\n"
-                f"💀 **{loser.display_name}** dogwater roll **{loss_roll}**.\n\n"
-                f"💰 **{winner.display_name}** gets the bag with **{economy.format_balance(payout)}**!\n"
-                f"{penalty_msg}"
-            ),
+            description=desc,
             color=discord.Color.dark_red()
         )
-        embed.set_footer(text=random.choice(flavor))
         await msg.edit(content=None, embed=embed)
 
 
