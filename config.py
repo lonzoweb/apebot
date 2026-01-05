@@ -4,6 +4,10 @@ Contains environment variables and constants
 """
 
 import os
+from dotenv import load_dotenv
+
+# Load .env file if it exists
+load_dotenv()
 
 # ============================================================
 # ENVIRONMENT VARIABLES

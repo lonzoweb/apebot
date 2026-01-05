@@ -6,3 +6,4 @@ ephem
 aiosqlite
 google-genai
 pillow
+python-dotenv

@@ -41,13 +41,13 @@ class ImageCog(commands.Cog):
         # 3. Get Image Bytes
         try:
             await asyncio.sleep(2.5) # Optics: The spirits need a moment
-            image_bytes = await google_generate_image(prompt)
+            image_bytes, error_msg = await google_generate_image(prompt)
             
             if not image_bytes:
                 # Refund on failure
                 if not ctx.author.guild_permissions.administrator:
                     await update_balance(user_id, cost)
-                await status_msg.edit(content="❌ Try again later. (Refunded)")
+                await status_msg.edit(content=f"❌ **Error**: {error_msg or 'Try again later.'} (Refunded)")
                 return
 
             # 4. Prepare File & Embed

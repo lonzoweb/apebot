@@ -229,27 +229,25 @@ async def pollinations_generate_image(prompt: str):
 async def google_generate_image(prompt: str):
     """
     Generate an image using Google's Imagen 3 model via google-genai.
-    Requires GOOGLE_API_KEY.
+    Returns (image_bytes, error_message).
     """
     if not GOOGLE_API_KEY:
-        logger.error("GOOGLE_API_KEY not set")
-        return None
+        return None, "GOOGLE_API_KEY is missing from environment."
 
     try:
-        from google import genai
-        from google.genai import types
+        try:
+            from google import genai
+            from google.genai import types
+        except ImportError:
+            return None, "Required libraries (`google-genai`, `pillow`) not installed on server."
         
-        # Use a separate thread for the synchronous SDK call if needed, 
-        # but google-genai might have an async client.
-        # For now, we'll use the sync client in a thread.
         client = genai.Client(api_key=GOOGLE_API_KEY)
         
-        # Run in thread pool to avoid blocking
         def generate():
-            response = client.models.generate_image(
+            response = client.models.generate_images(
                 model='imagen-3.0-generate-001',
                 prompt=prompt,
-                config=types.GenerateImageConfig(
+                config=types.GenerateImagesConfig(
                     number_of_images=1,
                     include_rai_reason=True,
                     output_mime_type='image/png'
@@ -259,8 +257,9 @@ async def google_generate_image(prompt: str):
 
         loop = asyncio.get_event_loop()
         image_bytes = await loop.run_in_executor(None, generate)
-        return image_bytes
+        return image_bytes, None
 
     except Exception as e:
-        logger.error(f"Error in google_generate_image: {e}", exc_info=True)
-        return None
+        err_msg = str(e)
+        logger.error(f"Error in google_generate_image: {err_msg}", exc_info=True)
+        return None, f"API Error: {err_msg[:100]}"
