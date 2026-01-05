@@ -7,6 +7,7 @@ import aiohttp
 import asyncio
 import logging
 import random
+import urllib.parse
 from config import SERPAPI_KEY, OPENCAGE_KEY, GOOGLE_API_KEY
 
 logger = logging.getLogger(__name__)
@@ -197,24 +198,20 @@ async def urban_dictionary_lookup(term):
             await session.close()
 
 # ============================================================
-# POLLINATIONS.AI IMAGE GENERATION
 # ============================================================
-
-import urllib.parse
+# POLLINATIONS.AI IMAGE MIRROR (FALLBACK)
+# ============================================================
 
 async def pollinations_generate_image(prompt: str):
     """
     Generate an image based on a prompt using Pollinations.ai.
-    Fetches raw bytes to ensure reliability in Discord.
+    Uses a robust retry loop and model failover for reliability.
     """
     import aiohttp
     
-    # URL Sanitization
     encoded_prompt = urllib.parse.quote(prompt)
-    seed = random.randint(1, 999999)
-    
-    # gen.pollinations.ai is the newer direct endpoint
-    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={seed}&model=flux&nologo=true"
+    models = ["flux", "turbo"] 
+    max_retries = 3
     
     session = bot_session
     created_session = False
@@ -223,19 +220,20 @@ async def pollinations_generate_image(prompt: str):
         created_session = True
 
     try:
-        async with session.get(image_url, timeout=60) as resp:
-            if resp.status != 200:
-                logger.error(f"Pollinations error {resp.status}")
-                return None, f"Mirror error: {resp.status}"
-            
-            image_bytes = await resp.read()
-            if not image_bytes or len(image_bytes) < 1000:
-                return None, "Received invalid image data."
-                
-            return image_bytes, None
-    except Exception as e:
-        logger.error(f"Pollinations fetch failed: {e}")
-        return None, f"Connection failed: {str(e)[:50]}"
+        for model in models:
+            for attempt in range(max_retries):
+                seed = random.randint(1, 999999)
+                image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={seed}&model={model}&nologo=true"
+                try:
+                    async with session.get(image_url, timeout=120) as resp:
+                        if resp.status == 200:
+                            image_bytes = await resp.read()
+                            if image_bytes and len(image_bytes) > 2000:
+                                return image_bytes, None
+                except Exception:
+                    pass
+                await asyncio.sleep(1)
+        return None, "All manifestation mirrors are dark."
     finally:
         if created_session:
             await session.close()
@@ -248,7 +246,7 @@ async def pollinations_generate_image(prompt: str):
 async def google_generate_image(prompt: str):
     """
     Generate an image using Google's Imagen 3 model via AI Studio.
-    Returns (image_bytes, error_message).
+    Uses the GA imagen-3.0-generate-002 model which supports API keys.
     """
     if not GOOGLE_API_KEY:
         return None, "GOOGLE_API_KEY is missing from environment."
@@ -257,13 +255,13 @@ async def google_generate_image(prompt: str):
         from google import genai
         from google.genai import types
         
-        # Initialize client with API KEY (AI Studio mode)
+        # Initialize client for AI Studio (vertexai=False is default)
         client = genai.Client(api_key=GOOGLE_API_KEY)
         
         def generate():
-            # Use the AI Studio / Gemini API endpoint model
+            # imagen-3.0-generate-002 is the GA model in AI Studio
             response = client.models.generate_images(
-                model='imagen-3.0-generate-001',
+                model='imagen-3.0-generate-002',
                 prompt=prompt,
                 config=types.GenerateImagesConfig(
                     number_of_images=1,
@@ -284,4 +282,7 @@ async def google_generate_image(prompt: str):
     except Exception as e:
         err_msg = str(e)
         logger.error(f"Error in google_generate_image: {err_msg}", exc_info=True)
-        return None, f"API Error: {err_msg[:100]}"
+        # If 401, it's likely still an auth/region issue
+        if "401" in err_msg:
+            return None, "Google API Key is restricted for Imagen. Use Vertex JSON."
+        return None, f"Google Error: {err_msg[:100]}"
