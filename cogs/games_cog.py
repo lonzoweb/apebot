@@ -902,21 +902,21 @@ class GamesCog(commands.Cog):
     async def pit_command(self, ctx):
         """Multiplayer elimination survival game."""
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
-            return await ctx.reply("🌑 **System Notice**: The Pit is sealed. Economy is disabled.", mention_author=False)
+            return await ctx.reply("🌑 **System Notice**: Pit is sealed. Economy disabled.", mention_author=False)
 
         user_id = ctx.author.id
         buy_in = 100
         now = time.time()
 
         if self.pit_spinning:
-            return await ctx.reply("🌑 **The Pit is currently active.** Wait for the slaughter to end.", mention_author=False)
+            return await ctx.reply("🌑 **Pit is currently active.** Wait for the slaughter to end.", mention_author=False)
 
         if any(p['id'] == user_id for p in self.active_pit):
-            return await ctx.reply("❌ You are already at the edge of the pit.", mention_author=False)
+            return await ctx.reply("❌ You're already at the edge of the pit.", mention_author=False)
 
         bal = await get_balance(user_id)
         if bal < buy_in:
-            return await ctx.reply(f"❌ You don't have enough to enter the pit. (Need {buy_in} tokens)", mention_author=False)
+            return await ctx.reply(f"❌ You can't afford the pit. (Need {buy_in} tokens)", mention_author=False)
 
         # Process Reaping/Tithe
         await update_balance(user_id, -buy_in)
@@ -942,7 +942,7 @@ class GamesCog(commands.Cog):
         else:
             elapsed = now - self.pit_start_time
             remaining = max(0, 15 - int(elapsed))
-            await ctx.send(f"💀 **{ctx.author.display_name}** has joined the assembly! [{len(queue)}/12]\n(Starts in {remaining}s)")
+            await ctx.send(f"💀 **{ctx.author.display_name}** has joined the ranks! [{len(queue)}/12]\n(Starts in {remaining}s)")
 
     async def pit_timer_loop(self, ctx):
         """Background task for pit countdown."""
@@ -953,7 +953,7 @@ class GamesCog(commands.Cog):
                 pass
 
             if len(self.active_pit) < 3:
-                await ctx.send("⏳ **IS THAT ALL?** The pit demands at least 3 sacrifices. Waiting...")
+                await ctx.send("⏳ **IS THAT ALL?** The pit demands at least 3 meals. Waiting...")
                 while len(self.active_pit) < 3:
                     await asyncio.sleep(1)
 
@@ -969,7 +969,7 @@ class GamesCog(commands.Cog):
         self.pit_spinning = True
         try:
             total_pot = len(self.active_pit) * 100
-            await ctx.send(f"🔐 **THE GATES CLOSE.** {len(self.active_pit)} souls trapped in the depths.\n**Total Pot: {economy.format_balance(total_pot)}**")
+            await ctx.send(f"🔐 **THE GATES CLOSE.** {len(self.active_pit)} souls trapped in the depths.\n**Booty: {economy.format_balance(total_pot)}**")
             await asyncio.sleep(3)
 
             while len(self.active_pit) > 1:
@@ -991,7 +991,7 @@ class GamesCog(commands.Cog):
             
             embed = discord.Embed(
                 title="🌑 THE PIT: ASCENSION",
-                description=f"👑 **{winner['display_name']}** climbs out over the bodies. \nThey secure the entire pot of **{economy.format_balance(total_pot)}** tokens!",
+                description=f"👑 **{winner['display_name']}** climbs out over the bodies. \nThey claim the booty, **{economy.format_balance(total_pot)}** tokens!",
                 color=discord.Color.dark_red()
             )
             await ctx.send(embed=embed)
