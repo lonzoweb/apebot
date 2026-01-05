@@ -85,6 +85,14 @@ ITEM_REGISTRY = {
         "shop_desc": "Passive dice advantage. Avoids 1-2-3 and low point rolls.",
         "feedback": "👁️ **INSIDER STATUS GRANTED.** You move with the house now.",
     },
+    "gun": {
+        "cost": 6666,
+        "type": "passive",
+        "restricted": True,
+        "hidden": True,
+        "shop_desc": "Guarantee you won't lose the fade. Streets are cold.",
+        "feedback": "🔫 **PACKING HEAT.** You can't lose a fade now.",
+    },
     "hot_potato": {
         "cost": 520,
         "type": "event",
