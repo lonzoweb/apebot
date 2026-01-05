@@ -66,7 +66,7 @@ class ImageCog(commands.Cog):
             logger.error(f"Error in .img command: {e}", exc_info=True)
             if not ctx.author.guild_permissions.administrator:
                 await update_balance(user_id, cost)
-            await loading_msg.edit(content="❌ **The ritual failed.** Check the logs. (Refunded)")
+            await loading_msg.edit(content="❌ **The gen failed.** Check the logs. (Refunded)")
 
 async def setup(bot):
     await bot.add_cog(ImageCog(bot))

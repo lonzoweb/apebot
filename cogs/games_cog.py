@@ -670,7 +670,7 @@ class GamesCog(commands.Cog):
 
             # Wait for minimum 3 players if timer expired with fewer
             if len(self.active_roulette) < 3:
-                await ctx.send("⏳ **NOT ENOUGH FODDER.** Waiting for at least 3 souls to begin the ritual...")
+                await ctx.send("⏳ **NOT ENOUGH FODDER.** Waiting for at least 3 souls to begin the game...")
                 while len(self.active_roulette) < 3:
                     await asyncio.sleep(1)
 
@@ -935,7 +935,7 @@ class GamesCog(commands.Cog):
             self.pit_event.clear()
             self.pit_timer_active = True
             self.pit_task = asyncio.create_task(self.pit_timer_loop(ctx))
-            await ctx.send(f"🚨 **THE DESCENT BEGINS.** {ctx.author.display_name} tossed 50 tokens to enter the ritual. [{len(queue)}/12]\n(Starts in 15s or at 12 players)")
+            await ctx.send(f"🚨 **THE DESCENT BEGINS.** {ctx.author.display_name} tossed 50 tokens to enter the game. [{len(queue)}/12]\n(Starts in 15s or at 12 players)")
         elif len(queue) == 12:
             self.pit_event.set()
             await ctx.send(f"🚨 **{ctx.author.display_name}** joined! [12/12]\n🔐 **THE GATES CLOSE.** No more souls allowed.")
