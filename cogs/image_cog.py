@@ -37,31 +37,28 @@ class ImageCog(commands.Cog):
         # 2. Manifesting message
         loading_msg = await ctx.send("🌑 **Manifesting...** The spirits are painting your vision.")
         
-        # 3. Call API
+        # 3. Get Image URL
         try:
-            image_bytes = await pollinations_generate_image(prompt)
+            image_url = await pollinations_generate_image(prompt)
             
-            if not image_bytes:
+            if not image_url:
                 # Refund on failure
                 if not ctx.author.guild_permissions.administrator:
                     await update_balance(user_id, cost)
                 await loading_msg.edit(content="❌ **The vision collapsed.** Try again later. (Refunded)")
                 return
 
-            # 4. Prepare File
-            file = discord.File(io.BytesIO(image_bytes), filename="manifestation.png")
-            
-            # 5. Send Result
+            # 4. Prepare Embed
             embed = discord.Embed(
                 title="🔮 Manifestation Complete",
                 description=f"**Vision**: {prompt}",
                 color=discord.Color.dark_purple()
             )
-            embed.set_image(url="attachment://manifestation.png")
+            embed.set_image(url=image_url)
             embed.set_footer(text=f"Requested by {ctx.author.display_name} | {cost} Tokens sacrificed")
             
             await loading_msg.delete()
-            await ctx.send(embed=embed, file=file)
+            await ctx.send(embed=embed)
 
         except Exception as e:
             logger.error(f"Error in .img command: {e}", exc_info=True)

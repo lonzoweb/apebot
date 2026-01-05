@@ -205,42 +205,18 @@ import urllib.parse
 async def pollinations_generate_image(prompt: str):
     """
     Generate an image based on a prompt using Pollinations.ai.
-    Uses raw user prompt per request.
+    Returns the URL immediately for faster Discord rendering.
     """
-    full_prompt = prompt
+    # 1. URL Sanitization
+    encoded_prompt = urllib.parse.quote(prompt)
     
-    # 2. URL Sanitization
-    encoded_prompt = urllib.parse.quote(full_prompt)
-    
-    # Random seeed for variety
+    # Random seed for variety
     seed = random.randint(1, 999999)
     width = 1024
     height = 1024
-    model = "flux" # Flux is currently the best performer on Pollinations for this style
+    model = "flux" 
     
+    # Append styling keywords for consistency if desired, or keep raw per request
     image_url = f"https://pollinations.ai/p/{encoded_prompt}?width={width}&height={height}&seed={seed}&model={model}&nologo=true"
     
-    # We don't actually need to fetch the bytes here if we just want to send the URL to Discord,
-    # but fetching them ensures the image is generated and allows us to send it as a File (better UX).
-    
-    session = bot_session
-    if session is None:
-        import aiohttp
-        session = aiohttp.ClientSession()
-        should_close = True
-    else:
-        should_close = False
-
-    try:
-        async with session.get(image_url, timeout=45) as resp:
-            if resp.status != 200:
-                logger.error(f"Pollinations returned status {resp.status}")
-                return None
-            image_bytes = await resp.read()
-            return image_bytes
-    except Exception as e:
-        logger.error(f"Error generating image from Pollinations: {e}")
-        return None
-    finally:
-        if should_close and session:
-            await session.close()
+    return image_url
