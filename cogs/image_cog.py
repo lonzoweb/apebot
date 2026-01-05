@@ -47,7 +47,7 @@ class ImageCog(commands.Cog):
                 # Refund on failure
                 if not ctx.author.guild_permissions.administrator:
                     await update_balance(user_id, cost)
-                await status_msg.edit(content="❌ **The vision collapsed.** Try again later. (Refunded)")
+                await status_msg.edit(content="❌ Try again later. (Refunded)")
                 return
 
             # 4. Prepare Embed
@@ -65,7 +65,7 @@ class ImageCog(commands.Cog):
             logger.error(f"Error in .img command: {e}", exc_info=True)
             if not ctx.author.guild_permissions.administrator:
                 await update_balance(user_id, cost)
-            await loading_msg.edit(content="❌ **The ritual failed.** Check the logs. (Refunded)")
+            await loading_msg.edit(content="❌ (Refunded)")
 
 async def setup(bot):
     await bot.add_cog(ImageCog(bot))
