@@ -216,7 +216,7 @@ async def pollinations_generate_image(prompt: str):
     height = 1024
     model = "flux" 
     
-    # Append styling keywords for consistency if desired, or keep raw per request
-    image_url = f"https://pollinations.ai/p/{encoded_prompt}?width={width}&height={height}&seed={seed}&model={model}&nologo=true"
+    # Correct endpoint for direct image rendering: image.pollinations.ai/prompt/
+    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model={model}&nologo=true"
     
     return image_url
