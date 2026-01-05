@@ -46,6 +46,8 @@ class GamesCog(commands.Cog):
         self.cut_event = asyncio.Event()
         self.cut_task = None
 
+        self.active_fades = {}  # challenger_id -> {target_id, time}
+
     async def process_reaping(self, ctx):
         """Handle Reaping lifecycle: End if expired, else tax user."""
         state = await get_reaping_state()
@@ -1076,6 +1078,105 @@ class GamesCog(commands.Cog):
         except Exception as e:
             logger.error(f"Error in lick_command: {e}", exc_info=True)
             await ctx.send("❌ An internal error occurred. Administrators have been notified.")
+
+    @commands.command(name="fade")
+    async def fade_command(self, ctx, target: discord.Member = None):
+        """1v1 Street Fade. Catch one for 30 tokens."""
+        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+            return await ctx.reply("🌑 **System Notice**: Fades are forbidden. Economy is disabled.", mention_author=False)
+
+        user_id = ctx.author.id
+        now = time.time()
+        buy_in = 30
+
+        # Check if user is accepting a fade
+        challenger_id = None
+        for cid, data in self.active_fades.items():
+            if data['target_id'] == user_id and (now - data['time']) < 60:
+                # Potential acceptance
+                if target is None or target.id == int(cid):
+                    challenger_id = int(cid)
+                    break
+
+        if challenger_id:
+            # EXECUTE FADE
+            challenger = ctx.guild.get_member(challenger_id)
+            if not challenger:
+                del self.active_fades[str(challenger_id)]
+                return await ctx.reply("❌ Wtf", mention_author=False)
+
+            # Check balances
+            if await get_balance(user_id) < buy_in:
+                return await ctx.reply(f"❌ You can't afford the fade anyone, {buy_in} tokens", mention_author=False)
+            if await get_balance(challenger_id) < buy_in:
+                return await ctx.reply(f"❌ They can't afford to fade you.", mention_author=False)
+
+            # Deduct and clear
+            await update_balance(user_id, -buy_in)
+            await update_balance(challenger_id, -buy_in)
+            del self.active_fades[str(challenger_id)]
+
+            await self.execute_fade(ctx, challenger, ctx.author)
+            return
+
+        # Check if initiating a new fade
+        if target is None:
+            return await ctx.reply("❌ Usage: `.fade @user` to challenge or accept.", mention_author=False)
+
+        if target.id == user_id:
+            return await ctx.reply("❌ You can't fade your own shadow.", mention_author=False)
+        
+        if target.bot:
+            return await ctx.reply("❌ Bots have no blood to spill.", mention_author=False)
+
+        if await get_balance(user_id) < buy_in:
+            return await ctx.reply(f"❌ You're too broke for a fade. (Need {buy_in} tokens)", mention_author=False)
+
+        # Record challenge
+        self.active_fades[str(user_id)] = {'target_id': target.id, 'time': now}
+        await ctx.send(f"⚔️ **FADE!** {ctx.author.mention} wants to run the fade with {target.mention}\n💡 {target.display_name}, type `.fade @{ctx.author.display_name}` to accept. (Expires in 60s)")
+
+    async def execute_fade(self, ctx, p1, p2):
+        """Perform the actual 1v1 dice battle."""
+        msg = await ctx.send(f"⚔️ **STREET FADE: {p1.display_name} vs {p2.display_name}**\nWho's getting murked?")
+        await asyncio.sleep(2)
+
+        p1_roll, p2_roll = 0, 0
+        while p1_roll == p2_roll:
+            p1_roll = random.randint(1, 100)
+            p2_roll = random.randint(1, 100)
+
+        winner = p1 if p1_roll > p2_roll else p2
+        loser = p2 if p1_roll > p2_roll else p1
+        win_roll = max(p1_roll, p2_roll)
+        loss_roll = min(p1_roll, p2_roll)
+
+        # Rewards (Pot 60 + 100 bonus)
+        payout = 160
+        await update_balance(winner.id, payout)
+
+        # Penalty
+        await add_active_effect(loser.id, "uwu", 60)
+        penalty_msg = f"🎀 {loser.mention} caught the hands. **uwu for 1m** applied."
+
+        flavor = [
+            "Blood on that money.",
+            "The streets claims their due."
+        ]
+
+        embed = discord.Embed(
+            title="⚔️ FADED",
+            description=(
+                f"🏆 **{winner.display_name}** wins with **{win_roll}**!\n"
+                f"💀 **{loser.display_name}** dogwater roll **{loss_roll}**.\n\n"
+                f"💰 **{winner.display_name}** gets the bag with **{economy.format_balance(payout)}**!\n"
+                f"{penalty_msg}"
+            ),
+            color=discord.Color.dark_red()
+        )
+        embed.set_footer(text=random.choice(flavor))
+        await msg.edit(content=None, embed=embed)
+
 
 async def setup(bot):
     await bot.add_cog(GamesCog(bot))
