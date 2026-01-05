@@ -4,7 +4,7 @@ import io
 import time
 import asyncio
 import logging
-from api import pollinations_generate_image
+from api import google_generate_image
 from database import get_balance, update_balance, is_economy_on
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class ImageCog(commands.Cog):
         # 3. Get Image Bytes
         try:
             await asyncio.sleep(2.5) # Optics: The spirits need a moment
-            image_bytes, error_msg = await pollinations_generate_image(prompt)
+            image_bytes, error_msg = await google_generate_image(prompt)
             
             if not image_bytes:
                 # Refund on failure

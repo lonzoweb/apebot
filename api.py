@@ -239,3 +239,49 @@ async def pollinations_generate_image(prompt: str):
     finally:
         if created_session:
             await session.close()
+
+
+# ============================================================
+# GOOGLE IMAGEN (AI STUDIO / GEMINI API)
+# ============================================================
+
+async def google_generate_image(prompt: str):
+    """
+    Generate an image using Google's Imagen 3 model via AI Studio.
+    Returns (image_bytes, error_message).
+    """
+    if not GOOGLE_API_KEY:
+        return None, "GOOGLE_API_KEY is missing from environment."
+
+    try:
+        from google import genai
+        from google.genai import types
+        
+        # Initialize client with API KEY (AI Studio mode)
+        client = genai.Client(api_key=GOOGLE_API_KEY)
+        
+        def generate():
+            # Use the AI Studio / Gemini API endpoint model
+            response = client.models.generate_images(
+                model='imagen-3.0-generate-001',
+                prompt=prompt,
+                config=types.GenerateImagesConfig(
+                    number_of_images=1,
+                    include_rai_reason=True,
+                    output_mime_type='image/png'
+                )
+            )
+            if not response.generated_images:
+                return None
+            return response.generated_images[0].image_bytes
+
+        loop = asyncio.get_event_loop()
+        image_bytes = await loop.run_in_executor(None, generate)
+        if not image_bytes:
+            return None, "Google returned no image data."
+        return image_bytes, None
+
+    except Exception as e:
+        err_msg = str(e)
+        logger.error(f"Error in google_generate_image: {err_msg}", exc_info=True)
+        return None, f"API Error: {err_msg[:100]}"
