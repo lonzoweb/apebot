@@ -1121,7 +1121,7 @@ class GamesCog(commands.Cog):
 
         # Check if initiating a new fade
         if target is None:
-            return await ctx.reply("❌ Usage: `.fade @user` to challenge or accept.", mention_author=False)
+            return await ctx.reply("❌ Usage: `.fade @user`, mention_author=False)
 
         if target.id == user_id:
             return await ctx.reply("❌ You can't fade your own shadow.", mention_author=False)
