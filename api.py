@@ -10,7 +10,7 @@ import random
 import os
 import json
 import urllib.parse
-from config import SERPAPI_KEY, OPENCAGE_KEY, GOOGLE_API_KEY, GOOGLE_CREDENTIALS_PATH
+from config import SERPAPI_KEY, OPENCAGE_KEY, GOOGLE_API_KEY, GOOGLE_CREDENTIALS_PATH, GOOGLE_CREDENTIALS_JSON
 
 logger = logging.getLogger(__name__)
 
@@ -250,27 +250,27 @@ async def google_generate_image(prompt: str):
     Generate an image using Google's Imagen 3 model.
     Pivots between Vertex AI (Service Account) or AI Studio (API Key).
     """
-    if not GOOGLE_API_KEY and not os.path.exists(GOOGLE_CREDENTIALS_PATH):
-        return None, "Google credentials (JSON or API Key) are missing."
+    if not GOOGLE_API_KEY and not os.path.exists(GOOGLE_CREDENTIALS_PATH) and not GOOGLE_CREDENTIALS_JSON:
+        return None, "Google credentials (JSON file, Env Var, or API Key) are missing."
 
     try:
         from google import genai
         from google.genai import types
         from google.oauth2 import service_account
         
-        # DEBUG: Check exactly where we are looking
-        logger.info(f"Checking for credentials at: {GOOGLE_CREDENTIALS_PATH}")
-        file_exists = os.path.exists(GOOGLE_CREDENTIALS_PATH)
-        logger.info(f"Credentials file exists: {file_exists}")
-
-        if file_exists:
-            # Explicit Service Account loading for Vertex AI
+        # Determine credentials source
+        creds_info = None
+        if os.path.exists(GOOGLE_CREDENTIALS_PATH):
+            logger.info(f"Loading credentials from file: {GOOGLE_CREDENTIALS_PATH}")
             with open(GOOGLE_CREDENTIALS_PATH, 'r') as f:
                 creds_info = json.load(f)
-                project_id = creds_info.get('project_id')
-            
-            logger.info(f"Manifesting via Vertex AI (Project: {project_id})")
-            
+        elif GOOGLE_CREDENTIALS_JSON:
+            logger.info("Loading credentials from GOOGLE_CREDENTIALS_JSON environment variable.")
+            creds_info = json.loads(GOOGLE_CREDENTIALS_JSON)
+        
+        if creds_info:
+            # Vertex AI Mode (Explicit Service Account Loading)
+            project_id = creds_info.get('project_id')
             creds = service_account.Credentials.from_service_account_info(creds_info)
             client = genai.Client(
                 vertexai=True,
@@ -279,9 +279,10 @@ async def google_generate_image(prompt: str):
                 location='us-central1'
             )
             model_name = 'imagen-3.0-generate-001'
+            logger.info(f"Manifesting via Vertex AI (Project: {project_id})")
         else:
             # Fallback to AI Studio Mode
-            logger.warning("No Service Account found. Falling back to AI Studio (API Key).")
+            logger.warning("No Service Account found (file or env). Falling back to AI Studio (API Key).")
             client = genai.Client(api_key=GOOGLE_API_KEY)
             model_name = 'imagen-3.0-generate-002'
             

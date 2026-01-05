@@ -18,6 +18,8 @@ OPENCAGE_KEY = os.getenv("OPENCAGE_KEY")
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_CREDENTIALS_PATH = os.path.join(os.path.dirname(__file__), "google_credentials.json")
+GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
+
 if os.path.exists(GOOGLE_CREDENTIALS_PATH):
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_CREDENTIALS_PATH
 
