@@ -1170,7 +1170,7 @@ class GamesCog(commands.Cog):
 
         # Penalty
         await add_active_effect(loser.id, "uwu", 60)
-        penalty_msg = f"🎀 {loser.mention} got pieced up. **uwu for 1m** applied."
+        penalty_msg = f"🎀 {loser.mention} got pieced up, bucked, and uwud ..."
 
         outcomes = [
             f"🦷  {loser.display_name} got they teeth busted in.",
