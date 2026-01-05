@@ -1185,7 +1185,7 @@ class GamesCog(commands.Cog):
         desc = (
             f"### {outcome}\n\n"
             f"🏆 **{winner.display_name}** wins (**{win_roll}**)\n"
-            f"💀 **{loser.display_name}** falls (**{loss_roll}**)\n\n"
+            f"💀 {loser.display_name} falls (**{loss_roll}**)\n\n"
             f"💰 **{winner.display_name}** takes **{economy.format_balance(payout)}**\n"
             f"{penalty_msg}"
         )
