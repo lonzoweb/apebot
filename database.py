@@ -97,6 +97,16 @@ async def init_db():
             """
             )
 
+            # Global Settings Table
+            await conn.execute(
+                "CREATE TABLE IF NOT EXISTS global_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT)"
+            )
+
+            # Shard Claim Tracking Table
+            await conn.execute(
+                "CREATE TABLE IF NOT EXISTS last_shard_claim (user_id TEXT PRIMARY KEY, last_claim REAL)"
+            )
+
             # 🌑 NEW: Active Effects Table (Curse/Mute)
             # Migration check: If table exists with old column names, drop it
             async with conn.execute("PRAGMA table_info(active_effects)") as cursor:
@@ -232,6 +242,57 @@ async def get_pending_role_removals() -> list:
 async def remove_masochist_role_record(user_id: str):
     async with get_db() as conn:
         await conn.execute("DELETE FROM masochist_roles WHERE user_id = ?", (user_id,))
+
+
+# ============================================================
+# GLOBAL SETTINGS MANAGEMENT
+# ============================================================
+
+
+async def get_setting(key: str, default: str = None) -> str:
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT setting_value FROM global_settings WHERE setting_key = ?", (key,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else default
+
+
+async def set_setting(key: str, value: str):
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES (?, ?)",
+            (key, value),
+        )
+
+
+# ============================================================
+# SHARD CLAIM MANAGEMENT
+# ============================================================
+
+
+async def can_claim_shard(user_id: int) -> bool:
+    user_id_str = str(user_id)
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT last_claim FROM last_shard_claim WHERE user_id = ?", (user_id_str,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return True
+            last_claim = row[0]
+            # 6 hours = 21600 seconds
+            return (time.time() - last_claim) >= 21600
+
+
+async def record_shard_claim(user_id: int):
+    user_id_str = str(user_id)
+    now = time.time()
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO last_shard_claim (user_id, last_claim) VALUES (?, ?)",
+            (user_id_str, now),
+        )
 
 
 # ============================================================

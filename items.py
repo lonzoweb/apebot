@@ -75,7 +75,15 @@ ITEM_REGISTRY = {
         "restricted": True,
         "hidden": True,
         "shop_desc": "You are cursed with good luck. 50% increased earnings for 24 hours.",
-        "feedback": "✨ **LUCK CURSE ACTIVATED.** Enjoy your heightened fortune for 24h. Earnings +50%.",
+        "feedback": "✨ **LUCK CURSE ACTIVATED.** Fortune favors the bold. Earnings +50%.",
+    },
+    "insider": {
+        "cost": 5555,
+        "type": "passive",
+        "restricted": True,
+        "hidden": True,
+        "shop_desc": "Passive dice advantage. Avoids 1-2-3 and low point rolls.",
+        "feedback": "👁️ **INSIDER STATUS GRANTED.** You move with the house now.",
     },
     "hot_potato": {
         "cost": 520,
@@ -173,6 +181,9 @@ ITEM_ALIASES = {
     "sleep": "night_vision",
     "night": "night_vision",
     "vision": "night_vision",
+    "insider": "insider",
+    "insider_status": "insider",
+    "advantage": "insider",
 }
 
 # ============================================================

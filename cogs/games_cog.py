@@ -10,11 +10,12 @@ import random
 import asyncio
 import time
 from database import (
-    get_balance, update_balance, add_active_effect, is_economy_on, 
+    get_balance, update_balance, add_active_effect, is_economy_on,
     get_user_inventory, remove_item_from_inventory, get_blood_moon_multiplier,
     get_potential_victims, is_reaping_active, add_reaping_tithe, get_active_effect,
-    get_reaping_state, end_reaping, transfer_tokens
+    get_reaping_state, end_reaping, transfer_tokens, get_setting
 )
+from helpers import has_authorized_role
 import economy
 import torture
 
@@ -263,12 +264,31 @@ class GamesCog(commands.Cog):
         )
         await asyncio.sleep(1.2)
 
+        # Check for Mod Advantage (Insider Item)
+        mod_advantage = False
+        inventory = await get_user_inventory(ctx.author.id)
+        if inventory.get("insider", 0) > 0:
+            mod_advantage = True
+            logger.info(f"MOD ADVANTAGE: Insider item detected for {ctx.author}. Advantage active.")
+
         player_rank, player_point = 0, 0
         player_dice = []
 
         while player_rank == 0:
             player_dice = [random.randint(1, 6) for _ in range(3)]
             player_rank, player_point = self.get_ceelo_score(player_dice)
+
+            # Mod Advantage: Reroll 1-2-3 (instant loss) or low points (1, 2)
+            if mod_advantage:
+                if player_rank == 1:
+                    logger.info(f"MOD ADVANTAGE: Avoided 1-2-3 for {ctx.author}")
+                    player_rank = 0
+                    continue
+                if player_rank == 2 and player_point <= 2:
+                    logger.info(f"MOD ADVANTAGE: Rerolling low point {player_point} for {ctx.author}")
+                    player_rank = 0
+                    continue
+
             d_str = f"{DICE_EMOJIS[player_dice[0]]}  {DICE_EMOJIS[player_dice[1]]}  {DICE_EMOJIS[player_dice[2]]}"
             if player_rank == 0:
                 await msg.edit(content=f"🎲 Your roll\n{d_str}\nBounced. Rollin' again...")
@@ -301,10 +321,10 @@ class GamesCog(commands.Cog):
             # 2. 10% chance for player to force 1-2-3 (Auto-Loss) - Added per user request
             roll = random.random()
             if bet > 1400:
-                if roll < 0.15:
+                if roll < 0.15 and not mod_advantage:
                     bot_dice = [4, 5, 6]
                     logger.info(f"HOUSE EDGE (BOT WIN) TRIGGERED: High bet of {bet} detected. Bot forced 4-5-6.")
-                elif roll < 0.25: # 0.15 + 0.10 = 0.25
+                elif roll < 0.25 and not mod_advantage: # 0.15 + 0.10 = 0.25
                     # CRITICAL: We need to override the PLAYER'S dice here, but dice is passed in.
                     # Instead, we force the BOT to win by checking this roll in the main loop logic.
                     # Or, easier: Force bot to roll higher than player if this roll hits.

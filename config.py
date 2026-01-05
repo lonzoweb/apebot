@@ -50,6 +50,20 @@ AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo", "Caporegime"]
 DAILY_COMMAND_ROLE = "Patrizio"
 ROLE_ADD_QUOTE = "Caporegime"
 
+# Pink Vote System
+MASOCHIST_ROLE_ID = 1167184822129664113
+VOTE_THRESHOLD = 7
+ROLE_DURATION_SECONDS = 172800 # 48 hours
+
+# Role Aliases for .gr command
+ROLE_ALIASES = {
+    "niggapass": 1168965931918176297,
+    "trial": 1444477594698514594,
+    "masochist": 1167184822129664113,
+    "hoe": 1168293630570676354,
+    "vip": 1234567890123456793,
+}
+
 # ============================================================
 # DATABASE CONFIGURATION
 # ============================================================

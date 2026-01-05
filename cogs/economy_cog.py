@@ -16,10 +16,12 @@ from database import (
     get_all_active_effects,
     set_balance, get_potential_victims, get_global_cooldown, 
     set_global_cooldown, is_economy_on, can_claim_daily, record_daily_claim,
-    set_blood_moon, start_reaping, is_reaping_active
+    set_blood_moon, start_reaping, is_reaping_active,
+    can_claim_shard, record_shard_claim
 )
 from exceptions import InsufficientTokens, InsufficientInventory, ActiveCurseError, ItemNotFoundError
 from items import ITEM_REGISTRY, ITEM_ALIASES
+from helpers import has_authorized_role
 import database
 
 logger = logging.getLogger(__name__)
@@ -88,7 +90,7 @@ class EconomyCog(commands.Cog):
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: The spirits have locked the exchange. Economy is currently disabled.", mention_author=False)
 
-        if item_name is None:
+        if item_name is None or (item_name.lower() == "hidden" and has_authorized_role(ctx.author)):
             embed = discord.Embed(
                 title="🎰 APEIRON EXCHANGE",
                 description="Spend your tokens and observe the fallout.",
@@ -98,21 +100,32 @@ class EconomyCog(commands.Cog):
             # Sort items by cost (ascending)
             sorted_items = sorted(ITEM_REGISTRY.items(), key=lambda x: x[1]["cost"])
 
+            # 1. Show Standard Items
             for item, data in sorted_items:
                 if data.get('hidden'):
                     continue
                     
                 price = f"{data['cost']} 💎"
-                if data.get('shop_desc'):
-                    desc = data['shop_desc']
-                else:
-                    desc = data.get('feedback', 'No description.')
-                    
+                desc = data.get('shop_desc', data.get('feedback', 'No description.'))
                 embed.add_field(
                     name=f"{item.replace('_', ' ').title()} — {price}",
                     value=f"*{desc}*",
                     inline=False,
                 )
+
+            # 2. Show Hidden Items for Mods
+            if has_authorized_role(ctx.author):
+                hidden_items = [i for i in sorted_items if i[1].get('hidden')]
+                if hidden_items:
+                    embed.add_field(name="──────────────", value="**🌑 THE HIDDEN EXCHANGE**", inline=False)
+                    for item, data in hidden_items:
+                        price = f"{data['cost']} 💎"
+                        desc = data.get('shop_desc', data.get('feedback', 'No description.'))
+                        embed.add_field(
+                            name=f"👁️ {item.replace('_', ' ').title()} — {price}",
+                            value=f"*{desc}*",
+                            inline=False,
+                        )
 
             try:
                 await ctx.author.send(embed=embed)
@@ -121,7 +134,8 @@ class EconomyCog(commands.Cog):
                 await ctx.send(f"❌ {ctx.author.mention}, Please open your DMs.")
             return
 
-            return
+        if item_name.lower() == "hidden":
+             return await ctx.reply("🌑 You're not ready for the hidden menu, peasant.", mention_author=False)
 
         # Smart Parsing Strategy (Consistent with .use)
         # 1. Try exact match first
@@ -618,6 +632,19 @@ class EconomyCog(commands.Cog):
 
         channel_id = message.channel.id
         user_id = message.author.id
+
+        # 💎 Re-entry Shard Reward
+        if await can_claim_shard(user_id):
+            await record_shard_claim(user_id)
+            bonus = 50
+            await update_balance(user_id, bonus)
+            try:
+                await message.channel.send(
+                    f"💎 **{message.author.display_name}** re-entered the shadows! **+50 tokens**",
+                    delete_after=15
+                )
+            except discord.Forbidden:
+                pass
 
         # 🌧️ Handle Token Storm
         if channel_id in self.active_storm:

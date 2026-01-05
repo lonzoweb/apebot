@@ -2266,7 +2266,7 @@ async def pink_command(ctx, member: discord.Member):
 # =========================================================
 
 
-@pink_command.error
+@_command.error
 async def pink_command_error(ctx, error):
     # Check for the specific error that happens when the user forgets the argument
     if isinstance(error, commands.MissingRequiredArgument):
