@@ -48,7 +48,7 @@ ITEM_REGISTRY = {
         "cost": 60,
         "type": "fun",
         "shop_desc": "APEIRON FIRE OG CART. Keyword: cart, pen, fire.",
-        "feedback": "💨 Ripping the Fire OG Cart. The flavor is heavy.",
+        "feedback": "💨 Ripping the cart. That's that gas.",
     },
     "ping_everyone": {
         "cost": 3400,
