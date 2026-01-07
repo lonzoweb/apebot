@@ -27,16 +27,16 @@ ITEM_REGISTRY = {
         "feedback": "🎀 Dawww~, cute for 30m",
     },
     "echo_ward": {
-        "cost": 500,
+        "cost": 600,
         "type": "defense",
-        "shop_desc": "Blocks 50% of the next theft attempt. One-time use.",
-        "feedback": "🛡️ Echo Ward added to inventory. Blocks 50% of next theft.",
+        "shop_desc": "General defense. Blocks 50% theft. One-time use.",
+        "feedback": "🛡️ Echo Ward purchased.",
     },
     "reversal_ward": {
         "cost": 700,
         "type": "defense",
-        "shop_desc": "Reflects 50% of the next theft back at the sender. One-time use.",
-        "feedback": "🔮 **REVERSAL WARD!** Reflects 50% of the next theft back at the sender!",
+        "shop_desc": "General defense. Reverse drain 50% theft. One-time use.",
+        "feedback": "🔮 **REVERSAL WARD!** Drains 50% of the next theft back from the thief!",
     },
     "kush_pack": {
         "cost": 60,
@@ -69,14 +69,14 @@ ITEM_REGISTRY = {
         "cost": 1100,
         "type": "event",
         "shop_desc": "Triggers a Token Storm. Next 10 speakers get bonus tokens.",
-        "feedback": "⛈️ **TOKEN STORM!** The next 10 unique users to talk in this channel earn 50 bonus tokens!",
+        "feedback": "⛈️ **TOKEN STORM!** The next 10 unique users to speak are blessed with 50 tokens!",
     },
     "luck_curse": {
         "cost": 7,
         "type": "buff",
         "restricted": True,
         "hidden": True,
-        "shop_desc": "You are cursed with good luck. 50% increased earnings for 24 hours.",
+        "shop_desc": "Cursed with good luck. 50% increased earnings for 24 hours.",
         "feedback": "✨ **LUCK CURSE ACTIVATED.** Fortune favors the bold. Earnings +50%.",
     },
     "insider": {
@@ -105,8 +105,8 @@ ITEM_REGISTRY = {
         "cost": 3000,
         "type": "defense",
         "max_uses": 6,
-        "shop_desc": "Ancient obsidian seal. Blocks 50% of 6 theft attempts before shattering.",
-        "feedback": "🪞 **ECHO SEAL SECURED.** Your essence is guarded by 6 layers of obsidian protection.",
+        "shop_desc": "Obsidian Echo Seal. Improved defense. Blocks 50% theft. 6 uses.",
+        "feedback": "🪞 **ECHO SEAL SECURED.** Your essence is guarded by layers of obsidian protection.",
     },
     "blood_altar": {
         "cost": 9000,
@@ -129,7 +129,7 @@ ITEM_REGISTRY = {
     "night_vision": {
         "cost": 400,
         "type": "protection",
-        "shop_desc": "5-hour overnight shield. Blocks theft but prevents all token gains.",
+        "shop_desc": "5-hour overnight shield. Blocks all theft and gains for duration.",
         "feedback": "🌙 **NIGHT VISION ACTIVATED.**\n\nProtecting your assets until you awaken.\n\n*The void watches its own.*",
     },
 }
