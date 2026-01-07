@@ -64,12 +64,12 @@ class GamesCog(commands.Cog):
         has_ward = False
         ward_used = None
         
-        if target_inv.get("black_mirror", 0) > 0:
+        if target_inv.get("echo_seal", 0) > 0:
             has_ward = True
-            ward_used = "black_mirror"
-        elif target_inv.get("echo_ward_max", 0) > 0:
+            ward_used = "echo_seal"
+        elif target_inv.get("reversal_ward", 0) > 0:
             has_ward = True
-            ward_used = "echo_ward_max"
+            ward_used = "reversal_ward"
         elif target_inv.get("echo_ward", 0) > 0:
             has_ward = True
             ward_used = "echo_ward"
@@ -985,9 +985,19 @@ class GamesCog(commands.Cog):
             logger.info(f"Target found: {target.display_name}. Sending announcement.")
             await ctx.send(f"🌑 **{ctx.author.display_name}** is hitting a lick on {target.mention}!\n🚨 {target.mention}, you have **18 seconds** to spook them! (Type anything in chat)")
 
-            # 4. Wait for response
-            def check(m):
-                return m.author.id == target.id and m.channel.id == ctx.channel.id
+            # 4. Wait for response (but ignore if they're cursed)
+            async def check(m):
+                if m.author.id != target.id or m.channel.id != ctx.channel.id:
+                    return False
+                # Check if target has active uwu or muzzle - they can't defend if cursed
+                uwu_effect = await get_active_effect(target.id, "uwu")
+                muzzle_effect = await get_active_effect(target.id, "muzzle")
+                current_time = time.time()
+                
+                # If they have active uwu or muzzle, ignore their defense attempt
+                if (uwu_effect and uwu_effect > current_time) or (muzzle_effect and muzzle_effect > current_time):
+                    return False
+                return True
 
             try:
                 await self.bot.wait_for('message', timeout=18.0, check=check)
@@ -999,44 +1009,65 @@ class GamesCog(commands.Cog):
                 logger.info("Target silence. Checking for wards...")
                 target_inv = await get_user_inventory(target.id)
 
-                # 0. Black Mirror Check (Multi-charge reflection)
-                if target_inv.get("black_mirror", 0) > 0:
-                    await remove_item_from_inventory(target.id, "black_mirror")
+                # 0. Echo Seal Check (Multi-charge 50% block)
+                if target_inv.get("echo_seal", 0) > 0:
+                    await remove_item_from_inventory(target.id, "echo_seal")
                     
-                    # Reflection Logic
-                    reflect_amt = random.randint(min_steal, max_steal)
-                    thief_bal = await get_balance(ctx.author.id)
-                    actual_loss = min(reflect_amt, thief_bal)
+                    # Block 50% of the theft
+                    steal_amt = random.randint(min_steal, max_steal)
+                    blocked_amt = steal_amt // 2  # 50% blocked
+                    stolen_amt = steal_amt - blocked_amt
                     
-                    await update_balance(ctx.author.id, -actual_loss)
-                    await update_balance(target.id, actual_loss) # Victim gets the tokens
+                    target_bal = await get_balance(target.id)
+                    actual_stolen = min(stolen_amt, target_bal)
+                    
+                    await update_balance(target.id, -actual_stolen)
+                    await update_balance(ctx.author.id, actual_stolen)
                     
                     return await ctx.send(
-                        f"🪞 **BLACK MIRROR INTERCEPTED!** {target.mention}'s obsidian barrier reflected the intent. "
-                        f"**{ctx.author.display_name}** lost **{economy.format_balance(actual_loss)}** to the void."
+                        f"🪞 **ECHO SEAL INTERCEPTED!** {target.mention}'s obsidian barrier blocked 50% of the theft. "
+                        f"**{ctx.author.display_name}** only got **{economy.format_balance(actual_stolen)}** (blocked {economy.format_balance(blocked_amt)})."
                     )
 
-                # 1. Mirror Ward Check (Single-use Reflection)
-                if target_inv.get("echo_ward_max", 0) > 0:
-                    await remove_item_from_inventory(target.id, "echo_ward_max")
+                # 1. Reversal Ward Check (Single-use 50% Reflection)
+                if target_inv.get("reversal_ward", 0) > 0:
+                    await remove_item_from_inventory(target.id, "reversal_ward")
                     
-                    # Reflection Logic: Thief gets robbed by the void
-                    reflect_amt = random.randint(min_steal, max_steal)
+                    # Reflect 50% back to thief, victim keeps 50%
+                    steal_amt = random.randint(min_steal, max_steal)
+                    reflected_amt = steal_amt // 2  # 50% reflected
+                    kept_amt = steal_amt - reflected_amt  # 50% kept by victim
+                    
                     thief_bal = await get_balance(ctx.author.id)
-                    actual_loss = min(reflect_amt, thief_bal)
+                    actual_reflect = min(reflected_amt, thief_bal)
                     
-                    await update_balance(ctx.author.id, -actual_loss)
-                    await update_balance(target.id, actual_loss) # Victim gets the tokens 
+                    await update_balance(ctx.author.id, -actual_reflect)
+                    await update_balance(target.id, actual_reflect)
                     
                     return await ctx.send(
-                        f"🪞 **MIRROR WARD SHATTERED!** {target.mention}'s protection reflected the intent. "
-                        f"**{ctx.author.display_name}** tripped on jagged glass and lost **{economy.format_balance(actual_loss)}** to the shadows."
+                        f"🔮 **REVERSAL WARD SHATTERED!** {target.mention}'s protection reflected 50% back. "
+                        f"**{ctx.author.display_name}** lost **{economy.format_balance(actual_reflect)}** to the shadows."
                     )
                 
-                # 2. Standard Ward Check
+                # 2. Standard Echo Ward Check (50% block)
                 if target_inv.get("echo_ward", 0) > 0:
                     await remove_item_from_inventory(target.id, "echo_ward")
-                    return await ctx.send(f"🛡️ **ECHO WARD SHATTERED.** {target.mention} was protected by a glass barrier. The thief escaped with nothing.")
+                    
+                    # Block 50% of the theft
+                    steal_amt = random.randint(min_steal, max_steal)
+                    blocked_amt = steal_amt // 2  # 50% blocked
+                    stolen_amt = steal_amt - blocked_amt
+                    
+                    target_bal = await get_balance(target.id)
+                    actual_stolen = min(stolen_amt, target_bal)
+                    
+                    await update_balance(target.id, -actual_stolen)
+                    await update_balance(ctx.author.id, actual_stolen)
+                    
+                    return await ctx.send(
+                        f"🛡️ **ECHO WARD SHATTERED.** {target.mention} was protected by a glass barrier. "
+                        f"Only **{economy.format_balance(actual_stolen)}** stolen (blocked {economy.format_balance(blocked_amt)})."
+                    )
 
                 # 3. Successful Lick - Dual Tier Returns
                 tier_roll = random.random()
@@ -1193,7 +1224,41 @@ class GamesCog(commands.Cog):
             color=discord.Color.dark_red()
         )
         embed.set_footer(text=f"💰 {winner.display_name} secured {economy.format_balance(payout)}")
+        
+        # Record stats
+        from database import record_fade_result
+        await record_fade_result(winner.id, won=True)
+        await record_fade_result(loser.id, won=False)
+        
         await msg.edit(content=None, embed=embed)
+
+    @commands.command(name="fadestats")
+    async def fadestats_command(self, ctx, member: discord.Member = None):
+        """View fade win/loss statistics. Usage: .fadestats [@user]"""
+        target = member or ctx.author
+        
+        from database import get_fade_stats
+        stats = await get_fade_stats(target.id)
+        
+        wins = stats["wins"]
+        losses = stats["losses"]
+        total = wins + losses
+        
+        if total == 0:
+            return await ctx.send(f"📊 {target.display_name} hasn't participated in any fades yet.")
+        
+        win_rate = (wins / total * 100) if total > 0 else 0
+        
+        embed = discord.Embed(
+            title=f"⚔️ {target.display_name}'s Fade Stats",
+            color=discord.Color.gold()
+        )
+        embed.add_field(name="Wins", value=f"✅ {wins}", inline=True)
+        embed.add_field(name="Losses", value=f"❌ {losses}", inline=True)
+        embed.add_field(name="Win Rate", value=f"📈 {win_rate:.1f}%", inline=True)
+        embed.set_footer(text=f"Total Fades: {total}")
+        
+        await ctx.send(embed=embed)
 
 
 async def setup(bot):

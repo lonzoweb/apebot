@@ -107,6 +107,10 @@ class AdminCog(commands.Cog):
             if current_time - timestamp < 3600
         }
         
+        # Check if user already voted
+        if voter_id in self.cleanse_votes[target_id]:
+            return await ctx.reply("❌ You've already voted to cleanse this user.", mention_author=False)
+        
         # Add this vote
         self.cleanse_votes[target_id][voter_id] = current_time
         vote_count = len(self.cleanse_votes[target_id])

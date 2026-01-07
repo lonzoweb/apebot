@@ -191,6 +191,17 @@ async def init_db():
                 "CREATE INDEX IF NOT EXISTS idx_activity_users_count ON activity_users(count DESC)"
             )
 
+            # Fade stats table
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS fade_stats (
+                    user_id TEXT PRIMARY KEY,
+                    wins INTEGER DEFAULT 0,
+                    losses INTEGER DEFAULT 0
+                )
+                """
+            )
+
         logger.info("✅ Database tables initialized (all modules unified).")
     except Exception as e:
         logger.error(f"Error initializing database: {e}", exc_info=True)
@@ -961,3 +972,35 @@ async def end_reaping():
         await conn.execute("DELETE FROM reaping_participants")
 
         return winner_count, payout_per_person, burned
+
+
+# ============================================================
+# FADE STATS MANAGEMENT
+# ============================================================
+
+async def record_fade_result(user_id: int, won: bool):
+    """Record a fade win or loss for a user."""
+    user_id_str = str(user_id)
+    field = "wins" if won else "losses"
+    async with get_db() as conn:
+        await conn.execute(
+            f"""
+            INSERT INTO fade_stats (user_id, {field}) VALUES (?, 1)
+            ON CONFLICT(user_id) DO UPDATE SET {field} = {field} + 1
+            """,
+            (user_id_str,)
+        )
+
+
+async def get_fade_stats(user_id: int) -> dict:
+    """Get fade stats for a user. Returns {'wins': int, 'losses': int}."""
+    user_id_str = str(user_id)
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT wins, losses FROM fade_stats WHERE user_id = ?",
+            (user_id_str,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return {"wins": row[0], "losses": row[1]}
+            return {"wins": 0, "losses": 0}

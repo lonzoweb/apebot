@@ -118,9 +118,9 @@ class EconomyCog(commands.Cog):
         
         item_display = official_name.replace('_', ' ').title()
         if new_qty == 0:
-            await ctx.send(f"🗑️ **[MOD]** Removed all **{removed}x {item_display}** from {member.mention}'s inventory.")
+            await ctx.send(f"🗑️ Removed all **{removed}x {item_display}** from {member.mention}'s inventory.")
         else:
-            await ctx.send(f"🗑️ **[MOD]** Removed **{removed}x {item_display}** from {member.mention}. ({new_qty} remaining)")
+            await ctx.send(f"🗑️ Removed **{removed}x {item_display}** from {member.mention}. ({new_qty} remaining)")
 
     @commands.command(name="buy", aliases=["shop"])
     @commands.cooldown(1, 5, commands.BucketType.user)
@@ -145,6 +145,9 @@ class EconomyCog(commands.Cog):
                     continue
                     
                 price = f"{data['cost']} 💎"
+                max_uses = data.get('max_uses')
+                if max_uses and max_uses > 1:
+                    price += f" ({max_uses} charges)"
                 desc = data.get('shop_desc', data.get('feedback', 'No description.'))
                 embed.add_field(
                     name=f"{item.replace('_', ' ').title()} — {price}",
@@ -159,6 +162,9 @@ class EconomyCog(commands.Cog):
                     embed.add_field(name="──────────────", value="**🌑 THE HIDDEN EXCHANGE**", inline=False)
                     for item, data in hidden_items:
                         price = f"{data['cost']} 💎"
+                        max_uses = data.get('max_uses')
+                        if max_uses and max_uses > 1:
+                            price += f" ({max_uses} charges)"
                         desc = data.get('shop_desc', data.get('feedback', 'No description.'))
                         embed.add_field(
                             name=f"👁️ {item.replace('_', ' ').title()} — {price}",
@@ -209,7 +215,7 @@ class EconomyCog(commands.Cog):
         # Special handling for wards - limit to one in inventory
         if item_data.get("type") == "defense":
             inventory = await get_user_inventory(ctx.author.id)
-            if inventory.get("echo_ward", 0) > 0 or inventory.get("echo_ward_max", 0) > 0:
+            if inventory.get("echo_ward", 0) > 0 or inventory.get("reversal_ward", 0) > 0 or inventory.get("echo_seal", 0) > 0:
                 return await ctx.reply(
                     "❌ You already have a ward in your stash. You can't handle another.", mention_author=False
                 )
@@ -261,7 +267,15 @@ class EconomyCog(commands.Cog):
 
         msg = "🎒 **Your Inventory:**\n"
         for item, qty in inventory.items():
-            msg += f"• **{item.replace('_', ' ').title()}**: x{qty}\n"
+            item_display = item.replace('_', ' ').title()
+            item_data = ITEM_REGISTRY.get(item, {})
+            max_uses = item_data.get("max_uses")
+            
+            # Show usage count for items with max_uses
+            if max_uses and max_uses > 1:
+                msg += f"• **{item_display}**: {qty}/{max_uses} uses\n"
+            else:
+                msg += f"• **{item_display}**: x{qty}\n"
 
         try:
             await ctx.author.send(msg)
@@ -365,9 +379,9 @@ class EconomyCog(commands.Cog):
 
                 target_inv = await get_user_inventory(target.id)
                 
-                # 0. Check for Black Mirror (Multi-charge Reflection)
-                if target_inv.get("black_mirror", 0) > 0:
-                    await remove_item_from_inventory(target.id, "black_mirror")
+                # 0. Check for Echo Seal (Multi-charge Reflection)
+                if target_inv.get("echo_seal", 0) > 0:
+                    await remove_item_from_inventory(target.id, "echo_seal")
                     await remove_item_from_inventory(ctx.author.id, official_name)
                     
                     # Reflect!
@@ -375,13 +389,13 @@ class EconomyCog(commands.Cog):
                     await add_active_effect(ctx.author.id, official_name, duration)
                     
                     return await ctx.send(
-                        f"🪞 **BLACK MIRROR INTERCEPTED!** {target.mention}'s obsidian barrier reflected the intent. "
+                        f"🪞 **ECHO SEAL INTERCEPTED!** {target.mention}'s obsidian barrier reflected the intent. "
                         f"{ctx.author.mention} is hit with their own **{official_name}**!"
                     )
 
-                # 1. Check for Echo Ward Max (Reflection)
-                if target_inv.get("echo_ward_max", 0) > 0:
-                    await remove_item_from_inventory(target.id, "echo_ward_max")
+                # 1. Check for Reversal Ward (Reflection)
+                if target_inv.get("reversal_ward", 0) > 0:
+                    await remove_item_from_inventory(target.id, "reversal_ward")
                     await remove_item_from_inventory(ctx.author.id, official_name)
                     
                     # Reflect! Apply effect to the sender (ctx.author)
@@ -389,7 +403,7 @@ class EconomyCog(commands.Cog):
                     await add_active_effect(ctx.author.id, official_name, duration)
                     
                     return await ctx.send(
-                        f"🔮 **REFLECTED!** {target.mention}'s Echo Ward Max bounced the curse back! {ctx.author.mention} is hit with **{official_name}**!"
+                        f"🔮 **REFLECTED!** {target.mention}'s Reversal Ward bounced the curse back! {ctx.author.mention} is hit with **{official_name}**!"
                     )
 
                 # 2. Check for Standard Echo Ward (Blocking)

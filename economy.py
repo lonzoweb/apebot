@@ -79,7 +79,7 @@ async def handle_send_command(ctx, member: discord.Member, amount: int):
             from database import update_balance
             await update_balance(recipient_id, amount)
             await ctx.send(
-                f"✅ **[MOD]** {format_balance(amount)} granted to {member.mention}"
+                f"✅ **{format_balance(amount)}** moved from {ctx.author.mention} to {member.mention}"
             )
         else:
             # Regular users must have sufficient balance
@@ -118,7 +118,8 @@ async def handle_gift_command(ctx, member: discord.Member, item_query: str):
         recipient_inv = await get_user_inventory(member.id)
         new_qty = recipient_inv.get(official_name, 0) + 1
         await update_inventory(member.id, official_name, new_qty)
-        await ctx.send(f"🎁 **[MOD]** {official_name.replace('_', ' ').title()} granted to {member.mention}!")
+        item_display = official_name.replace('_', ' ').title()
+        await ctx.send(f"🎁 **{ctx.author.display_name}** handed a **{item_display}** to {member.mention}!")
     else:
         # Regular users must possess the item
         success = await transfer_item(ctx.author.id, member.id, official_name)
