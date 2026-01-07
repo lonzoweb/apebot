@@ -242,8 +242,6 @@ class EconomyCog(commands.Cog):
             await atomic_purchase(ctx.author.id, official_name, cost, qty)
             
             payout_msg = f"💰 **{ctx.author.display_name}** grabbed a **{official_name.replace('_', ' ').title()}** for {cost} 💎."
-            if qty > 1:
-                payout_msg += f" ({qty} charges added to vault)"
             
             await ctx.send(f"{payout_msg} Pleasure doing business.")
         except InsufficientTokens as e:
@@ -379,18 +377,13 @@ class EconomyCog(commands.Cog):
 
                 target_inv = await get_user_inventory(target.id)
                 
-                # 0. Check for Echo Seal (Multi-charge Reflection)
+                # 0. Check for Echo Seal (Multi-charge Blocking)
                 if target_inv.get("echo_seal", 0) > 0:
                     await remove_item_from_inventory(target.id, "echo_seal")
                     await remove_item_from_inventory(ctx.author.id, official_name)
                     
-                    # Reflect!
-                    duration = item_info.get("duration_sec", 600)
-                    await add_active_effect(ctx.author.id, official_name, duration)
-                    
                     return await ctx.send(
-                        f"🪞 **ECHO SEAL INTERCEPTED!** {target.mention}'s obsidian barrier reflected the intent. "
-                        f"{ctx.author.mention} is hit with their own **{official_name}**!"
+                        f"🪞 **ECHO SEAL TRIGGERED!** {target.mention}'s obsidian barrier blocked {ctx.author.mention}'s curse!"
                     )
 
                 # 1. Check for Reversal Ward (Reflection)
