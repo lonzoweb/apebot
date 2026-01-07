@@ -231,7 +231,8 @@ class EconomyCog(commands.Cog):
             )
 
         try:
-            qty = 5 if official_name == "black_mirror" else 1
+            # Check if item has max_uses defined, otherwise default to 1
+            qty = item_data.get("max_uses", 1)
             await atomic_purchase(ctx.author.id, official_name, cost, qty)
             
             payout_msg = f"💰 **{ctx.author.display_name}** grabbed a **{official_name.replace('_', ' ').title()}** for {cost} 💎."

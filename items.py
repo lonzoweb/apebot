@@ -104,6 +104,7 @@ ITEM_REGISTRY = {
     "black_mirror": {
         "cost": 3000,
         "type": "defense",
+        "max_uses": 5,
         "shop_desc": "Ancient obsidian. Intercepts and reflects 5 licks/curses before shattering. (Multi-use Ward Max)",
         "feedback": "🪞 **BLACK MIRROR SECURED.** Your essence is guarded by 5 layers of obsidian reflection.",
     },
