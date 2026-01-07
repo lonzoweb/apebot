@@ -41,12 +41,14 @@ ITEM_REGISTRY = {
     "kush_pack": {
         "cost": 60,
         "type": "fun",
+        "max_uses": 6,
         "shop_desc": "OG APEIRON KUSH WITH AUTO SHIELD.",
         "feedback": "Sparking Apeiron Kush Pack. Shields active.",
     },
     "fire_og_cart": {
         "cost": 60,
         "type": "fun",
+        "max_uses": 6,
         "shop_desc": "APEIRON FIRE OG CART. Keyword: cart, pen, fire.",
         "feedback": "💨 Ripping the cart. That's that gas.",
     },

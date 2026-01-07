@@ -57,13 +57,17 @@ class EconomyCog(commands.Cog):
         """Transfer tokens or items to another user. Usage: .send @user <amount/item>"""
         content = content.strip()
         
-        # Try numeric (tokens)
-        try:
-            amount = int(content)
-            return await economy.handle_send_command(ctx, member, amount)
-        except ValueError:
-            # Not a number, try gifting item
-            return await economy.handle_gift_command(ctx, member, content)
+        # Try numeric (tokens) - extract first number and ignore trailing text
+        words = content.split()
+        if words:
+            try:
+                amount = int(words[0])
+                return await economy.handle_send_command(ctx, member, amount)
+            except ValueError:
+                pass
+        
+        # Not a number, try gifting item
+        return await economy.handle_gift_command(ctx, member, content)
 
     @commands.command(name="baladd")
     @commands.has_permissions(administrator=True)
@@ -82,6 +86,41 @@ class EconomyCog(commands.Cog):
     async def baledit_command(self, ctx, member: discord.Member, new_balance: int):
         """[ADMIN] Set a user's balance to an exact amount. Usage: .baledit @user <amount>"""
         await economy.handle_baledit_command(ctx, member, new_balance)
+
+    @commands.command(name="invremove")
+    async def invremove_command(self, ctx, member: discord.Member, item: str, quantity: int = 1):
+        """[MOD] Remove items from a user's inventory. Usage: .invremove @user <item> [quantity]"""
+        if not has_authorized_role(ctx.author):
+            return await ctx.reply("❌ This command is restricted to moderators.", mention_author=False)
+        
+        # Parse item name
+        official_name = ITEM_ALIASES.get(item.strip().lower())
+        if not official_name:
+            return await ctx.reply(f"❌ '{item}' is not a valid item.", mention_author=False)
+        
+        if quantity <= 0:
+            return await ctx.reply("❌ Quantity must be positive.", mention_author=False)
+        
+        # Get current inventory
+        from database import get_user_inventory, update_inventory
+        inv = await get_user_inventory(member.id)
+        current_qty = inv.get(official_name, 0)
+        
+        if current_qty <= 0:
+            return await ctx.reply(f"❌ {member.display_name} doesn't have any **{official_name.replace('_', ' ').title()}**.", mention_author=False)
+        
+        # Calculate new quantity
+        new_qty = max(0, current_qty - quantity)
+        removed = current_qty - new_qty
+        
+        # Update inventory
+        await update_inventory(member.id, official_name, new_qty)
+        
+        item_display = official_name.replace('_', ' ').title()
+        if new_qty == 0:
+            await ctx.send(f"🗑️ **[MOD]** Removed all **{removed}x {item_display}** from {member.mention}'s inventory.")
+        else:
+            await ctx.send(f"🗑️ **[MOD]** Removed **{removed}x {item_display}** from {member.mention}. ({new_qty} remaining)")
 
     @commands.command(name="buy", aliases=["shop"])
     @commands.cooldown(1, 5, commands.BucketType.user)

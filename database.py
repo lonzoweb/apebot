@@ -468,6 +468,22 @@ async def remove_item_from_inventory(user_id: int, item_name: str) -> bool:
             return False
 
 
+async def update_inventory(user_id: int, item_name: str, quantity: int):
+    """Sets the quantity of an item in user inventory. Deletes if quantity <= 0."""
+    user_id_str = str(user_id)
+    async with get_db() as conn:
+        if quantity <= 0:
+            await conn.execute(
+                "DELETE FROM user_inventory WHERE user_id = ? AND item_name = ?",
+                (user_id_str, item_name),
+            )
+        else:
+            await conn.execute(
+                "INSERT OR REPLACE INTO user_inventory (user_id, item_name, quantity) VALUES (?, ?, ?)",
+                (user_id_str, item_name, quantity),
+            )
+
+
 async def transfer_item(sender_id: int, receiver_id: int, item_name: str) -> bool:
     """Move 1 item from sender's inventory to receiver's."""
     sender_id_str = str(sender_id)

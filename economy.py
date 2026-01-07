@@ -53,13 +53,20 @@ async def handle_balance_command(ctx, member: discord.Member = None):
 
 async def handle_send_command(ctx, member: discord.Member, amount: int):
     """Handles the .send @user <amount> command."""
+    from helpers import has_authorized_role
+    
     if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
         return await ctx.reply("🌑 **System Notice**: Token flow is currently frozen by the administration.", mention_author=False)
 
+    is_authorized = has_authorized_role(ctx.author)
+    
     if member.bot:
         return await ctx.reply("❌ Bots don't need your charity.", mention_author=False)
-    if member.id == ctx.author.id:
+    
+    # Mods can send to themselves
+    if member.id == ctx.author.id and not is_authorized:
         return await ctx.reply("❌ You can't send tokens to yourself, clown.", mention_author=False)
+    
     if amount <= 0:
         return await ctx.reply("❌ Enter a real amount.", mention_author=False)
 
@@ -67,12 +74,19 @@ async def handle_send_command(ctx, member: discord.Member, amount: int):
     recipient_id = member.id
 
     try:
-        # Directly await the async transfer function
-        await transfer_tokens(sender_id, recipient_id, amount)
-        # Don't reveal balance in public chat
-        await ctx.send(
-            f"✅ **{format_balance(amount)}** moved from {ctx.author.mention} to {member.mention}"
-        )
+        # Mods bypass balance check - directly add tokens if authorized
+        if is_authorized:
+            from database import update_balance
+            await update_balance(recipient_id, amount)
+            await ctx.send(
+                f"✅ **[MOD]** {format_balance(amount)} granted to {member.mention}"
+            )
+        else:
+            # Regular users must have sufficient balance
+            await transfer_tokens(sender_id, recipient_id, amount)
+            await ctx.send(
+                f"✅ **{format_balance(amount)}** moved from {ctx.author.mention} to {member.mention}"
+            )
     except InsufficientTokens:
         await ctx.reply(
             f"❌ Transaction declined. You're flat. Need **{format_balance(amount)}**.", mention_author=False
@@ -80,23 +94,38 @@ async def handle_send_command(ctx, member: discord.Member, amount: int):
 
 async def handle_gift_command(ctx, member: discord.Member, item_query: str):
     """Handles parsing and sending an item to another user."""
+    from helpers import has_authorized_role
+    
     if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
         return await ctx.reply("🌑 **System Notice**: The exchange of gifts is forbidden during the blackout.", mention_author=False)
 
+    is_authorized = has_authorized_role(ctx.author)
+    
     if member.bot:
         return await ctx.reply("❌ The machine spirits have no use for physical trinkets.", mention_author=False)
-    if member.id == ctx.author.id:
+    
+    # Mods can gift to themselves
+    if member.id == ctx.author.id and not is_authorized:
         return await ctx.reply("❌ Gifting yourself? How lonely. Seek help.", mention_author=False)
 
     official_name = ITEM_ALIASES.get(item_query.strip().lower())
     if not official_name:
         return await ctx.reply(f"❌ '{item_query}' isn't something you can wrap in a bow.", mention_author=False)
 
-    success = await transfer_item(ctx.author.id, member.id, official_name)
-    if success:
-        await ctx.send(f"🎁 **{ctx.author.display_name}** handed a **{official_name.replace('_', ' ').title()}** to {member.mention}!")
+    # Mods can create items from thin air
+    if is_authorized:
+        from database import get_user_inventory, update_inventory
+        recipient_inv = await get_user_inventory(member.id)
+        new_qty = recipient_inv.get(official_name, 0) + 1
+        await update_inventory(member.id, official_name, new_qty)
+        await ctx.send(f"🎁 **[MOD]** {official_name.replace('_', ' ').title()} granted to {member.mention}!")
     else:
-        await ctx.reply(f"❌ You don't possess a **{official_name.replace('_', ' ').title()}** to give.", mention_author=False)
+        # Regular users must possess the item
+        success = await transfer_item(ctx.author.id, member.id, official_name)
+        if success:
+            await ctx.send(f"🎁 **{ctx.author.display_name}** handed a **{official_name.replace('_', ' ').title()}** to {member.mention}!")
+        else:
+            await ctx.reply(f"❌ You don't possess a **{official_name.replace('_', ' ').title()}** to give.", mention_author=False)
 
 
 async def handle_admin_modify_command(
