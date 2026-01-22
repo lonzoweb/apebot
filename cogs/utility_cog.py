@@ -335,8 +335,8 @@ class UtilityCog(commands.Cog):
             life_path = calculate_life_path(month, day, year)
             traits = get_life_path_traits(life_path)
 
-            zodiac_animal, zodiac_emoji = get_chinese_zodiac_animal(year)
-            zodiac_element = get_chinese_zodiac_element(year)
+            zodiac_animal, zodiac_emoji = get_chinese_zodiac_animal(year, month, day)
+            zodiac_element = get_chinese_zodiac_element(year, month, day)
             animal_traits = get_chinese_animal_traits(zodiac_animal)
             element_traits = get_chinese_element_traits(zodiac_element)
 

@@ -985,18 +985,27 @@ class GamesCog(commands.Cog):
             logger.info(f"Target found: {target.display_name}. Sending announcement.")
             await ctx.send(f"🌑 **{ctx.author.display_name}** is hitting a lick on {target.mention}!\n🚨 {target.mention}, you have **18 seconds** to spook them! (Type anything in chat)")
 
-            # 4. Wait for response (but ignore if they're cursed)
+            # 4. Wait for response (but ignore if they're cursed or tortured)
             async def check(m):
                 if m.author.id != target.id or m.channel.id != ctx.channel.id:
                     return False
-                # Check if target has active uwu or muzzle - they can't defend if cursed
+                
+                # PREVENT Spooking while Cursed (uwu/muzzle)
                 uwu_effect = await get_active_effect(target.id, "uwu")
                 muzzle_effect = await get_active_effect(target.id, "muzzle")
                 current_time = time.time()
                 
-                # If they have active uwu or muzzle, ignore their defense attempt
-                if (uwu_effect and uwu_effect > current_time) or (muzzle_effect and muzzle_effect > current_time):
+                is_cursed = (uwu_effect and uwu_effect > current_time) or (muzzle_effect and muzzle_effect > current_time)
+                
+                # PREVENT Spooking while Tortured (Masochist Role)
+                from config import MASOCHIST_ROLE_ID
+                has_torture_role = any(r.id == MASOCHIST_ROLE_ID for r in target.roles)
+                
+                if is_cursed or has_torture_role:
+                    reason = "CURSED" if is_cursed else "TORTURED"
+                    logger.info(f"Jugg defense ignored: {target.display_name} is {reason}.")
                     return False
+                    
                 return True
 
             try:

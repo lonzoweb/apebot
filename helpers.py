@@ -174,28 +174,35 @@ def get_zodiac_sign(ecliptic_lon):
 
 
 def calculate_life_path(month, day, year):
-    """Calculate life path number with master number logic"""
+    """
+    Calculate life path number with Master Number logic (11, 22, 33).
+    Uses the Component Method (standard in numerology).
+    """
 
-    def reduce_to_single_or_master(num):
-        """Reduce number to single digit or master number (11, 22, 33)"""
-        while num > 9:
-            if num in [11, 22, 33]:
-                return num
-            num = sum(int(d) for d in str(num))
-        return num
+    def reduce_number(n, keep_masters=True):
+        """Reduce a number to a single digit, optionally keeping 11, 22, 33."""
+        if keep_masters and n in [11, 22, 33]:
+            return n
+        while n > 9:
+            n = sum(int(d) for d in str(n))
+            if keep_masters and n in [11, 22, 33]:
+                return n
+        return n
 
-    # Reduce each component
-    month_reduced = reduce_to_single_or_master(month)
-    day_reduced = reduce_to_single_or_master(day)
-    year_reduced = reduce_to_single_or_master(sum(int(d) for d in str(year)))
+    # 1. Reduce Month
+    res_month = reduce_number(month)
+    
+    # 2. Reduce Day
+    res_day = reduce_number(day)
+    
+    # 3. Reduce Year
+    res_year = reduce_number(year)
 
-    # Sum them
-    total = month_reduced + day_reduced + year_reduced
-
-    # Reduce final sum (stopping at master numbers)
-    life_path = reduce_to_single_or_master(total)
-
-    return life_path
+    # 4. Sum the reduced components
+    total = res_month + res_day + res_year
+    
+    # 5. Final reduction
+    return reduce_number(total)
 
 
 def get_life_path_traits(number):
@@ -217,33 +224,40 @@ def get_life_path_traits(number):
     return traits.get(number, "Unknown")
 
 
-def get_chinese_zodiac_animal(year):
-    """Get Chinese zodiac animal and emoji based on year"""
+def get_chinese_zodiac_animal(year, month=None, day=None):
+    """
+    Get Chinese zodiac animal and emoji based on year, with Lunar Year adjustment.
+    If month/day is provided, handle January/Early February birthdays.
+    """
     animals = [
-        ("Rat", "🐀"),
-        ("Ox", "🐂"),
-        ("Tiger", "🐅"),
-        ("Rabbit", "🐇"),
-        ("Dragon", "🐉"),
-        ("Snake", "🐍"),
-        ("Horse", "🐴"),
-        ("Goat", "🐐"),
-        ("Monkey", "🐒"),
-        ("Rooster", "🐓"),
-        ("Dog", "🐕"),
-        ("Pig", "🐖"),
+        ("Rat", "🐀"), ("Ox", "🐂"), ("Tiger", "🐅"), ("Rabbit", "🐇"),
+        ("Dragon", "🐉"), ("Snake", "🐍"), ("Horse", "🐴"), ("Goat", "🐐"),
+        ("Monkey", "🐒"), ("Rooster", "🐓"), ("Dog", "🐕"), ("Pig", "🐖"),
     ]
-    # Chinese zodiac started in 1924 (Year of the Rat)
-    # Calculate offset from 1924
-    index = (year - 1924) % 12
+    
+    # Approximate Lunar New Year shift: 
+    # If month is January (1) or February (2) before the 5th, 
+    # the person belongs to the PREVIOUS year's zodiac sign.
+    effective_year = year
+    if month is not None:
+        if month == 1 or (month == 2 and day is not None and day < 5):
+            effective_year -= 1
+            
+    index = (effective_year - 1924) % 12
     return animals[index]
 
 
-def get_chinese_zodiac_element(year):
-    """Get Chinese zodiac element based on year"""
+def get_chinese_zodiac_element(year, month=None, day=None):
+    """Get Chinese zodiac element based on year, with Lunar Year adjustment."""
     elements = ["Wood", "Fire", "Earth", "Metal", "Water"]
     # Elements cycle every 2 years, starting with Wood in 1924-1925
-    index = ((year - 1924) // 2) % 5
+    
+    effective_year = year
+    if month is not None:
+        if month == 1 or (month == 2 and day is not None and day < 5):
+            effective_year -= 1
+            
+    index = ((effective_year - 1924) // 2) % 5
     return elements[index]
 
 

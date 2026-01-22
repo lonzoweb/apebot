@@ -123,6 +123,7 @@ async def on_ready():
         "cogs.tarot_cog",
         "cogs.admin_cog",
         "cogs.image_cog",
+        "cogs.snake_cog",
         "activitycog",
     ]
 
@@ -279,7 +280,7 @@ async def globally_block_channels(ctx):
             return False
 
     # Allow channels in these channel names
-    ALLOWED_CHANNEL_NAMES = ["forum", "forum-livi", "emperor"]
+    ALLOWED_CHANNEL_NAMES = ["forum", "forum-livi", "bot-logs"]
 
     return ctx.channel.name in ALLOWED_CHANNEL_NAMES
 
