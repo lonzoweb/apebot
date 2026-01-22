@@ -166,6 +166,10 @@ class GamesCog(commands.Cog):
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: The underground casinos are closed while the economy is disabled.", mention_author=False)
         
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
+        
         # Handle help command
         if bet and bet.lower() == "help":
             help_embed = discord.Embed(
