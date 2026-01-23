@@ -60,7 +60,7 @@ class ImageCog(commands.Cog):
             embed.set_footer(text=f"Requested by {ctx.author.display_name}")
             
             # 5. Edit Original Message with Attachment
-            await status_msg.edit(content=f"🌑 **Completed {prompt}:**", embed=embed, attachments=[file])
+            await status_msg.edit(content=f"🌑 **Finished {prompt}:**", embed=embed, attachments=[file])
 
         except Exception as e:
             logger.error(f"Error in .img command: {e}", exc_info=True)
