@@ -2,7 +2,9 @@ import discord
 from discord.ext import commands
 import random
 import logging
-import urllib.parse
+import io
+import asyncio
+from api import pollinations_generate_image
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +72,7 @@ class SnakeCog(commands.Cog):
             },
             {
                 "name": "Bushmaster",
-                "scientific": "Lachesis muta",
+                "scientific": "Lachesis muta",  
                 "origin": "Central and South America",
                 "danger": "High. The longest pit viper in the world. Shy but extremely dangerous if disturbed.",
                 "traits": "Egg-laying, rough scales, lives in primary rainforests."
@@ -95,6 +97,97 @@ class SnakeCog(commands.Cog):
                 "origin": "Southeast Asia",
                 "danger": "Maximum (Constrictor). The world's longest snake. Large individuals are known to eat humans.",
                 "traits": "Geometric patterns, aquatic proficiency, massive muscular force."
+            },
+            {
+                "name": "Saw-scaled Viper",
+                "scientific": "Echis carinatus",
+                "origin": "Middle East & Central Asia",
+                "danger": "High. Small but incredibly aggressive. Responsible for more human deaths than any other snake species.",
+                "traits": "Sizzling sound from scale-rubbing, lightning-fast strike, highly potent hemotoxin."
+            },
+            {
+                "name": "Boomslang",
+                "scientific": "Dispholidus typus",
+                "origin": "Sub-Saharan Africa",
+                "danger": "Severe. A rear-fanged snake with hemotoxic venom that causes internal bleeding from every orifice.",
+                "traits": "Large emerald eyes, incredible camouflage, shy tree-dweller."
+            },
+            {
+                "name": "Eastern Brown Snake",
+                "scientific": "Pseudonaja textilis",
+                "origin": "Australia",
+                "danger": "Lethal. Responsible for the most snakebite deaths in Australia. Known for its speed and aggression.",
+                "traits": "Slim body, highly variable color, 'S' shaped defensive posture."
+            },
+            {
+                "name": "Russell's Viper",
+                "scientific": "Daboia russelii",
+                "origin": "Asia",
+                "danger": "Maximum. One of the 'Big Four' venomous snakes in India. Extremely irritable and loud-hissing.",
+                "traits": "Chain-like patterns, powerful strike, highly destructive venom."
+            },
+            {
+                "name": "Fer-de-lance",
+                "scientific": "Bothrops asper",
+                "origin": "Central & South America",
+                "danger": "Severe. Highly irritable and fast. Known as the 'Ultimate Pit Viper'.",
+                "traits": "Triangular head, defensive 'tail vibrating', large size."
+            },
+            {
+                "name": "Common Krait",
+                "scientific": "Bungarus caeruleus",
+                "origin": "Indian Subcontinent",
+                "danger": "Lethal. Nocturnal hunter with a bite that is often painless, yet deadly within hours.",
+                "traits": "Polished black scales with white bands, docile by day, aggressive by night."
+            },
+            {
+                "name": "Tiger Snake",
+                "scientific": "Notechis scutatus",
+                "origin": "Australia",
+                "danger": "Extreme. Highly venomous with a potent mix of neurotoxins, hemolysins, and coagulants.",
+                "traits": "Dark bands like a tiger, flattened neck when threatened, semi-aquatic."
+            },
+            {
+                "name": "Mozambique Spitting Cobra",
+                "scientific": "Naja mossambica",
+                "origin": "Eastern & Southern Africa",
+                "danger": "High. Can accurately spit venom into eyes from up to 8 feet away.",
+                "traits": "Salmon-colored throat, highly nervous, unique defensive spitting."
+            },
+            {
+                "name": "Eastern Coral Snake",
+                "scientific": "Micrurus fulvius",
+                "origin": "Southeastern United States",
+                "danger": "Severe. Possesses one of the most potent neurotoxins in the Americas.",
+                "traits": "Vibrant red, yellow, and black rings, shy and reclusive, stays underground."
+            },
+            {
+                "name": "Death Adder",
+                "scientific": "Acanthophis antarcticus",
+                "origin": "Australia & New Guinea",
+                "danger": "Lethal. Master of ambush. Possesses the fastest strike of any snake in the world.",
+                "traits": "Short body, leaf-litter camouflage, lures prey with a worm-like tail tip."
+            },
+            {
+                "name": "Sidewinder",
+                "scientific": "Crotalus cerastes",
+                "origin": "Southwestern US & Mexico",
+                "danger": "Moderate. A specialized desert rattlesnake with a unique locomotion.",
+                "traits": "Horn-like scales above eyes, J-shaped scent trails, rapid desert movement."
+            },
+            {
+                "name": "Rhinoceros Viper",
+                "scientific": "Bitis nasicornis",
+                "origin": "Central African Rainforests",
+                "danger": "High. A massive, slow-moving heavy-hitter with incredible patterns.",
+                "traits": "Horns on snout, stunning geometric colors, loud 'hissing' like a bellows."
+            },
+            {
+                "name": "Cape Cobra",
+                "scientific": "Naja nivea",
+                "origin": "Southern Africa",
+                "danger": "Extreme. Considered the most dangerous cobra in Africa due to its potent neurotoxic venom.",
+                "traits": "Yellow to copper scales, diurnal hunter, highly aggressive defensive hood."
             }
         ]
 
@@ -104,26 +197,37 @@ class SnakeCog(commands.Cog):
         """Draw a random snake from the compendium with a high-quality visualization."""
         snake = random.choice(self.snakes)
         
-        # Generate image prompt
+        # 2. Get Image Bytes via API
         prompt = f"Hi-quality realistic photography of a {snake['name']} ({snake['scientific']}) in its natural habitat, {snake['origin']}, dark cinematic lighting, extremely detailed scales and eyes, 8k resolution, National Geographic style."
-        encoded_prompt = urllib.parse.quote(prompt)
-        image_url = f"https://pollinations.ai/p/{encoded_prompt}"
         
-        embed = discord.Embed(
-            title=f"🐍 {snake['name']}",
-            description=f"*{snake['scientific']}*",
-            color=discord.Color.dark_green()
-        )
-        
-        embed.set_image(url=image_url)
-        embed.add_field(name="🌎 Origin", value=snake['origin'], inline=True)
-        embed.add_field(name="⚠️ Danger", value=snake['danger'], inline=False)
-        embed.add_field(name="✨ Traits", value=snake['traits'], inline=False)
-        
-        footer_text = "Drawn from the Great Serpent Compendium."
-        embed.set_footer(text=footer_text)
-        
-        await ctx.send(embed=embed)
+        try:
+            image_bytes, error_msg = await pollinations_generate_image(prompt)
+            
+            if not image_bytes:
+                return
+
+            # 3. Prepare File & Embed
+            file = discord.File(io.BytesIO(image_bytes), filename="snake.png")
+            embed = discord.Embed(
+                title=f"🐍 {snake['name']}",
+                description=f"*{snake['scientific']}*",
+                color=discord.Color.dark_green()
+            )
+            
+            embed.set_image(url="attachment://snake.png")
+            embed.add_field(name="🌎 Origin", value=snake['origin'], inline=True)
+            embed.add_field(name="⚠️ Danger", value=snake['danger'], inline=False)
+            embed.add_field(name="✨ Traits", value=snake['traits'], inline=False)
+            
+            footer_text = "Snake"
+            embed.set_footer(text=footer_text)
+            
+            # 4. Final delivery
+            await ctx.send(embed=embed, file=file)
+
+        except Exception as e:
+            logger.error(f"Error in .snake command: {e}", exc_info=True)
+            return
 
 async def setup(bot):
     await bot.add_cog(SnakeCog(bot))
