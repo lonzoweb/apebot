@@ -23,6 +23,9 @@ from exceptions import InsufficientTokens, InsufficientInventory, ActiveCurseErr
 from items import ITEM_REGISTRY, ITEM_ALIASES
 from helpers import has_authorized_role
 import database
+import shutil
+import os
+from database import reset_economy_data
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +89,35 @@ class EconomyCog(commands.Cog):
     async def baledit_command(self, ctx, member: discord.Member, new_balance: int):
         """[ADMIN] Set a user's balance to an exact amount. Usage: .baledit @user <amount>"""
         await economy.handle_baledit_command(ctx, member, new_balance)
+
+    @commands.command(name="backup_economy")
+    @commands.has_permissions(administrator=True)
+    async def backup_economy_command(self, ctx):
+        """[ADMIN] Create a backup of the database file."""
+        from config import DB_FILE
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        backup_file = f"{DB_FILE}.{timestamp}.bak"
+        try:
+            shutil.copy2(DB_FILE, backup_file)
+            await ctx.send(f"✅ Database backed up to `{os.path.basename(backup_file)}`")
+        except Exception as e:
+            await ctx.send(f"❌ Backup failed: {e}")
+
+    @commands.command(name="reset_economy")
+    @commands.has_permissions(administrator=True)
+    async def reset_economy_command(self, ctx):
+        """[ADMIN] Reset the entire economy (balances and inventories)."""
+        await ctx.send("🚨 **WARNING**: This will wipe ALL balances and inventories. Are you absolutely sure? Type `CONFIRM RESET` to proceed.")
+
+        def check(m):
+            return m.author == ctx.author and m.channel == ctx.channel and m.content == "CONFIRM RESET"
+
+        try:
+            await self.bot.wait_for("message", check=check, timeout=30.0)
+            await reset_economy_data()
+            await ctx.send("🔥 **ECONOMY WIPED.** All balances and inventories have been reset to zero.")
+        except asyncio.TimeoutError:
+            await ctx.send("⌛ Reset cancelled. The treasury remains intact.")
 
     @commands.command(name="invremove")
     async def invremove_command(self, ctx, member: discord.Member, item: str, quantity: int = 1):

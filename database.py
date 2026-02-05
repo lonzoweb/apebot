@@ -524,6 +524,16 @@ async def transfer_item(sender_id: int, receiver_id: int, item_name: str) -> boo
         return True
 
 
+async def reset_economy_data():
+    """Wipes all rows from balances and user_inventory tables. Standard reset."""
+    async with get_db() as conn:
+        await conn.execute("DELETE FROM balances")
+        await conn.execute("DELETE FROM user_inventory")
+        # Optional: also clear daily claims if we want a fresh start
+        await conn.execute("DELETE FROM daily_claims")
+    logger.info("⚠️ ECONOMY RESET: All balances and inventories cleared.")
+
+
 # ============================================================
 # ACTIVE EFFECT MANAGEMENT
 # ============================================================

@@ -58,7 +58,7 @@ async def handle_send_command(ctx, member: discord.Member, amount: int):
     if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
         return await ctx.reply("🌑 **System Notice**: Token flow is currently frozen by the administration.", mention_author=False)
 
-    is_authorized = has_authorized_role(ctx.author)
+    is_authorized = ctx.author.guild_permissions.administrator
     
     if member.bot:
         return await ctx.reply("❌ Bots don't need your charity.", mention_author=False)
@@ -99,7 +99,7 @@ async def handle_gift_command(ctx, member: discord.Member, item_query: str):
     if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
         return await ctx.reply("🌑 **System Notice**: The exchange of gifts is forbidden during the blackout.", mention_author=False)
 
-    is_authorized = has_authorized_role(ctx.author)
+    is_authorized = ctx.author.guild_permissions.administrator
     
     if member.bot:
         return await ctx.reply("❌ The machine spirits have no use for physical trinkets.", mention_author=False)

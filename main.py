@@ -123,7 +123,6 @@ async def on_ready():
         "cogs.tarot_cog",
         "cogs.admin_cog",
         "cogs.image_cog",
-        "cogs.snake_cog",
         "activitycog",
     ]
 
@@ -268,21 +267,44 @@ async def on_raw_reaction_add(payload):
 
 
 @bot.check
-async def globally_block_channels(ctx):
-    """Block all commands except in allowed channels"""
-    # Admins can use commands anywhere
+async def globally_block_commands(ctx):
+    """Block all commands except in allowed channels or if muzzled/uwud."""
+    # Admins can use commands anywhere and are immune to curses
     if ctx.author.guild_permissions.administrator:
         return True
 
     # Check debug mode
     if getattr(bot, "DEBUG_MODE", False):
-        if not ctx.author.guild_permissions.administrator:
-            return False
+        return False
 
     # Allow channels in these channel names
     ALLOWED_CHANNEL_NAMES = ["forum", "forum-livi", "bot-logs"]
+    if ctx.channel.name not in ALLOWED_CHANNEL_NAMES:
+        return False
 
-    return ctx.channel.name in ALLOWED_CHANNEL_NAMES
+    # Block if muzzled or uwud
+    effects = await get_all_active_effects(ctx.author.id)
+    for effect_name, expiration in effects:
+        if time.time() < expiration and effect_name in ["muzzle", "uwu"]:
+            return False
+
+    return True
+
+
+@bot.tree.interaction_check
+async def global_interaction_check(interaction: discord.Interaction):
+    """Global check for slash commands - block muzzled/uwud users."""
+    if interaction.user.guild_permissions.administrator:
+        return True
+
+    effects = await get_all_active_effects(interaction.user.id)
+    for effect_name, expiration in effects:
+        if time.time() < expiration and effect_name in ["muzzle", "uwu"]:
+            await interaction.response.send_message(
+                "❌ Your voice is currently suppressed.", ephemeral=True
+            )
+            return False
+    return True
 
 
 @bot.event
