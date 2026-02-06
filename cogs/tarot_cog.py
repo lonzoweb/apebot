@@ -12,6 +12,7 @@ from datetime import datetime
 from database import get_guild_tarot_deck, set_guild_tarot_deck, get_balance, update_balance
 import tarot
 import rws
+import manara
 import economy
 
 logger = logging.getLogger(__name__)
@@ -42,9 +43,15 @@ class TarotCog(commands.Cog):
 
             deck_name = deck_name.lower()
 
-            if deck_name not in ["thoth", "rws"]:
+            if deck_name in ["thoth", "aleister"]:
+                deck_name = "thoth"
+            elif deck_name in ["rws", "rider", "waite"]:
+                deck_name = "rws"
+            elif deck_name in ["manara", "milo", "erotic"]:
+                deck_name = "manara"
+            else:
                 return await ctx.reply(
-                    f"❌ Unknown deck `{deck_name}`. The spirits only know `thoth` or `rws`.", mention_author=False
+                    f"❌ Unknown deck `{deck_name}`. The spirits only know `thoth`, `rws` or `manara`.", mention_author=False
                 )
 
             await set_guild_tarot_deck(ctx.guild.id, deck_name)
@@ -57,6 +64,8 @@ class TarotCog(commands.Cog):
 
         if deck_name_clean == "rws":
             deck_module = rws
+        elif deck_name_clean == "manara":
+            deck_module = manara
         else:
             deck_module = tarot
 
