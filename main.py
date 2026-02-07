@@ -337,8 +337,19 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.CheckFailure):
         return
 
-    # REDIRECT ERRORS TO LOGS
+    # REDIRECT ERRORS TO LOGS (with simple rate limiting to prevent 429s)
     elif isinstance(error, (commands.MemberNotFound, commands.UserNotFound, commands.CommandInvokeError)):
+        # Simple local rate limiting for errors
+        if not hasattr(bot, "_error_cooldowns"):
+            bot._error_cooldowns = {}
+        
+        error_key = f"{ctx.command.name}:{str(error)}"
+        now = time.time()
+        if now - bot._error_cooldowns.get(error_key, 0) < 60:
+            return # Don't spam same error for same command more than once per minute
+
+        bot._error_cooldowns[error_key] = now
+
         log_channel = await get_log_channel(ctx.guild)
         if log_channel:
             embed = discord.Embed(

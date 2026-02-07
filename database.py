@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def get_db():
     """Async context manager for safe database connections and transactions."""
-    async with aiosqlite.connect(DB_FILE, timeout=10.0) as conn:
-        await conn.execute("PRAGMA journal_mode=WAL")
+    async with aiosqlite.connect(DB_FILE, timeout=20.0) as conn:
         try:
             yield conn
             await conn.commit()
@@ -44,6 +43,10 @@ async def init_db():
     """
     try:
         async with get_db() as conn:
+            # Persistent performance optimizations
+            await conn.execute("PRAGMA journal_mode=WAL")
+            await conn.execute("PRAGMA synchronous=NORMAL")
+
             # Quotes Table
             await conn.execute(
                 "CREATE TABLE IF NOT EXISTS quotes (id INTEGER PRIMARY KEY AUTOINCREMENT, quote TEXT UNIQUE)"

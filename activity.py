@@ -54,29 +54,30 @@ async def flush_activity_to_db():
     # 2. Flush to DB
     try:
         async with get_db() as conn:
-            # Batch insert hourly data
-            # Update last_updated timestamp to prevent cleanup from deleting recently updated entries
-            for hour, count in hourly_data.items():
-                await conn.execute(
+            # Batch update hourly data
+            if hourly_data:
+                hourly_items = [(hour, count, count) for hour, count in hourly_data.items()]
+                await conn.executemany(
                     """
                     INSERT INTO activity_hourly (hour, count, last_updated) VALUES (?, ?, datetime('now'))
                     ON CONFLICT(hour) DO UPDATE SET 
                         count = count + ?,
                         last_updated = datetime('now')
-                """,
-                    (hour, count, count),
+                    """,
+                    hourly_items,
                 )
 
-            # Batch insert user data
-            for user_id, count in user_data.items():
-                await conn.execute(
+            # Batch update user data
+            if user_data:
+                user_items = [(user_id, count, count) for user_id, count in user_data.items()]
+                await conn.executemany(
                     """
                     INSERT INTO activity_users (user_id, count, last_updated) VALUES (?, ?, datetime('now'))
                     ON CONFLICT(user_id) DO UPDATE SET 
                         count = count + ?,
                         last_updated = datetime('now')
-                """,
-                    (user_id, count, count),
+                    """,
+                    user_items,
                 )
 
             # The context manager (get_db) handles conn.commit()

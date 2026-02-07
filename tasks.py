@@ -52,8 +52,8 @@ def setup_tasks(bot, guild_id: int):
 
     cleanup_activity_daily.start()
 
-    # --- 2. Activity Flushing Task (30 minutes) ---
-    @tasks.loop(minutes=30)
+    # --- 2. Activity Flushing Task (5 minutes) ---
+    @tasks.loop(minutes=5)
     async def flush_activity_frequent():
         """Flush batched activity data to database"""
         try:
