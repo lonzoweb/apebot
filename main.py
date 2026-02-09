@@ -103,7 +103,7 @@ class YapManager:
         self.presets = {
             "low": {"window": 30, "limit": 4, "heat_threshold": 1},
             "high": {"window": 70, "limit": 8, "heat_threshold": 1},
-            "center": {"global_cd": 15, "strike_window": 60, "strike_threshold": 2}
+            "center": {"global_cd": 7, "strike_window": 60, "strike_threshold": 6}
         }
 
     def check_spam(self, user_id: int, level: str) -> tuple[bool, str]:
@@ -121,11 +121,12 @@ class YapManager:
                 self.strikes[user_id] = [t for t in self.strikes[user_id] if now - t < config["strike_window"]]
                 self.strikes[user_id].append(now)
                 
-                if len(self.strikes[user_id]) >= config["strike_threshold"]:
+                strike_count = len(self.strikes[user_id])
+                if strike_count >= config["strike_threshold"]:
                     self.strikes[user_id] = [] # Reset on muzzle
-                    return True, "Strike 2, muzzled for 5m. Chill out."
+                    return True, f"Strike {strike_count}, muzzled for 5m. Chill out."
                 else:
-                    return False, "Strike given, chill tf out."
+                    return False, "Strike given, relax"
             else:
                 # Bot not on CD, update global time
                 self.last_global_cmd_time = now
