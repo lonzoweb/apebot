@@ -163,8 +163,8 @@ class AdminCog(commands.Cog):
         value = value.lower()
 
         if setting_name == "yap":
-            if value not in ["low", "high"]:
-                return await ctx.reply("❌ Yap `low` or `high`.", mention_author=False)
+            if value not in ["low", "high", "center"]:
+                return await ctx.reply("❌ Yap `low`, `high`, or `center`.", mention_author=False)
             
             await set_yap_level(value)
             await ctx.reply(f"🔇 yap set to **{value.upper()}**.", mention_author=False)

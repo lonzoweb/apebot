@@ -98,31 +98,57 @@ class YapManager:
     def __init__(self):
         self.usage = {} # {user_id: [timestamps]}
         self.heat = {}  # {user_id: count}
+        self.strikes = {} # {user_id: [timestamps]}
+        self.last_global_cmd_time = 0
         self.presets = {
             "low": {"window": 30, "limit": 4, "heat_threshold": 1},
-            "high": {"window": 70, "limit": 8, "heat_threshold": 1}
+            "high": {"window": 70, "limit": 8, "heat_threshold": 1},
+            "center": {"global_cd": 15, "strike_window": 60, "strike_threshold": 2}
         }
 
-    def check_spam(self, user_id: int, level: str) -> bool:
-        """Returns True if user should be muzzled."""
+    def check_spam(self, user_id: int, level: str) -> tuple[bool, str]:
+        """Returns (triggered_muzzle, feedback_message)."""
         now = time.time()
-        config = self.presets.get(level, self.presets["high"])
         
-        if user_id not in self.usage:
-            self.usage[user_id] = []
+        if level == "center":
+            config = self.presets["center"]
+            # Check global cooldown
+            if now - self.last_global_cmd_time < config["global_cd"]:
+                # User gets a strike
+                if user_id not in self.strikes:
+                    self.strikes[user_id] = []
+                # Clean old strikes
+                self.strikes[user_id] = [t for t in self.strikes[user_id] if now - t < config["strike_window"]]
+                self.strikes[user_id].append(now)
+                
+                if len(self.strikes[user_id]) >= config["strike_threshold"]:
+                    self.strikes[user_id] = [] # Reset on muzzle
+                    return True, "Strike 2, muzzled for 5m. Chill out."
+                else:
+                    return False, "Strike given, chill tf out."
+            else:
+                # Bot not on CD, update global time
+                self.last_global_cmd_time = now
+                return False, ""
         
-        # Clean old timestamps
-        self.usage[user_id] = [t for t in self.usage[user_id] if now - t < config["window"]]
-        self.usage[user_id].append(now)
-        
-        if len(self.usage[user_id]) > config["limit"]:
-            self.heat[user_id] = self.heat.get(user_id, 0) + 1
-            if self.heat[user_id] >= config["heat_threshold"]:
-                # Reset heat/usage on trigger
-                self.heat[user_id] = 0
+        else: # low / high
+            config = self.presets.get(level, self.presets["high"])
+            
+            if user_id not in self.usage:
                 self.usage[user_id] = []
-                return True
-        return False
+            
+            # Clean old timestamps
+            self.usage[user_id] = [t for t in self.usage[user_id] if now - t < config["window"]]
+            self.usage[user_id].append(now)
+            
+            if len(self.usage[user_id]) > config["limit"]:
+                self.heat[user_id] = self.heat.get(user_id, 0) + 1
+                if self.heat[user_id] >= config["heat_threshold"]:
+                    # Reset heat/usage on trigger
+                    self.heat[user_id] = 0
+                    self.usage[user_id] = []
+                    return True, "Go outside, keep yourself safe. Stop yapping."
+            return False, ""
 
 bot.yap_manager = YapManager()
 
@@ -328,9 +354,15 @@ async def globally_block_commands(ctx):
 
     # YAP SYSTEM (Heat / Spam Check)
     yap_level = await get_yap_level()
-    if bot.yap_manager.check_spam(ctx.author.id, yap_level):
+    muzzle_trigger, feedback = bot.yap_manager.check_spam(ctx.author.id, yap_level)
+    
+    if muzzle_trigger:
         await add_active_effect(ctx.author.id, "muzzle", 300) # 5 min muzzle
-        await ctx.reply("Go outside, keep yourself safe. Stop yapping.", mention_author=False)
+        await ctx.reply(feedback, mention_author=False)
+        return False
+    elif feedback:
+        # This covers "Strike given" but not muzzled yet
+        await ctx.reply(feedback, mention_author=False)
         return False
 
     return True
