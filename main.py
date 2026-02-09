@@ -103,7 +103,7 @@ class YapManager:
         self.presets = {
             "low": {"window": 30, "limit": 4, "heat_threshold": 1},
             "high": {"window": 70, "limit": 8, "heat_threshold": 1},
-            "center": {"global_cd": 15, "strike_window": 60, "strike_threshold": 2}
+            "center": {"global_cd": 7, "strike_window": 60, "strike_threshold": 6}
         }
 
     def check_spam(self, user_id: int, level: str) -> tuple[bool, str]:
