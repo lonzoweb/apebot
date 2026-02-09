@@ -25,11 +25,12 @@ from items import aggressive_uwu
 from config import TOKEN, COMMAND_PREFIX, AUTHORIZED_ROLES
 from database import (
     init_db,
-    get_active_effect,
+    add_active_effect,
     get_all_active_effects,
     remove_active_effect,
     get_user_timezone,
-    increment_gif_count
+    increment_gif_count,
+    get_yap_level
 )
 from helpers import extract_gif_url
 import activity
@@ -87,6 +88,43 @@ bot.start_time = datetime.now()
 
 # Global state
 bot.DEBUG_MODE = False
+
+# ============================================================
+# YAP SYSTEM (Spam Enforcement)
+# ============================================================
+
+class YapManager:
+    """Manages command frequency tracking and heat accumulation."""
+    def __init__(self):
+        self.usage = {} # {user_id: [timestamps]}
+        self.heat = {}  # {user_id: count}
+        self.presets = {
+            "low": {"window": 30, "limit": 4, "heat_threshold": 1},
+            "high": {"window": 70, "limit": 8, "heat_threshold": 1}
+        }
+
+    def check_spam(self, user_id: int, level: str) -> bool:
+        """Returns True if user should be muzzled."""
+        now = time.time()
+        config = self.presets.get(level, self.presets["high"])
+        
+        if user_id not in self.usage:
+            self.usage[user_id] = []
+        
+        # Clean old timestamps
+        self.usage[user_id] = [t for t in self.usage[user_id] if now - t < config["window"]]
+        self.usage[user_id].append(now)
+        
+        if len(self.usage[user_id]) > config["limit"]:
+            self.heat[user_id] = self.heat.get(user_id, 0) + 1
+            if self.heat[user_id] >= config["heat_threshold"]:
+                # Reset heat/usage on trigger
+                self.heat[user_id] = 0
+                self.usage[user_id] = []
+                return True
+        return False
+
+bot.yap_manager = YapManager()
 
 
 @bot.event
@@ -287,6 +325,13 @@ async def globally_block_commands(ctx):
     for effect_name, expiration in effects:
         if time.time() < expiration and effect_name in ["muzzle", "uwu"]:
             return False
+
+    # YAP SYSTEM (Heat / Spam Check)
+    yap_level = await get_yap_level()
+    if bot.yap_manager.check_spam(ctx.author.id, yap_level):
+        await add_active_effect(ctx.author.id, "muzzle", 300) # 5 min muzzle
+        await ctx.reply("Go outside, keep yourself safe. Stop yapping.", mention_author=False)
+        return False
 
     return True
 

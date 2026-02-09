@@ -1017,3 +1017,24 @@ async def get_fade_stats(user_id: int) -> dict:
             if row:
                 return {"wins": row[0], "losses": row[1]}
             return {"wins": 0, "losses": 0}
+
+# ============================================================
+# YAP SYSTEM SETTINGS
+# ============================================================
+
+async def get_yap_level() -> str:
+    """Get the global yap level (low/high). Defaults to high."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT value FROM system_settings WHERE key = 'yap_level'"
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else "high"
+
+async def set_yap_level(level: str):
+    """Set the global yap level (low/high)."""
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?",
+            ("yap_level", level.lower(), level.lower()),
+        )

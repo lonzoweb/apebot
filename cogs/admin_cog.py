@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from database import is_economy_on, set_economy_status
+from database import is_economy_on, set_economy_status, set_yap_level, get_yap_level
 
 class AdminCog(commands.Cog):
     """Admin-only commands for system control."""
@@ -151,6 +151,25 @@ class AdminCog(commands.Cog):
                 await ctx.send(f"✅ **{member.display_name}** has been given the **{role.name}** role.")
         except discord.Forbidden:
             await ctx.send("❌ I don't have permission to manage this role.")
+
+    @commands.command(name="set")
+    @commands.has_permissions(administrator=True)
+    async def set_system_setting(self, ctx, setting_name: str = None, value: str = None):
+        """Set a system level setting (e.g., .set yap low/high)"""
+        if not setting_name or not value:
+            return await ctx.reply("❌ Usage: `.set <setting> <value>`. Example: `.set yap low`", mention_author=False)
+
+        setting_name = setting_name.lower()
+        value = value.lower()
+
+        if setting_name == "yap":
+            if value not in ["low", "high"]:
+                return await ctx.reply("❌ Yap `low` or `high`.", mention_author=False)
+            
+            await set_yap_level(value)
+            await ctx.reply(f"🔇 yap set to **{value.upper()}**.", mention_author=False)
+        else:
+            await ctx.reply(f"❌ Unknown setting: `{setting_name}`.", mention_author=False)
 
 async def setup(bot):
     await bot.add_cog(AdminCog(bot))

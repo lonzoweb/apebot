@@ -652,16 +652,27 @@ class UtilityCog(commands.Cog):
 
         REWARD_AMOUNT = 3
         last_used = getattr(self.bot, 'key_last_used', {})
-
+        current_time = time.time()
+        
+        # 1. Global Cooldown (2 minutes)
+        global_cooldown_duration = 120
+        last_global_use = getattr(self.bot, 'key_global_last_used', 0)
+        
         is_admin = ctx.author.guild_permissions.administrator
-
+        
         if not is_admin:
-            current_time = time.time()
-            cooldown_duration = 60
+            # Check Global Cooldown first
+            if current_time - last_global_use < global_cooldown_duration:
+                # Silently fail or send a subtle message? User requested "increase cooldown", 
+                # but usually global CDs in this bot are handled silently or with a "spirits are busy" message.
+                # I'll return silently to match existing pattern for cooldowns in this cog.
+                return
 
+            # 2. Per-User Cooldown (3 minutes)
+            user_cooldown_duration = 180
             if "key" in last_used:
                 time_since_last_use = current_time - last_used["key"]
-                if time_since_last_use < cooldown_duration:
+                if time_since_last_use < user_cooldown_duration:
                     return
 
         STICKER_ID = 1416504837436342324
@@ -677,7 +688,8 @@ class UtilityCog(commands.Cog):
             await update_balance(ctx.author.id, REWARD_AMOUNT)
 
             if not is_admin:
-                last_used["key"] = time.time()
+                self.bot.key_global_last_used = current_time
+                last_used["key"] = current_time
                 self.bot.key_last_used = last_used
 
         except discord.NotFound:
