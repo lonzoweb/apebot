@@ -162,14 +162,7 @@ class AdminCog(commands.Cog):
         setting_name = setting_name.lower()
         value = value.lower()
 
-        if setting_name == "yap":
-            if value not in ["low", "high", "center"]:
-                return await ctx.reply("❌ Yap `low`, `high`, or `center`.", mention_author=False)
-            
-            await set_yap_level(value)
-            await ctx.reply(f"🔇 yap set to **{value.upper()}**.", mention_author=False)
-        else:
-            await ctx.reply(f"❌ Unknown setting: `{setting_name}`.", mention_author=False)
+        await ctx.reply(f"❌ Unknown setting: `{setting_name}`.", mention_author=False)
 
 async def setup(bot):
     await bot.add_cog(AdminCog(bot))

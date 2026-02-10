@@ -132,6 +132,12 @@ ITEM_REGISTRY = {
         "shop_desc": "5-hour overnight shield. Blocks all theft and gains for duration.",
         "feedback": "🌙 **NIGHT VISION ACTIVATED.**\n\nProtecting your assets until you awaken.\n\n*The void watches its own.*",
     },
+    "gold_card": {
+        "cost": 10000,
+        "type": "passive",
+        "shop_desc": "Lets you spam more. Worth its weight.",
+        "feedback": "💳 **GOLD CARD SECURED.** You've obtained VIP status. Limits increased.",
+    },
 }
 
 # Aliases to make buying/using easier for users
@@ -201,6 +207,8 @@ ITEM_ALIASES = {
     "gun": "gun",
     "strap": "gun",
     "heat": "gun",
+    "gold": "gold_card",
+    "gold_card": "gold_card",
 }
 
 # ============================================================

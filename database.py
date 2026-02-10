@@ -1038,3 +1038,14 @@ async def set_yap_level(level: str):
             "INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?",
             ("yap_level", level.lower(), level.lower()),
         )
+
+async def has_item(user_id: int, item_name: str) -> bool:
+    """Check if a user has at least one of a specific item."""
+    user_id_str = str(user_id)
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT quantity FROM user_inventory WHERE user_id = ? AND item_name = ?",
+            (user_id_str, item_name),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return (row[0] > 0) if row else False

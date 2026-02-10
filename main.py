@@ -30,7 +30,8 @@ from database import (
     remove_active_effect,
     get_user_timezone,
     increment_gif_count,
-    get_yap_level
+    get_yap_level,
+    has_item
 )
 from helpers import extract_gif_url
 import activity
@@ -94,62 +95,26 @@ bot.DEBUG_MODE = False
 # ============================================================
 
 class YapManager:
-    """Manages command frequency tracking and heat accumulation."""
+    """Manages command frequency tracking with 20s windows."""
     def __init__(self):
         self.usage = {} # {user_id: [timestamps]}
-        self.heat = {}  # {user_id: count}
-        self.strikes = {} # {user_id: [timestamps]}
-        self.last_global_cmd_time = 0
-        self.presets = {
-            "low": {"window": 30, "limit": 4, "heat_threshold": 1},
-            "high": {"window": 70, "limit": 8, "heat_threshold": 1},
-            "center": {"global_cd": 7, "strike_window": 60, "strike_threshold": 6}
-        }
 
-    def check_spam(self, user_id: int, level: str) -> tuple[bool, str]:
-        """Returns (triggered_muzzle, feedback_message)."""
+    def check_spam(self, user_id: int, is_gold: bool) -> bool:
+        """Returns True if user should be muzzled."""
         now = time.time()
+        limit = 7 if is_gold else 4
+        window = 20
         
-        if level == "center":
-            config = self.presets["center"]
-            # Check global cooldown
-            if now - self.last_global_cmd_time < config["global_cd"]:
-                # User gets a strike
-                if user_id not in self.strikes:
-                    self.strikes[user_id] = []
-                # Clean old strikes
-                self.strikes[user_id] = [t for t in self.strikes[user_id] if now - t < config["strike_window"]]
-                self.strikes[user_id].append(now)
-                
-                strike_count = len(self.strikes[user_id])
-                if strike_count >= config["strike_threshold"]:
-                    self.strikes[user_id] = [] # Reset on muzzle
-                    return True, f"Strike {strike_count}, muzzled for 5m. Chill out."
-                else:
-                    return False, "Strike given, relax"
-            else:
-                # Bot not on CD, update global time
-                self.last_global_cmd_time = now
-                return False, ""
+        if user_id not in self.usage:
+            self.usage[user_id] = []
         
-        else: # low / high
-            config = self.presets.get(level, self.presets["high"])
-            
-            if user_id not in self.usage:
-                self.usage[user_id] = []
-            
-            # Clean old timestamps
-            self.usage[user_id] = [t for t in self.usage[user_id] if now - t < config["window"]]
-            self.usage[user_id].append(now)
-            
-            if len(self.usage[user_id]) > config["limit"]:
-                self.heat[user_id] = self.heat.get(user_id, 0) + 1
-                if self.heat[user_id] >= config["heat_threshold"]:
-                    # Reset heat/usage on trigger
-                    self.heat[user_id] = 0
-                    self.usage[user_id] = []
-                    return True, "Go outside, keep yourself safe. Stop yapping."
-            return False, ""
+        # Clean old timestamps
+        self.usage[user_id] = [t for t in self.usage[user_id] if now - t < window]
+        self.usage[user_id].append(now)
+        
+        if len(self.usage[user_id]) >= limit:
+            return True
+        return False
 
 bot.yap_manager = YapManager()
 
@@ -353,17 +318,12 @@ async def globally_block_commands(ctx):
         if time.time() < expiration and effect_name in ["muzzle", "uwu"]:
             return False
 
-    # YAP SYSTEM (Heat / Spam Check)
-    yap_level = await get_yap_level()
-    muzzle_trigger, feedback = bot.yap_manager.check_spam(ctx.author.id, yap_level)
-    
-    if muzzle_trigger:
+    # YAP SYSTEM (20s Window)
+    is_gold = await has_item(ctx.author.id, "gold_card")
+    if bot.yap_manager.check_spam(ctx.author.id, is_gold):
         await add_active_effect(ctx.author.id, "muzzle", 300) # 5 min muzzle
-        await ctx.reply(feedback, mention_author=False)
-        return False
-    elif feedback:
-        # This covers "Strike given" but not muzzled yet
-        await ctx.reply(feedback, mention_author=False)
+        msg = "for yapping" if not is_gold else "for excessive yapping"
+        await ctx.reply(f"{ctx.author.mention} muzzled for 5m {msg}.", mention_author=False)
         return False
 
     return True
