@@ -659,8 +659,9 @@ class UtilityCog(commands.Cog):
         last_global_use = getattr(self.bot, 'key_global_last_used', 0)
         
         is_admin = ctx.author.guild_permissions.administrator
+        is_capo = any(role.name == "Capo" for role in ctx.author.roles)
         
-        if not is_admin:
+        if not (is_admin or is_capo):
             cooldown_messages = [
                 "Rest...",
                 "Patience...",
@@ -689,14 +690,13 @@ class UtilityCog(commands.Cog):
 
             await ctx.send(f"{ctx.author.display_name} ʰᵃˢ ᵖᵃᶦᵈ ᵗʳᶦᵇᵘᵗᵉ")
 
-            is_capo = any(role.name == "Capo" for role in ctx.author.roles)
             sticker_count = 6 if (is_admin or is_capo) else 2
             for _ in range(sticker_count):
                 await ctx.send(stickers=[sticker])
 
             await update_balance(ctx.author.id, REWARD_AMOUNT)
 
-            if not is_admin:
+            if not (is_admin or is_capo):
                 self.bot.key_global_last_used = current_time
                 last_used["key"] = current_time
                 self.bot.key_last_used = last_used

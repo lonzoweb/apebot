@@ -300,8 +300,9 @@ async def on_raw_reaction_add(payload):
 @bot.check
 async def globally_block_commands(ctx):
     """Block all commands except in allowed channels or if muzzled/uwud."""
-    # Admins can use commands anywhere and are immune to curses
-    if ctx.author.guild_permissions.administrator:
+    # Admins and Capos can use commands anywhere and are immune to curses/spam checks
+    is_capo = any(role.name == "Capo" for role in ctx.author.roles)
+    if ctx.author.guild_permissions.administrator or is_capo:
         return True
 
     # Check debug mode
