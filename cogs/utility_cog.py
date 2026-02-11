@@ -661,8 +661,17 @@ class UtilityCog(commands.Cog):
         is_admin = ctx.author.guild_permissions.administrator
         
         if not is_admin:
+            cooldown_messages = [
+                "Rest...",
+                "Patience...",
+                "The abyss awaits...",
+                "You will wait...",
+                "Not on my watch...",
+                "The void beckons...",
+            ]
             # Check Global Cooldown first
             if current_time - last_global_use < global_cooldown_duration:
+                await ctx.send(random.choice(cooldown_messages))
                 return
 
             # 2. Per-User Cooldown (3 minutes)
@@ -670,6 +679,7 @@ class UtilityCog(commands.Cog):
             if "key" in last_used:
                 time_since_last_use = current_time - last_used["key"]
                 if time_since_last_use < user_cooldown_duration:
+                    await ctx.send(random.choice(cooldown_messages))
                     return
 
         STICKER_ID = 1416504837436342324
@@ -679,7 +689,8 @@ class UtilityCog(commands.Cog):
 
             await ctx.send(f"{ctx.author.display_name} ʰᵃˢ ᵖᵃᶦᵈ ᵗʳᶦᵇᵘᵗᵉ")
 
-            sticker_count = 6 if is_admin else 2
+            is_capo = any(role.name == "Capo" for role in ctx.author.roles)
+            sticker_count = 6 if (is_admin or is_capo) else 2
             for _ in range(sticker_count):
                 await ctx.send(stickers=[sticker])
 
