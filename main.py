@@ -99,11 +99,12 @@ class YapManager:
     def __init__(self):
         self.usage = {} # {user_id: [timestamps]}
 
-    def check_spam(self, user_id: int, is_gold: bool) -> bool:
-        """Returns True if user should be muzzled."""
+    def check_spam(self, user_id: int, is_gold: bool) -> tuple[bool, int]:
+        """Returns (triggered_muzzle, duration_sec)."""
         now = time.time()
-        limit = 7 if is_gold else 4
+        limit = 10 if is_gold else 5
         window = 20
+        duration = 60 if is_gold else 180 # 1m or 3m
         
         if user_id not in self.usage:
             self.usage[user_id] = []
@@ -113,8 +114,8 @@ class YapManager:
         self.usage[user_id].append(now)
         
         if len(self.usage[user_id]) >= limit:
-            return True
-        return False
+            return True, duration
+        return False, 0
 
 bot.yap_manager = YapManager()
 
@@ -320,10 +321,12 @@ async def globally_block_commands(ctx):
 
     # YAP SYSTEM (20s Window)
     is_gold = await has_item(ctx.author.id, "gold_card")
-    if bot.yap_manager.check_spam(ctx.author.id, is_gold):
-        await add_active_effect(ctx.author.id, "muzzle", 300) # 5 min muzzle
+    triggered, duration = bot.yap_manager.check_spam(ctx.author.id, is_gold)
+    if triggered:
+        await add_active_effect(ctx.author.id, "muzzle", duration)
         msg = "for yapping" if not is_gold else "for excessive yapping"
-        await ctx.reply(f"{ctx.author.mention} muzzled for 5m {msg}.", mention_author=False)
+        mins = int(duration / 60)
+        await ctx.reply(f"{ctx.author.mention} muzzled for {mins}m {msg}.", mention_author=False)
         return False
 
     return True
