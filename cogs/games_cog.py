@@ -920,13 +920,14 @@ class GamesCog(commands.Cog):
         side_name = "HEADS" if outcome == 'h' else "TAILS"
         
         if win:
-            await update_balance(user_id, bet)
+            reward = bet * 2
+            await update_balance(user_id, reward)
             await self.process_reaping(ctx)
             win_msgs = [
-                f"🩸 **BIG BRAULIO.** It's **{side_name}**. BREAD STACKER. (+{economy.format_balance(bet)})",
-                f"🩸 **STACKED.** It's **{side_name}**. We eatin' good today. (+{economy.format_balance(bet)})",
-                f"🩸 **CERTIFIED.** It's **{side_name}**. Bread winner. (+{economy.format_balance(bet)})",
-                f"🩸 **CLEAN.** It's **{side_name}**. Dead homies are proud. (+{economy.format_balance(bet)})"
+                f"🩸 **BIG BRAULIO.** It's **{side_name}**. BREAD STACKER. (+{economy.format_balance(reward)})",
+                f"🩸 **STACKED.** It's **{side_name}**. We eatin' good today. (+{economy.format_balance(reward)})",
+                f"🩸 **CERTIFIED.** It's **{side_name}**. Bread winner. (+{economy.format_balance(reward)})",
+                f"🩸 **CLEAN.** It's **{side_name}**. Dead homies are proud. (+{economy.format_balance(reward)})"
             ]
             final_msg = f"{random.choice(win_msgs)}\n{ctx.author.mention}"
         else:
