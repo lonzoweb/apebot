@@ -15,6 +15,7 @@ from database import (
     get_potential_victims, is_reaping_active, add_reaping_tithe, get_active_effect,
     get_reaping_state, end_reaping, transfer_tokens, get_setting
 )
+from discord.ui import View, Button
 from helpers import has_authorized_role
 import economy
 import torture
@@ -28,6 +29,98 @@ DICE_EMOJIS = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️�
 user_dice_usage = {}
 user_pull_usage = {}
 
+# ============================================================
+# TIC-TAC-TOE UI COMPONENTS
+# ============================================================
+
+class TTTButton(discord.ui.Button):
+    def __init__(self, x: int, y: int):
+        super().__init__(style=discord.ButtonStyle.secondary, label="\u200b", row=y)
+        self.x = x
+        self.y = y
+
+    async def callback(self, interaction: discord.Interaction):
+        assert self.view is not None
+        view: 'TTTView' = self.view
+        
+        if interaction.user != view.current_player:
+            return await interaction.response.send_message("❌ It's not your turn!", ephemeral=True)
+
+        if view.board[self.y][self.x] != 0:
+            return await interaction.response.send_message("❌ This spot is already taken!", ephemeral=True)
+
+        # Update board
+        view.board[self.y][self.x] = view.turn
+        self.label = None
+        self.emoji = view.X_SYMBOL if view.turn == 1 else view.O_SYMBOL
+        self.disabled = True
+        self.style = discord.ButtonStyle.primary if view.turn == 1 else discord.ButtonStyle.success
+
+        # Check win/draw
+        if view.check_win():
+            for child in view.children:
+                child.disabled = True
+            await interaction.response.edit_message(content=f"🏆 **{interaction.user.display_name} wins!**", view=view)
+            view.stop()
+            return
+
+        if view.check_draw():
+            await interaction.response.edit_message(content="🤝 **It's a draw!**", view=view)
+            view.stop()
+            return
+
+        # Switch turn
+        view.turn = 3 - view.turn
+        view.current_player = view.p2 if view.turn == 2 else view.p1
+        symbol_next = view.X_SYMBOL if view.turn == 1 else view.O_SYMBOL
+        await interaction.response.edit_message(
+            content=f"🎮 **Tic-Tac-Toe**\n{view.p1.mention} (❌) vs {view.p2.mention} ({view.O_SYMBOL})\nTurn: {view.current_player.mention} ({symbol_next})",
+            view=view
+        )
+
+class TTTView(discord.ui.View):
+    X_SYMBOL = "❌"
+    O_SYMBOL = discord.PartialEmoji.from_str("<:ttt_o:1471201667004498085>")
+
+    def __init__(self, p1: discord.Member, p2: discord.Member):
+        super().__init__(timeout=300) # 5m timeout
+        self.p1 = p1
+        self.p2 = p2
+        self.turn = 1 # 1 = X, 2 = O
+        self.current_player = p1
+        self.board = [[0, 0, 0] for _ in range(3)] # 0=empty, 1=X, 2=O
+
+        for y in range(3):
+            for x in range(3):
+                self.add_item(TTTButton(x, y))
+
+    def check_win(self):
+        # Rows
+        for row in self.board:
+            if row[0] == row[1] == row[2] != 0:
+                return True
+        # Columns
+        for col in range(3):
+            if self.board[0][col] == self.board[1][col] == self.board[2][col] != 0:
+                return True
+        # Diagonals
+        if self.board[0][0] == self.board[1][1] == self.board[2][2] != 0:
+            return True
+        if self.board[0][2] == self.board[1][1] == self.board[2][0] != 0:
+            return True
+        return False
+
+    def check_draw(self):
+        return all(all(cell != 0 for cell in row) for row in self.board)
+
+    async def on_timeout(self):
+        # Disable all buttons
+        for child in self.children:
+            child.disabled = True
+        # We can't easily edit the original message without saving it, 
+        # but the game effectively ends.
+
+# ============================================================
 
 class GamesCog(commands.Cog):
     def __init__(self, bot):
@@ -47,6 +140,7 @@ class GamesCog(commands.Cog):
         self.cut_task = None
 
         self.active_fades = {}  # challenger_id -> {target_id, time}
+        self.ttt_lobbies = {}    # user_id -> {'time': timestamp, 'message': discord.Message}
 
     async def process_reaping(self, ctx):
         """Handle Reaping lifecycle: End if expired, else tax user."""
@@ -736,10 +830,46 @@ class GamesCog(commands.Cog):
             embed.add_field(name="Outcome", value=penalty_msg, inline=False)
             
             await ctx.send(embed=embed)
-
         finally:
             self.active_roulette.clear()
             self.roulette_spinning = False
+
+    @commands.command(name="ttt")
+    async def ttt_command(self, ctx):
+        """Play Tic-Tac-Toe with another player."""
+        user = ctx.author
+        now = time.time()
+
+        # Prune expired lobbies
+        self.ttt_lobbies = {k: v for k, v in self.ttt_lobbies.items() if now - v['time'] < 300}
+
+        # Check if user is JOINING an existing lobby
+        joinable = [k for k in self.ttt_lobbies.keys() if k != user.id]
+        
+        if joinable:
+            host_id = joinable[0]
+            host_data = self.ttt_lobbies.pop(host_id)
+            host = self.bot.get_user(host_id)
+            if not host:
+                return await ctx.reply("❌ The host is no longer available.")
+            
+            # Start game
+            view = TTTView(host, user)
+            await ctx.send(
+                f"🎮 **TIC-TAC-TOE BEGINS!**\n{host.mention} (❌) vs {user.mention} ({TTTView.O_SYMBOL})\nTurn: {host.mention} (❌)",
+                view=view
+            )
+            return
+
+        # Otherwise, START a new lobby
+        if user.id in self.ttt_lobbies:
+            return await ctx.reply("❌ You already have an open lobby! Wait for a challenger.", mention_author=False)
+
+        prompt = await ctx.send(f"🎮 **TIC-TAC-TOE**\n{user.mention} is looking for a challenger!\nType `.ttt` within 5 minutes to join.")
+        self.ttt_lobbies[user.id] = {
+            'time': now,
+            'message': prompt
+        }
 
     @commands.command(name="cut")
     async def cut_command(self, ctx):
