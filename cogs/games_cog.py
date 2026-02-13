@@ -871,6 +871,59 @@ class GamesCog(commands.Cog):
             'message': prompt
         }
 
+    @commands.command(name="bt", aliases=["bloodtoss", "toss"])
+    async def blood_toss(self, ctx, amount: str = None, side: str = None):
+        """High-stakes blood-themed coinflip. Usage: .bt <amount> <h/t>"""
+        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+            return await ctx.reply("🌑 **System Notice**: The streets are quiet. Economy is disabled.", mention_author=False)
+
+        if not amount or not side:
+            return await ctx.reply("Usage: `.bt <amount> <h/t>`\n*\"Put some bread on the line... h or t?\"*", mention_author=False)
+
+        user_id = ctx.author.id
+        balance = await get_balance(user_id)
+
+        if amount.lower() == "all":
+            bet = balance
+        else:
+            try:
+                bet = int(amount)
+            except ValueError:
+                return await ctx.reply("❌ That ain't real bread. Enter an amount.", mention_author=False)
+
+        if bet <= 0:
+            return await ctx.reply("❌ Bet some bread fool", mention_author=False)
+        if balance < bet:
+            return await ctx.reply(f"❌ You're short. {economy.format_balance(bet)} to play.", mention_author=False)
+
+        side_input = side.lower()
+        if side_input in ['h', 'head', 'heads']:
+            side_clean = 'h'
+        elif side_input in ['t', 'tail', 'tails']:
+            side_clean = 't'
+        else:
+            return await ctx.reply("❌ Pick a side: `h` / `heads` or `t` / `tails`.", mention_author=False)
+
+        # Execution
+        msg = await ctx.send("🩸 **Flippin rn, dead homies**")
+        await asyncio.sleep(1.5)
+
+        outcome = random.choice(['h', 't'])
+        win = side_clean == outcome
+        
+        side_name = "HEADS" if outcome == 'h' else "TAILS"
+        
+        if win:
+            await update_balance(user_id, bet)
+            await self.process_reaping(ctx)
+            final_msg = f"🩸 **BIG BRAULIO.** It's **{side_name}**. BREAD STACKER. (+{economy.format_balance(bet)})\n{ctx.author.mention}"
+        else:
+            await update_balance(user_id, -bet)
+            await self.process_reaping(ctx)
+            final_msg = f"❌ **RAPED.** It's **{side_name}**. The A claims your tribute. (-{economy.format_balance(bet)})\n{ctx.author.mention}"
+
+        await msg.edit(content=final_msg)
+
     @commands.command(name="cut")
     async def cut_command(self, ctx):
         """High-stakes card draw (15% balance ante). Min 3, Max 6 players."""
