@@ -905,7 +905,13 @@ class GamesCog(commands.Cog):
             return await ctx.reply("❌ Pick a side: `h` / `heads` or `t` / `tails`.", mention_author=False)
 
         # Execution
-        msg = await ctx.send("🩸 **Flippin rn, dead homies**")
+        intros = [
+            "🩸 **Flippin rn, dead homies**",
+            "🩸 **Heads or tails for the A.**",
+            "🩸 **On set, flippin coin.**",
+            "🩸 **Life or death, heads or tails.**"
+        ]
+        msg = await ctx.send(random.choice(intros))
         await asyncio.sleep(1.5)
 
         outcome = random.choice(['h', 't'])
@@ -916,11 +922,23 @@ class GamesCog(commands.Cog):
         if win:
             await update_balance(user_id, bet)
             await self.process_reaping(ctx)
-            final_msg = f"🩸 **BIG BRAULIO.** It's **{side_name}**. BREAD STACKER. (+{economy.format_balance(bet)})\n{ctx.author.mention}"
+            win_msgs = [
+                f"🩸 **BIG BRAULIO.** It's **{side_name}**. BREAD STACKER. (+{economy.format_balance(bet)})",
+                f"🩸 **STACKED.** It's **{side_name}**. We eatin' good today. (+{economy.format_balance(bet)})",
+                f"🩸 **CERTIFIED.** It's **{side_name}**. Bread winner. (+{economy.format_balance(bet)})",
+                f"🩸 **CLEAN.** It's **{side_name}**. Dead homies are proud. (+{economy.format_balance(bet)})"
+            ]
+            final_msg = f"{random.choice(win_msgs)}\n{ctx.author.mention}"
         else:
             await update_balance(user_id, -bet)
             await self.process_reaping(ctx)
-            final_msg = f"❌ **RAPED.** It's **{side_name}**. The A claims your tribute. (-{economy.format_balance(bet)})\n{ctx.author.mention}"
+            loss_msgs = [
+                f"❌ **RAPED.** It's **{side_name}**. The A claims your tribute. (-{economy.format_balance(bet)})",
+                f"❌ **TOUCHED.** It's **{side_name}**. You just got taxed. (-{economy.format_balance(bet)})",
+                f"❌ **SLUMPED.** It's **{side_name}**. Your bread is ours now. (-{economy.format_balance(bet)})",
+                f"❌ **DONE.** It's **{side_name}**. You ain't built for the A. (-{economy.format_balance(bet)})"
+            ]
+            final_msg = f"{random.choice(loss_msgs)}\n{ctx.author.mention}"
 
         await msg.edit(content=final_msg)
 
