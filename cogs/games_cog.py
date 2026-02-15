@@ -11,11 +11,9 @@ import asyncio
 import time
 from database import (
     get_balance, update_balance, add_active_effect, is_economy_on,
-    get_user_inventory, remove_item_from_inventory, get_blood_moon_multiplier,
-    get_potential_victims, is_reaping_active, add_reaping_tithe, get_active_effect,
-    get_reaping_state, end_reaping, transfer_tokens, get_setting
+    get_user_inventory, remove_item_from_inventory, add_reaping_tithe,
+    get_reaping_state, end_reaping
 )
-from discord.ui import View, Button
 from helpers import has_authorized_role
 import economy
 import torture
@@ -25,102 +23,8 @@ logger = logging.getLogger(__name__)
 # Dice emoji mapping
 DICE_EMOJIS = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️⃣", 6: "6️⃣"}
 
-# Tracking
-user_dice_usage = {}
-user_pull_usage = {}
 
-# ============================================================
-# TIC-TAC-TOE UI COMPONENTS
-# ============================================================
 
-class TTTButton(discord.ui.Button):
-    def __init__(self, x: int, y: int):
-        super().__init__(style=discord.ButtonStyle.secondary, label="\u200b", row=y)
-        self.x = x
-        self.y = y
-
-    async def callback(self, interaction: discord.Interaction):
-        assert self.view is not None
-        view: 'TTTView' = self.view
-        
-        if interaction.user != view.current_player:
-            return await interaction.response.send_message("❌ It's not your turn!", ephemeral=True)
-
-        if view.board[self.y][self.x] != 0:
-            return await interaction.response.send_message("❌ This spot is already taken!", ephemeral=True)
-
-        # Update board
-        view.board[self.y][self.x] = view.turn
-        self.label = None
-        self.emoji = view.X_SYMBOL if view.turn == 1 else view.O_SYMBOL
-        self.disabled = True
-        self.style = discord.ButtonStyle.primary if view.turn == 1 else discord.ButtonStyle.success
-
-        # Check win/draw
-        if view.check_win():
-            for child in view.children:
-                child.disabled = True
-            await interaction.response.edit_message(content=f"🏆 **{interaction.user.display_name} wins!**", view=view)
-            view.stop()
-            return
-
-        if view.check_draw():
-            await interaction.response.edit_message(content="🤝 **It's a draw!**", view=view)
-            view.stop()
-            return
-
-        # Switch turn
-        view.turn = 3 - view.turn
-        view.current_player = view.p2 if view.turn == 2 else view.p1
-        symbol_next = view.X_SYMBOL if view.turn == 1 else view.O_SYMBOL
-        await interaction.response.edit_message(
-            content=f"🎮 **Tic-Tac-Toe**\n{view.p1.mention} (❌) vs {view.p2.mention} ({view.O_SYMBOL})\nTurn: {view.current_player.mention} ({symbol_next})",
-            view=view
-        )
-
-class TTTView(discord.ui.View):
-    X_SYMBOL = "❌"
-    O_SYMBOL = discord.PartialEmoji.from_str("<:ttt_o:1471201667004498085>")
-
-    def __init__(self, p1: discord.Member, p2: discord.Member):
-        super().__init__(timeout=300) # 5m timeout
-        self.p1 = p1
-        self.p2 = p2
-        self.turn = 1 # 1 = X, 2 = O
-        self.current_player = p1
-        self.board = [[0, 0, 0] for _ in range(3)] # 0=empty, 1=X, 2=O
-
-        for y in range(3):
-            for x in range(3):
-                self.add_item(TTTButton(x, y))
-
-    def check_win(self):
-        # Rows
-        for row in self.board:
-            if row[0] == row[1] == row[2] != 0:
-                return True
-        # Columns
-        for col in range(3):
-            if self.board[0][col] == self.board[1][col] == self.board[2][col] != 0:
-                return True
-        # Diagonals
-        if self.board[0][0] == self.board[1][1] == self.board[2][2] != 0:
-            return True
-        if self.board[0][2] == self.board[1][1] == self.board[2][0] != 0:
-            return True
-        return False
-
-    def check_draw(self):
-        return all(all(cell != 0 for cell in row) for row in self.board)
-
-    async def on_timeout(self):
-        # Disable all buttons
-        for child in self.children:
-            child.disabled = True
-        # We can't easily edit the original message without saving it, 
-        # but the game effectively ends.
-
-# ============================================================
 
 class GamesCog(commands.Cog):
     def __init__(self, bot):
@@ -132,15 +36,8 @@ class GamesCog(commands.Cog):
         self.roulette_event = asyncio.Event()
         self.roulette_task = None
 
-        self.active_cut = []
-        self.cut_spinning = False
-        self.cut_timer_active = False
-        self.cut_start_time = 0
-        self.cut_event = asyncio.Event()
-        self.cut_task = None
 
         self.active_fades = {}  # challenger_id -> {target_id, time}
-        self.ttt_lobbies = {}    # user_id -> {'time': timestamp, 'message': discord.Message}
 
     async def process_reaping(self, ctx):
         """Handle Reaping lifecycle: End if expired, else tax user."""
@@ -151,6 +48,43 @@ class GamesCog(commands.Cog):
         active, pool, games_count, expires_at = state
         now = time.time()
         user_id = ctx.author.id
+
+        # 1. Check Expiration
+        if active and expires_at and now >= expires_at:
+            winner_count, payout_per_person, burned = await end_reaping()
+            
+            if winner_count > 0:
+                formatted_payout = economy.format_balance(payout_per_person)
+                formatted_burned = economy.format_balance(burned)
+                await ctx.send(
+                    f"🌾 **THE HARVEST IS COMPLETE.**\n"
+                    f"The gathered souls have been judged.\n\n"
+                    f"👥 **Participants:** {winner_count}\n"
+                    f"💰 **Payout:** {formatted_payout} each\n"
+                    f"🔥 **Burned:** {formatted_burned}"
+                )
+            else:
+                await ctx.send("🌾 **The Harvest Ends.** No souls were claimed.")
+            return
+
+        # 2. Apply Tax if Active
+        if active:
+            # Update DB state (Game +1, Pool + tithe)
+            bal = await get_balance(user_id)
+            tithe = 0
+            if bal > 0:
+                tithe = int(bal * 0.04)
+            
+            if tithe > 0:
+                await update_balance(user_id, -tithe)
+            
+            await add_reaping_tithe(user_id, tithe)
+            
+            # Batch Announcement (Every 4 games)
+            current_games = games_count + 1
+            if current_games % 4 == 0:
+                 new_pool = pool + tithe
+                 await ctx.send(f"🌾 **Harvest:** {current_games} sacrifices made. Pool: {economy.format_balance(new_pool)}")
 
     async def apply_minigame_penalty(self, user_id, mention):
         """Standardized 5m UwU penalty with ward protection check."""
@@ -176,66 +110,7 @@ class GamesCog(commands.Cog):
         else:
             duration = 300
             await add_active_effect(user_id, "uwu", duration)
-            return f"🎀 {mention} took the full shot. **uwu for 5m** applied."
-
-        # 1. Check Expiration
-        if active and expires_at and now >= expires_at:
-            winner_count, payout_per_person, burned = await end_reaping()
-            
-            if winner_count > 0:
-                formatted_payout = economy.format_balance(payout_per_person)
-                formatted_burned = economy.format_balance(burned)
-                await ctx.send(
-                    f"🌾 **THE HARVEST IS COMPLETE.**\n"
-                    f"The gathered souls have been judged.\n\n"
-                    f"👥 **Participants:** {winner_count}\n"
-                    f"💰 **Payout:** {formatted_payout} each\n"
-                    f"🔥 **Burned:** {formatted_burned}"
-                )
-            else:
-                await ctx.send("🌾 **The Harvest Ends.** No souls were claimed.")
-            return
-
-        # 2. Apply Tax if Active
-        # 2. Apply Tax if Active
-        if active:
-            # Always increment game count for the event progression
-            await add_reaping_tithe(user_id, 0) # Helper needs to support 0 amount just for increment
-            
-            # Now calculate tax separately 
-            bal = await get_balance(user_id)
-            tithe = 0
-            if bal > 0:
-                tithe = int(bal * 0.04)
-                if tithe > 0:
-                    await update_balance(user_id, -tithe)
-                    # We already incremented game count, so just add to pool?
-                    # Actually add_reaping_tithe increments game count.
-                    # We should probably split the helper or just call it once with the amount.
-            
-            # Let's fix this properly. 
-            # We want to increment games_count + 1 ALWAYS.
-            # We want to add tithe to pool IF tithe > 0.
-            
-            # Refactored Logic:
-            tithe = 0
-            if bal > 0:
-                tithe = int(bal * 0.04)
-            
-            if tithe > 0:
-                await update_balance(user_id, -tithe)
-            
-            # Update DB state (Game +1, Pool + tithe)
-            await add_reaping_tithe(user_id, tithe)
-            
-            # Batch Announcement (Every 4 games)
-            # games_count in 'state' is the OLD count. 
-            # add_reaping_tithe made it games_count + 1.
-            current_games = games_count + 1
-            
-            if current_games % 4 == 0:
-                 new_pool = pool + tithe
-                 await ctx.send(f"🌾 **Harvest:** {current_games} sacrifices made. Pool: {economy.format_balance(new_pool)}")
+            return f"� {mention} took the full shot. **uwu for 5m** applied."
 
     def get_ceelo_score(self, dice):
         """Calculate Cee-lo score"""
@@ -834,42 +709,6 @@ class GamesCog(commands.Cog):
             self.active_roulette.clear()
             self.roulette_spinning = False
 
-    @commands.command(name="ttt")
-    async def ttt_command(self, ctx):
-        """Play Tic-Tac-Toe with another player."""
-        user = ctx.author
-        now = time.time()
-
-        # Prune expired lobbies
-        self.ttt_lobbies = {k: v for k, v in self.ttt_lobbies.items() if now - v['time'] < 300}
-
-        # Check if user is JOINING an existing lobby
-        joinable = [k for k in self.ttt_lobbies.keys() if k != user.id]
-        
-        if joinable:
-            host_id = joinable[0]
-            host_data = self.ttt_lobbies.pop(host_id)
-            host = self.bot.get_user(host_id)
-            if not host:
-                return await ctx.reply("❌ The host is no longer available.")
-            
-            # Start game
-            view = TTTView(host, user)
-            await ctx.send(
-                f"🎮 **TIC-TAC-TOE BEGINS!**\n{host.mention} (❌) vs {user.mention} ({TTTView.O_SYMBOL})\nTurn: {host.mention} (❌)",
-                view=view
-            )
-            return
-
-        # Otherwise, START a new lobby
-        if user.id in self.ttt_lobbies:
-            return await ctx.reply("❌ You already have an open lobby! Wait for a challenger.", mention_author=False)
-
-        prompt = await ctx.send(f"🎮 **TIC-TAC-TOE**\n{user.mention} is looking for a challenger!\nType `.ttt` within 5 minutes to join.")
-        self.ttt_lobbies[user.id] = {
-            'time': now,
-            'message': prompt
-        }
 
     @commands.command(name="bt", aliases=["bloodtoss", "toss"])
     async def blood_toss(self, ctx, amount: str = None, side: str = None):
@@ -943,175 +782,6 @@ class GamesCog(commands.Cog):
 
         await msg.edit(content=final_msg)
 
-    @commands.command(name="cut")
-    async def cut_command(self, ctx):
-        """High-stakes card draw (15% balance ante). Min 3, Max 6 players."""
-        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
-            return await ctx.reply("🌑 **System Notice**: The deck is sealed while the economy is disabled.", mention_author=False)
-        
-        user_id = ctx.author.id
-        now = time.time()
-        
-        if self.cut_spinning:
-            return await ctx.reply("🃏 **PATIENCE.** The dealer is already flipping cards.", mention_author=False)
-            
-        # Prune expired queue members (1 hour limit)
-        expired = [p for p in self.active_cut if now - p['time'] >= 3600]
-        if expired:
-            for p in expired:
-                await update_balance(p['id'], p['ante'])
-            self.active_cut = [p for p in self.active_cut if now - p['time'] < 3600]
-
-        queue = self.active_cut
-        
-        # Prune expired queue members (1 hour limit)
-        expired = [p for p in queue if now - p['time'] >= 3600]
-        if expired:
-            for p in expired:
-                await update_balance(p['id'], p.get('ante', 0))
-            self.active_cut = [p for p in queue if now - p['time'] < 3600]
-            queue = self.active_cut
-        if any(p['id'] == user_id for p in queue):
-            return await ctx.reply(f"❌ {ctx.author.mention}, you've already bought into this cut!", mention_author=False)
-            
-        if len(queue) >= 6:
-            return await ctx.reply(f"❌ The table is full! Wait for the reveal.", mention_author=False)
-
-        balance = await get_balance(user_id)
-        ante = int(balance * 0.15)
-        
-        if balance < 100 or ante < 15:
-            return await ctx.reply(f"❌ You're too broke for this table. Need at least 100 tokens.", mention_author=False)
-            
-        await update_balance(user_id, -ante)
-        await self.process_reaping(ctx)
-
-        # RE-CHECK: Make sure they didn't slip in while we were awaiting balance/reaping
-        if any(p['id'] == user_id for p in self.active_cut):
-            await update_balance(user_id, ante) # Refund
-            return await ctx.reply(f"❌ Caught a glitch at the table. You're already in. (Refunded)", mention_author=False)
-
-        queue.append({'id': user_id, 'display_name': ctx.author.display_name, 'mention': ctx.author.mention, 'ante': ante, 'time': now})
-        
-        if not self.cut_timer_active:
-            self.cut_start_time = now
-            self.cut_event.clear()
-            self.cut_timer_active = True
-            # Start the background timer task
-            self.cut_task = asyncio.create_task(self.cut_timer_loop(ctx))
-            await ctx.send(f"🃏 **{ctx.author.display_name}** tossed **{economy.format_balance(ante)}** into the pot! [{len(queue)}/6]\n🚨 **THE CLOCK IS TICKING.** 25 seconds to join.")
-        elif len(queue) == 6:
-            # Instant start
-            self.cut_event.set()
-            await ctx.send(f"🃏 **{ctx.author.display_name}** joined! [6/6]\n⚠️ **TABLE FULL.** Dealing immediately...")
-        else:
-            elapsed = now - self.cut_start_time
-            remaining = max(0, 25 - int(elapsed))
-            await ctx.send(f"🃏 **{ctx.author.display_name}** tossed **{economy.format_balance(ante)}** in! [{len(queue)}/6]\n(Starts in {remaining}s or at 6 players)")
-
-    async def cut_timer_loop(self, ctx):
-        """Background task for cut countdown."""
-        try:
-            # Wait 25s OR until event set (6 players)
-            try:
-                await asyncio.wait_for(self.cut_event.wait(), timeout=25.0)
-            except asyncio.TimeoutError:
-                pass 
-
-            # Wait for minimum 3 players if timer expired with fewer
-            if len(self.active_cut) < 3:
-                await ctx.send("⏳ **NOT ENOUGH FODDER.** Waiting for at least 3 souls to begin the cut...")
-                while len(self.active_cut) < 3:
-                    await asyncio.sleep(1)
-
-            await self.execute_cut(ctx)
-        except Exception as e:
-            logger.error(f"Cut timer loop error: {e}")
-        finally:
-            self.cut_timer_active = False
-            self.cut_task = None
-
-    async def execute_cut(self, ctx):
-        """Perform the actual cut resolution."""
-        self.cut_spinning = True
-        try:
-            await ctx.send("🌑 **SHUFFLING THE COLD DECK...** 🃏")
-            await asyncio.sleep(2.5)
-            
-            # 1. Deck Generation
-            suits = ["♣️", "♦️", "❤️", "♠️"]
-            ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
-            deck = []
-            for r_idx, r in enumerate(ranks):
-                for s_idx, s in enumerate(suits):
-                    deck.append({'label': f"**{r}** {s}", 'score': r_idx * 10 + s_idx})
-            
-            # 2. Draw for each player
-            random.shuffle(deck)
-            results = []
-            total_pot = 0
-            for i, p in enumerate(self.active_cut):
-                card = deck.pop()
-                results.append({**p, 'card': card})
-                total_pot += p['ante']
-            
-            # 3. Determine Winner and Loser
-            results.sort(key=lambda x: x['card']['score'], reverse=True)
-            winner = results[0]
-            loser = results[-1]
-            others = results[1:-1]
-            
-            # 4. Payouts
-            # 60% of total pot to King, 40% split among survivors
-            king_share = int(total_pot * 0.60)
-            survivor_total_share = int(total_pot * 0.40)
-            
-            await update_balance(winner['id'], king_share)
-            
-            survivor_payout = 0
-            if others:
-                survivor_payout = int(survivor_total_share / len(others))
-                for s in others:
-                    await update_balance(s['id'], survivor_payout)
-
-            # 5. Loser Penalty
-            penalty_msg = await self.apply_minigame_penalty(loser['id'], loser['mention'])
-
-            # 6. Final Optics
-            lines = []
-            for r in results:
-                if r == winner:
-                    prefix = "👑"
-                    payout = king_share
-                    # Show Total Payout as primary, Profit as secondary
-                    profit = payout - r['ante']
-                    change = f"**{economy.format_balance(payout)}** ({'+' if profit >= 0 else ''}{economy.format_balance(profit)} net)"
-                elif r == loser:
-                    prefix = "💀"
-                    change = f"**0** (-{economy.format_balance(r['ante'])} net)"
-                else:
-                    prefix = "🃏"
-                    payout = survivor_payout
-                    profit = payout - r['ante']
-                    change = f"**{economy.format_balance(payout)}** ({'+' if profit >= 0 else ''}{economy.format_balance(profit)} net)"
-                
-                lines.append(f"{prefix} **{r['display_name']}**: {r['card']['label']} — {change}")
-            
-            embed = discord.Embed(
-                title="🃏 THE CUT: RESULTS",
-                description="\n".join(lines),
-                color=discord.Color.dark_purple()
-            )
-            embed.set_footer(text=f"Total Pot: {economy.format_balance(total_pot)}")
-            
-            embed.add_field(name="Judgment", value=penalty_msg, inline=False)
-            
-            await ctx.send(embed=embed)
-
-        finally:
-            # Reset
-            self.active_cut.clear()
-            self.cut_spinning = False
 
 
     @commands.command(name="jugg")
