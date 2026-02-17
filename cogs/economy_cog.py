@@ -13,12 +13,12 @@ import economy
 from database import (
     get_balance, update_balance, atomic_purchase, get_user_inventory, 
     remove_item_from_inventory, add_active_effect, get_active_effect, 
-    get_all_active_effects,
-    set_balance, get_potential_victims, get_global_cooldown, 
-    set_global_cooldown, is_economy_on, can_claim_daily, record_daily_claim,
-    set_blood_moon, start_reaping, is_reaping_active,
-    can_claim_shard, record_shard_claim
+    get_all_active_effects, set_balance, get_potential_victims, 
+    get_global_cooldown, set_global_cooldown, is_economy_on, 
+    can_claim_daily, record_daily_claim, set_blood_moon, start_reaping, 
+    is_reaping_active, can_claim_shard, record_shard_claim
 )
+from activity import get_recent_active_users
 from exceptions import InsufficientTokens, InsufficientInventory, ActiveCurseError, ItemNotFoundError
 from items import ITEM_REGISTRY, ITEM_ALIASES
 from helpers import has_authorized_role
@@ -28,6 +28,108 @@ import os
 from database import reset_economy_data
 
 logger = logging.getLogger(__name__)
+
+
+
+# ============================================================
+# SILENCER VIEW (Vote Mute)
+# ============================================================
+
+# ============================================================
+# SILENCER VIEW (Public Vote)
+# ============================================================
+
+class SilencerView(discord.ui.View):
+    NUMBERS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+
+    def __init__(self, initiator, active_users, bot, cog):
+        super().__init__(timeout=45) # Vote duration
+        self.initiator = initiator
+        self.active_users = active_users[:10] # List of Member objects
+        self.bot = bot
+        self.cog = cog
+        self.message = None
+
+    async def start(self, ctx):
+        lines = [f"{self.NUMBERS[i]} **{m.display_name}**" for i, m in enumerate(self.active_users)]
+        
+        embed = discord.Embed(
+            title="🤐 THE SILENCER: PUBLIC RITUAL",
+            description=f"{self.initiator.mention} has activated the Silencer.\n\n**Targets:**\n" + "\n".join(lines) + 
+                        "\n\nReact with the corresponding number to cast your vote.\n**Duration**: 45s",
+            color=discord.Color.dark_grey()
+        )
+        embed.set_footer(text="Min 2 total votes required.")
+        
+        self.message = await ctx.send(embed=embed, view=self)
+        
+        # Add reactions
+        for i in range(len(self.active_users)):
+            await self.message.add_reaction(self.NUMBERS[i])
+
+    async def on_timeout(self):
+        # Resolve voting
+        results = await self.resolve_vote()
+        if results:
+            await self.message.edit(embed=results, view=None)
+
+    async def resolve_vote(self):
+        try:
+            msg = await self.message.channel.fetch_message(self.message.id)
+        except discord.NotFound:
+            return None
+        
+        vote_counts = [0] * len(self.active_users)
+        active_ids = {u[0] for u in get_recent_active_users(50)} # All active users in last 5m
+        
+        total_valid_votes = 0
+        voted_users = set() # To prevent multi-voting? User didn't specify, but usually standard.
+        
+        for i in range(len(self.active_users)):
+            reaction = discord.utils.get(msg.reactions, emoji=self.NUMBERS[i])
+            if reaction:
+                users = [u async for u in reaction.users()]
+                # Filter valid voters
+                valid_voters = [u for u in users if str(u.id) in active_ids and not u.bot and u.id != self.initiator.id]
+                
+                # If we want to prevent multi-voting, we track users
+                for v in valid_voters:
+                    if v.id not in voted_users:
+                        voted_users.add(v.id)
+                        vote_counts[i] += 1
+                        total_valid_votes += 1
+
+        if total_valid_votes < 2:
+            embed = discord.Embed(
+                title="🗳️ VOTE CANCELLED", 
+                description="Not enough participants emerged from the shadows.", 
+                color=discord.Color.light_grey()
+            )
+            return embed
+
+        # Determine winner
+        max_votes = max(vote_counts)
+        winners_indices = [i for i, count in enumerate(vote_counts) if count == max_votes and count > 0]
+        
+        if not winners_indices:
+            embed = discord.Embed(title="🗳️ VOTE FAILED", description="The ritual yielded no conclusion.", color=discord.Color.light_grey())
+            return embed
+
+        # If tie, pick random? User didn't specify. I'll pick one.
+        winner_idx = random.choice(winners_indices)
+        target = self.active_users[winner_idx]
+        
+        # Silence! 20m muzzle.
+        await add_active_effect(target.id, "muzzle", 1200)
+        
+        score_lines = [f"{self.NUMBERS[i]} **{self.active_users[i].display_name}**: {vote_counts[i]}" for i in range(len(self.active_users)) if vote_counts[i] > 0]
+        
+        embed = discord.Embed(
+            title="🤐 SILENCED",
+            description=f"The shadows have spoken. **{target.display_name}** silenced for 20 minutes.\n\n**Final Count:**\n" + "\n".join(score_lines),
+            color=discord.Color.dark_purple()
+        )
+        return embed
 
 
 class EconomyCog(commands.Cog):
@@ -380,8 +482,9 @@ class EconomyCog(commands.Cog):
                      pass
 
         try:
+            is_admin = ctx.author.guild_permissions.administrator
             inventory = await get_user_inventory(ctx.author.id)
-            if inventory.get(official_name, 0) <= 0:
+            if not is_admin and inventory.get(official_name, 0) <= 0:
                 raise InsufficientInventory(official_name)
 
             item_type = item_info.get("type")
@@ -686,6 +789,36 @@ class EconomyCog(commands.Cog):
                 await add_active_effect(ctx.author.id, official_name, duration)
                 await remove_item_from_inventory(ctx.author.id, official_name)
                 await ctx.send(item_info['feedback'])
+
+            elif official_name == "silencer":
+                # 20 min global cooldown
+                if not is_admin:
+                    cooldown = await get_global_cooldown("silencer")
+                    now = time.time()
+                    if cooldown > now:
+                        rem = int(cooldown - now)
+                        return await ctx.reply(f"⏳ **GLITCH IN THE SHADOWS.** The Silencer needs `{rem // 60}m {rem % 60}s` to recharge.", mention_author=False)
+
+                # Get active users (last 5 mins)
+                active_users_data = get_recent_active_users(15) # get a few more to filter
+                
+                # Fetch Member objects for them
+                active_members = []
+                for uid_str, _ in active_users_data:
+                    member = ctx.guild.get_member(int(uid_str))
+                    if member and not member.bot and not member.guild_permissions.administrator:
+                        active_members.append(member)
+                
+                if len(active_members) < 3 and not is_admin:
+                    return await ctx.reply("🌑 **DARKNESS IS TOO STAGNANT.** At least 3 active souls are required to initiate a silence.", mention_author=False)
+
+                if not is_admin:
+                    await remove_item_from_inventory(ctx.author.id, official_name)
+                    # Set 20 min cooldown
+                    await set_global_cooldown("silencer", 1200)
+
+                view = SilencerView(ctx.author, active_members[:10], self.bot, self)
+                await view.start(ctx)
 
         except InsufficientInventory:
             await ctx.send(f"❌ You don't have any **{official_name.replace('_', ' ').title()}**s!")

@@ -178,5 +178,16 @@ async def cleanup_old_activity(days=30):
         logger.error(f"Error cleaning up activity: {e}")
 
 
+def get_recent_active_users(limit=10):
+    """
+    Get users active in the current memory buffer (last ~5 mins).
+    Returns a list of (user_id, count) sorted by activity.
+    """
+    sorted_users = sorted(
+        activity_buffer["users"].items(), key=lambda x: x[1], reverse=True
+    )
+    return sorted_users[:limit]
+
+
 # Set init_activity_tables as the function to call on startup
 # You must call this from your main bot file or Cog setup.

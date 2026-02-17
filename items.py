@@ -138,6 +138,12 @@ ITEM_REGISTRY = {
         "shop_desc": "Lets you spam more. Worth its weight.",
         "feedback": "💳 **GOLD CARD SECURED.** You've obtained VIP status. Limits increased.",
     },
+    "silencer": {
+        "cost": 2500,
+        "type": "consumable",
+        "shop_desc": "Initiate a vote to muzzle an active chatter for 20 minutes.",
+        "feedback": "🤐 **THE SILENCER HAS BEEN ACTIVATED.** Initiating the silencing rituals...",
+    },
 }
 
 # Aliases to make buying/using easier for users
@@ -209,6 +215,10 @@ ITEM_ALIASES = {
     "heat": "gun",
     "gold": "gold_card",
     "gold_card": "gold_card",
+    "silencer": "silencer",
+    "silent": "silencer",
+    "svote": "silencer",
+    "vmut": "silencer",
 }
 
 # ============================================================
