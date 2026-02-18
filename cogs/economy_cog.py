@@ -44,46 +44,67 @@ class SilencerView(discord.ui.View):
     NUMBERS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 
     def __init__(self, initiator, active_users, bot, cog):
-        super().__init__(timeout=30) # Shortened to 30s
+        # We don't use View timeout for the vote itself anymore, we use asyncio.sleep
+        super().__init__(timeout=120) 
         self.initiator = initiator
-        self.active_users = active_users[:10] # List of Member objects
+        self.active_users = active_users[:10]
         self.bot = bot
         self.cog = cog
         self.message = None
 
     async def start(self, ctx):
-        lines = [f"{self.NUMBERS[i]} **{m.display_name}**" for i, m in enumerate(self.active_users)]
-        
-        embed = discord.Embed(
-            title="🤐 Silencer",
-            description=f"{self.initiator.mention} has bought a Silencer.\n\n**Targets:**\n" + "\n".join(lines) + 
-                        "\n\nReact with the number to cast your vote.\n**Duration**: 30s",
-            color=discord.Color.dark_grey()
-        )
-        embed.set_footer(text="Min 2 total votes required.")
-        
-        self.message = await ctx.send(embed=embed, view=self)
-        
-        # Add reactions
-        for i in range(len(self.active_users)):
-            await self.message.add_reaction(self.NUMBERS[i])
+        try:
+            lines = [f"{self.NUMBERS[i]} **{m.display_name}**" for i, m in enumerate(self.active_users)]
+            
+            embed = discord.Embed(
+                title="🤐 Silencer",
+                description=f"{self.initiator.mention} has bought a Silencer.\n\n**Targets:**\n" + "\n".join(lines) + 
+                            "\n\nReact with the number to cast your vote.\n**Duration**: 30s",
+                color=discord.Color.dark_grey()
+            )
+            embed.set_footer(text="Min 2 total votes required.")
+            
+            self.message = await ctx.send(embed=embed, view=self)
+            
+            # Add reactions
+            for i in range(len(self.active_users)):
+                await self.message.add_reaction(self.NUMBERS[i])
+            
+            # Use asyncio.sleep for reliable timing
+            await asyncio.sleep(30)
+            
+            # Resolve
+            await self.resolve_and_finish()
+            
+        except Exception as e:
+            logger.error(f"Error in Silencer start/loop: {e}", exc_info=True)
+            if self.message:
+                try:
+                    await self.message.edit(content="❌ The ritual was interrupted by a void leak.", embed=None, view=None)
+                    await self.message.clear_reactions()
+                except:
+                    pass
 
-    async def on_timeout(self):
-        # Resolve voting
+    async def resolve_and_finish(self):
         try:
             results = await self.resolve_vote()
             if results:
                 await self.message.edit(embed=results, view=None)
-                try:
-                    await self.message.clear_reactions()
-                except:
-                    pass
-        except Exception as e:
-            logger.error(f"Error resolving Silencer vote: {e}", exc_info=True)
+            else:
+                await self.message.edit(content="🗳️ The ritual yielded no conclusion.", embed=None, view=None)
+            
             try:
-                await self.message.edit(content="❌ The ritual was interrupted and failed.", embed=None, view=None)
+                await self.message.clear_reactions()
             except:
                 pass
+        except Exception as e:
+            logger.error(f"Error resolving Silencer: {e}", exc_info=True)
+            try:
+                await self.message.edit(content="❌ The ritual failed to resolve.", embed=None, view=None)
+            except:
+                pass
+        finally:
+            self.stop()
 
     async def resolve_vote(self):
         if not self.active_users:
@@ -97,7 +118,7 @@ class SilencerView(discord.ui.View):
         # 1. Tally all reactions
         vote_counts = [0] * len(self.active_users)
         recent_active = await get_recent_active_users(50)
-        active_ids = {u[0] for u in recent_active} # All active users in last 10m
+        active_ids = {str(u[0]) for u in recent_active} # Ensure strings
         
         total_valid_votes = 0
         
@@ -110,8 +131,6 @@ class SilencerView(discord.ui.View):
                     if str(user.id) in active_ids:
                         vote_counts[i] += 1
                         total_valid_votes += 1
-
-        # NOTE: Allowing multiple votes per user as requested.
 
         if total_valid_votes < 2:
             return discord.Embed(
