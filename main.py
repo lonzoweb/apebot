@@ -430,6 +430,14 @@ async def shutdown(sig, loop):
     """Gracefully shutdown the bot and cleanup resources"""
     logger.info(f"🛑 Received signal {sig.name}, starting graceful shutdown...")
     
+    # 0. Flush activity data
+    try:
+        from activity import flush_activity_to_db
+        await flush_activity_to_db()
+        logger.info("📦 Activity data flushed to database.")
+    except Exception as e:
+        logger.error(f"Failed to flush activity on shutdown: {e}")
+
     # 1. Stop the bot (disconnects from Discord)
     if not bot.is_closed():
         await bot.close()
