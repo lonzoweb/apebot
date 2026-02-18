@@ -83,7 +83,8 @@ class SilencerView(discord.ui.View):
             return None
         
         vote_counts = [0] * len(self.active_users)
-        active_ids = {u[0] for u in get_recent_active_users(50)} # All active users in last 5m
+        recent_active = await get_recent_active_users(50)
+        active_ids = {u[0] for u in recent_active} # All active users in last 5m
         
         total_valid_votes = 0
         voted_users = set() 
@@ -798,7 +799,7 @@ class EconomyCog(commands.Cog):
                         return await ctx.reply(f"⏳ **GLITCH IN THE SHADOWS.** The Silencer needs `{rem // 60}m {rem % 60}s` to recharge.", mention_author=False)
 
                 # Get active users (last 5 mins)
-                active_users_data = get_recent_active_users(15) # get a few more to filter
+                active_users_data = await get_recent_active_users(15) # get a few more to filter
                 
                 # Fetch Member objects for them (excluding initiator and admins)
                 active_members = []

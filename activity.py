@@ -178,13 +178,41 @@ async def cleanup_old_activity(days=30):
         logger.error(f"Error cleaning up activity: {e}")
 
 
-def get_recent_active_users(limit=10):
+async def get_recent_active_users(limit=10):
     """
-    Get users active in the current memory buffer (last ~5 mins).
-    Returns a list of (user_id, count) sorted by activity.
+    Get users active in the last ~10 minutes.
+    Merges the current memory buffer with recently updated users in the DB.
+    Returns a list of (user_id, total_count) sorted by activity.
     """
+    # 1. Get current buffer data
+    combined_activity = defaultdict(int)
+    for uid, count in activity_buffer["users"].items():
+        combined_activity[uid] += count
+
+    # 2. Query DB for users active in the last 10 minutes (to cover the 5m flush gap)
+    try:
+        async with get_db() as conn:
+            # We look for users updated in the last 10 mins. 
+            # We use their total count as a proxy for 'most active'
+            async with conn.execute(
+                """
+                SELECT user_id, count FROM activity_users 
+                WHERE last_updated > datetime('now', '-10 minutes')
+                ORDER BY count DESC
+                LIMIT ?
+            """, (limit * 2,)
+            ) as cursor:
+                db_users = await cursor.fetchall()
+                for uid_str, count in db_users:
+                    # Merge: use the max or sum? 
+                    # Sum might overcount if they just flushed, but it's safe for 'most active'
+                    combined_activity[uid_str] += count
+    except Exception as e:
+        logger.error(f"Error merging DB activity: {e}")
+
+    # 3. Sort and limit
     sorted_users = sorted(
-        activity_buffer["users"].items(), key=lambda x: x[1], reverse=True
+        combined_activity.items(), key=lambda x: x[1], reverse=True
     )
     return sorted_users[:limit]
 
