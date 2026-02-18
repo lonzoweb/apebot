@@ -56,7 +56,7 @@ class SilencerView(discord.ui.View):
         embed = discord.Embed(
             title="🤐 Silencer",
             description=f"{self.initiator.mention} has bought a Silencer.\n\n**Targets:**\n" + "\n".join(lines) + 
-                        "\n\nReact with the number to cast your vote.\n**Duration**: 45s",
+                        "\n\n Figure it out.\n**Duration**: 45s",
             color=discord.Color.dark_grey()
         )
         embed.set_footer(text="Min 2 total votes required.")
@@ -126,7 +126,7 @@ class SilencerView(discord.ui.View):
         
         return discord.Embed(
             title="🤐 SILENCED",
-            description=f"The shadows have spoken. **{target.display_name}** silenced for 20 minutes.\n\n**Final Count:**\n" + "\n".join(score_lines),
+            description=f"The gang has spoken. **{target.display_name}** muzzled for 20. Go touch grass\n\n**Final Count:**\n" + "\n".join(score_lines),
             color=discord.Color.dark_purple()
         )
 
