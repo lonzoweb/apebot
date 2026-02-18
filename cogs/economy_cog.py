@@ -43,7 +43,7 @@ class SilencerView(discord.ui.View):
     NUMBERS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 
     def __init__(self, initiator, active_users, bot, cog):
-        super().__init__(timeout=45) # Vote duration
+        super().__init__(timeout=30) # Shortened to 30s
         self.initiator = initiator
         self.active_users = active_users[:10] # List of Member objects
         self.bot = bot
@@ -56,7 +56,7 @@ class SilencerView(discord.ui.View):
         embed = discord.Embed(
             title="🤐 Silencer",
             description=f"{self.initiator.mention} has bought a Silencer.\n\n**Targets:**\n" + "\n".join(lines) + 
-                        "\n\nReact with the number to cast your vote.\n**Duration**: 45s",
+                        "\n\nReact with the number to cast your vote.\n**Duration**: 30s",
             color=discord.Color.dark_grey()
         )
         embed.set_footer(text="Min 2 total votes required.")
@@ -69,9 +69,20 @@ class SilencerView(discord.ui.View):
 
     async def on_timeout(self):
         # Resolve voting
-        results = await self.resolve_vote()
-        if results:
-            await self.message.edit(embed=results, view=None)
+        try:
+            results = await self.resolve_vote()
+            if results:
+                await self.message.edit(embed=results, view=None)
+                try:
+                    await self.message.clear_reactions()
+                except:
+                    pass
+        except Exception as e:
+            logger.error(f"Error resolving Silencer vote: {e}", exc_info=True)
+            try:
+                await self.message.edit(content="❌ The ritual was interrupted and failed.", embed=None, view=None)
+            except:
+                pass
 
     async def resolve_vote(self):
         if not self.active_users:
