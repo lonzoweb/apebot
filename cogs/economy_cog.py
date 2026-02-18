@@ -54,9 +54,9 @@ class SilencerView(discord.ui.View):
         lines = [f"{self.NUMBERS[i]} **{m.display_name}**" for i, m in enumerate(self.active_users)]
         
         embed = discord.Embed(
-            title="🤐 THE SILENCER: PUBLIC RITUAL",
-            description=f"{self.initiator.mention} has activated the Silencer.\n\n**Targets:**\n" + "\n".join(lines) + 
-                        "\n\nReact with the corresponding number to cast your vote.\n**Duration**: 45s",
+            title="🤐 Silencer",
+            description=f"{self.initiator.mention} has bought a Silencer.\n\n**Targets:**\n" + "\n".join(lines) + 
+                        "\n\nReact with the number to cast your vote.\n**Duration**: 45s",
             color=discord.Color.dark_grey()
         )
         embed.set_footer(text="Min 2 total votes required.")
@@ -74,6 +74,9 @@ class SilencerView(discord.ui.View):
             await self.message.edit(embed=results, view=None)
 
     async def resolve_vote(self):
+        if not self.active_users:
+            return discord.Embed(title="🗳️ VOTE CANCELLED", description="No souls were present to be silenced.", color=discord.Color.light_grey())
+
         try:
             msg = await self.message.channel.fetch_message(self.message.id)
         except discord.NotFound:
@@ -83,16 +86,15 @@ class SilencerView(discord.ui.View):
         active_ids = {u[0] for u in get_recent_active_users(50)} # All active users in last 5m
         
         total_valid_votes = 0
-        voted_users = set() # To prevent multi-voting? User didn't specify, but usually standard.
+        voted_users = set() 
         
         for i in range(len(self.active_users)):
             reaction = discord.utils.get(msg.reactions, emoji=self.NUMBERS[i])
             if reaction:
                 users = [u async for u in reaction.users()]
-                # Filter valid voters
+                # Filter valid voters: active, not bot, not initiator
                 valid_voters = [u for u in users if str(u.id) in active_ids and not u.bot and u.id != self.initiator.id]
                 
-                # If we want to prevent multi-voting, we track users
                 for v in valid_voters:
                     if v.id not in voted_users:
                         voted_users.add(v.id)
@@ -100,36 +102,32 @@ class SilencerView(discord.ui.View):
                         total_valid_votes += 1
 
         if total_valid_votes < 2:
-            embed = discord.Embed(
+            return discord.Embed(
                 title="🗳️ VOTE CANCELLED", 
                 description="Not enough participants emerged from the shadows.", 
                 color=discord.Color.light_grey()
             )
-            return embed
 
         # Determine winner
         max_votes = max(vote_counts)
         winners_indices = [i for i, count in enumerate(vote_counts) if count == max_votes and count > 0]
         
         if not winners_indices:
-            embed = discord.Embed(title="🗳️ VOTE FAILED", description="The ritual yielded no conclusion.", color=discord.Color.light_grey())
-            return embed
+            return discord.Embed(title="🗳️ VOTE FAILED", description="The ritual yielded no conclusion.", color=discord.Color.light_grey())
 
-        # If tie, pick random? User didn't specify. I'll pick one.
+        # If tie, pick random
         winner_idx = random.choice(winners_indices)
         target = self.active_users[winner_idx]
         
-        # Silence! 20m muzzle.
         await add_active_effect(target.id, "muzzle", 1200)
         
         score_lines = [f"{self.NUMBERS[i]} **{self.active_users[i].display_name}**: {vote_counts[i]}" for i in range(len(self.active_users)) if vote_counts[i] > 0]
         
-        embed = discord.Embed(
+        return discord.Embed(
             title="🤐 SILENCED",
             description=f"The shadows have spoken. **{target.display_name}** silenced for 20 minutes.\n\n**Final Count:**\n" + "\n".join(score_lines),
             color=discord.Color.dark_purple()
         )
-        return embed
 
 
 class EconomyCog(commands.Cog):
@@ -802,15 +800,24 @@ class EconomyCog(commands.Cog):
                 # Get active users (last 5 mins)
                 active_users_data = get_recent_active_users(15) # get a few more to filter
                 
-                # Fetch Member objects for them
+                # Fetch Member objects for them (excluding initiator and admins)
                 active_members = []
                 for uid_str, _ in active_users_data:
                     member = ctx.guild.get_member(int(uid_str))
-                    if member and not member.bot and not member.guild_permissions.administrator:
+                    if member and not member.bot and not member.guild_permissions.administrator and member.id != ctx.author.id:
                         active_members.append(member)
                 
-                if len(active_members) < 3 and not is_admin:
-                    return await ctx.reply("🌑 **DARKNESS IS TOO STAGNANT.** At least 3 active souls are required to initiate a silence.", mention_author=False)
+                if not active_members:
+                    return await ctx.reply("🌑 **DARKNESS IS EMPTY.** There are no valid souls to silence in the current shadows.", mention_author=False)
+
+                if len(active_members) < 2 and not is_admin: # requires at least 2 candidates or 2 participants? 
+                    # User said "requires min 3 active users to initiate". 
+                    # If author is excluded from targets, we need 2 more active users.
+                    # active_users_data includes author.
+                    # Let's count total active users
+                    total_active = sum(1 for uid_str, _ in active_users_data if ctx.guild.get_member(int(uid_str)) and not ctx.guild.get_member(int(uid_str)).bot)
+                    if total_active < 3:
+                        return await ctx.reply("🌑 **DARKNESS IS TOO STAGNANT.** At least 3 active souls are required to initiate a silence.", mention_author=False)
 
                 if not is_admin:
                     await remove_item_from_inventory(ctx.author.id, official_name)
