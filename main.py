@@ -11,6 +11,7 @@ import logging
 import colorlog
 import time
 import aiohttp
+import signal
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -425,16 +426,29 @@ async def on_error(event, *args, **kwargs):
 # SHUTDOWN HANDLER
 # ============================================================
 
-import atexit
-
-
-def cleanup_session():
-    """Cleanup aiohttp session on shutdown"""
+async def shutdown(sig, loop):
+    """Gracefully shutdown the bot and cleanup resources"""
+    logger.info(f"🛑 Received signal {sig.name}, starting graceful shutdown...")
+    
+    # 1. Stop the bot (disconnects from Discord)
+    if not bot.is_closed():
+        await bot.close()
+        logger.info("📡 Discord connection closed.")
+    
+    # 2. Close aiohttp session
     if bot.aiohttp_session and not bot.aiohttp_session.closed:
-        asyncio.run(bot.aiohttp_session.close())
-
-
-atexit.register(cleanup_session)
+        await bot.aiohttp_session.close()
+        logger.info("🌐 HTTP session closed.")
+    
+    # 3. Cancel all remaining tasks
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    [task.cancel() for task in tasks]
+    
+    logger.info(f"🧹 Cancelling {len(tasks)} pending tasks...")
+    await asyncio.gather(*tasks, return_exceptions=True)
+    
+    loop.stop()
+    logger.info("✨ Shutdown complete.")
 
 
 # ============================================================
@@ -443,4 +457,21 @@ atexit.register(cleanup_session)
 
 if __name__ == "__main__":
     logger.info("Starting bot...")
-    bot.run(TOKEN)
+    
+    loop = asyncio.get_event_loop()
+    
+    # Register signal handlers for SIGINT (Ctrl+C) and SIGTERM (Railway/Docker)
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(shutdown(s, loop)))
+        except NotImplementedError:
+            # Fallback for Windows if needed, though Railway is Linux
+            pass
+
+    try:
+        loop.run_until_complete(bot.start(TOKEN))
+    except (KeyboardInterrupt, SystemExit):
+        pass
+    finally:
+        if not loop.is_closed():
+            loop.close()
