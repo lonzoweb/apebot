@@ -10,6 +10,7 @@ import asyncio
 import random
 import time
 import economy
+from collections import defaultdict
 from database import (
     get_balance, update_balance, atomic_purchase, get_user_inventory, 
     remove_item_from_inventory, add_active_effect, get_active_effect, 
@@ -93,25 +94,24 @@ class SilencerView(discord.ui.View):
         except discord.NotFound:
             return None
         
+        # 1. Tally all reactions
         vote_counts = [0] * len(self.active_users)
         recent_active = await get_recent_active_users(50)
-        active_ids = {u[0] for u in recent_active} # All active users in last 5m
+        active_ids = {u[0] for u in recent_active} # All active users in last 10m
         
         total_valid_votes = 0
-        voted_users = set() 
         
         for i in range(len(self.active_users)):
             reaction = discord.utils.get(msg.reactions, emoji=self.NUMBERS[i])
             if reaction:
-                users = [u async for u in reaction.users()]
-                # Filter valid voters: active, not bot, not initiator
-                valid_voters = [u for u in users if str(u.id) in active_ids and not u.bot and u.id != self.initiator.id]
-                
-                for v in valid_voters:
-                    if v.id not in voted_users:
-                        voted_users.add(v.id)
+                async for user in reaction.users():
+                    if user.bot or user.id == self.initiator.id:
+                        continue
+                    if str(user.id) in active_ids:
                         vote_counts[i] += 1
                         total_valid_votes += 1
+
+        # NOTE: Allowing multiple votes per user as requested.
 
         if total_valid_votes < 2:
             return discord.Embed(
