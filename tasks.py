@@ -64,7 +64,7 @@ def setup_tasks(bot, guild_id: int):
     @flush_activity_frequent.before_loop
     async def before_flush_activity():
         await bot.wait_until_ready()
-        logger.info("⏳ Activity flush task started (every 30 minutes)")
+        logger.info("⏳ Activity flush task started (every 5 minutes)")
 
     flush_activity_frequent.start()
 

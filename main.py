@@ -386,9 +386,12 @@ async def on_command_error(ctx, error):
         if not hasattr(bot, "_error_cooldowns"):
             bot._error_cooldowns = {}
         
-        error_key = f"{ctx.command.name}:{str(error)}"
         now = time.time()
-        if now - bot._error_cooldowns.get(error_key, 0) < 60:
+        # Prune stale entries to prevent unbounded memory growth
+        bot._error_cooldowns = {k: v for k, v in bot._error_cooldowns.items() if now - v < 60}
+        
+        error_key = f"{ctx.command.name}:{str(error)}"
+        if error_key in bot._error_cooldowns:
             return # Don't spam same error for same command more than once per minute
 
         bot._error_cooldowns[error_key] = now

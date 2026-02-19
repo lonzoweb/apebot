@@ -26,18 +26,13 @@ from helpers import has_authorized_role
 import database
 import shutil
 import os
-from database import reset_economy_data
 
 logger = logging.getLogger(__name__)
 
 
 
 # ============================================================
-# SILENCER VIEW (Vote Mute)
-# ============================================================
-
-# ============================================================
-# SILENCER VIEW (Public Vote)
+# SILENCER VIEW
 # ============================================================
 
 class SilencerView(discord.ui.View):
@@ -80,7 +75,7 @@ class SilencerView(discord.ui.View):
             logger.error(f"Error in Silencer start/loop: {e}", exc_info=True)
             if self.message:
                 try:
-                    await self.message.edit(content="❌ The ritual was interrupted by a void leak.", embed=None, view=None)
+                    await self.message.edit(content="❌ The silencer was interrupted by a void leak.", embed=None, view=None)
                     await self.message.clear_reactions()
                 except:
                     pass
@@ -152,11 +147,9 @@ class SilencerView(discord.ui.View):
         
         await add_active_effect(target.id, "muzzle", 1200)
         
-        score_lines = [f"{self.NUMBERS[i]} **{self.active_users[i].display_name}**: {vote_counts[i]}" for i in range(len(self.active_users)) if vote_counts[i] > 0]
-        
         return discord.Embed(
             title="🤐 SILENCED",
-            description=f"The shadows have spoken. **{target.display_name}** silenced for 20 minutes.\n\n**Final Count:**\n" + "\n".join(score_lines),
+            description=f"The shades have spoken. **{target.display_name}** silenced for 20 minutes.\n\n**Votes:** {max_votes}",
             color=discord.Color.dark_purple()
         )
 
