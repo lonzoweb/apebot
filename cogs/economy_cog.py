@@ -75,27 +75,35 @@ class SilencerView(discord.ui.View):
             logger.error(f"Error in Silencer start/loop: {e}", exc_info=True)
             if self.message:
                 try:
-                    await self.message.edit(content="❌ The silencer was interrupted by a void leak.", embed=None, view=None)
-                    await self.message.clear_reactions()
+                    await self.message.delete()
                 except:
                     pass
+                await self.message.channel.send("❌ **THE RITUAL FAILED.** The silencer was interrupted by a void leak.")
 
     async def resolve_and_finish(self):
         try:
             results = await self.resolve_vote()
-            if results:
-                await self.message.edit(embed=results, view=None)
-            else:
-                await self.message.edit(content="🗳️ The ritual yielded no conclusion.", embed=None, view=None)
             
-            try:
-                await self.message.clear_reactions()
-            except:
-                pass
+            # Delete original message
+            if self.message:
+                try:
+                    await self.message.delete()
+                except:
+                    pass
+            
+            # Send result as new message
+            if results:
+                if isinstance(results, discord.Embed):
+                    await self.message.channel.send(embed=results)
+                else:
+                    await self.message.channel.send(content=results)
+            else:
+                 await self.message.channel.send("🗳️ The ritual yielded no conclusion.")
+
         except Exception as e:
             logger.error(f"Error resolving Silencer: {e}", exc_info=True)
             try:
-                await self.message.edit(content="❌ The ritual failed to resolve.", embed=None, view=None)
+                await self.message.channel.send("❌ The ritual failed to resolve.")
             except:
                 pass
         finally:
