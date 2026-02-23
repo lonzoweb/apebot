@@ -1,6 +1,9 @@
 import discord
 from discord.ext import commands
-from database import is_economy_on, set_economy_status, set_yap_level, get_yap_level
+from database import (
+    is_economy_on, set_economy_status, set_yap_level, get_yap_level,
+    get_top_balances, cap_all_balances, clear_user_inventory
+)
 
 class AdminCog(commands.Cog):
     """Admin-only commands for system control."""
@@ -163,6 +166,66 @@ class AdminCog(commands.Cog):
         value = value.lower()
 
         await ctx.reply(f"❌ Unknown setting: `{setting_name}`.", mention_author=False)
+
+    @commands.command(name="top20")
+    @commands.has_permissions(administrator=True)
+    async def top20_command(self, ctx):
+        """[ADMIN] Show the top 20 users by balance."""
+        top_users = await get_top_balances(20)
+        if not top_users:
+            return await ctx.send("🌑 The treasury is currently empty.")
+
+        embed = discord.Embed(
+            title="💎 TOP 20 TREASURY",
+            color=discord.Color.gold(),
+            timestamp=discord.utils.utcnow()
+        )
+        
+        lines = []
+        for i, (uid, bal) in enumerate(top_users, 1):
+            member = ctx.guild.get_member(int(uid))
+            name = member.display_name if member else f"User#{uid[:5]}"
+            lines.append(f"**{i}.** {name}: `{bal:,} 💎`")
+        
+        embed.description = "\n".join(lines)
+        await ctx.send(embed=embed)
+
+    @commands.command(name="max")
+    @commands.has_permissions(administrator=True)
+    async def max_balance_command(self, ctx, amount: int):
+        """[ADMIN] Cap all user balances to a specific amount. Usage: .max <amount>"""
+        if amount < 0:
+            return await ctx.send("❌ Amount must be positive.")
+
+        await ctx.send(f"🚨 **WARNING**: This will cap ALL balances over `{amount:,}` down to `{amount:,}`. Type `CONFIRM CAP` to proceed.")
+
+        def check(m):
+            return m.author == ctx.author and m.channel == ctx.channel and m.content == "CONFIRM CAP"
+
+        try:
+            import asyncio
+            await self.bot.wait_for("message", check=check, timeout=30.0)
+            await cap_all_balances(amount)
+            await ctx.send(f"⚖️ **BALANCES CAPPED.** All users over `{amount:,} 💎` have been reset to the ceiling.")
+        except asyncio.TimeoutError:
+            await ctx.send("⌛ Cap cancelled.")
+
+    @commands.command(name="clearinv")
+    @commands.has_permissions(administrator=True)
+    async def clearinv_command(self, ctx, member: discord.Member):
+        """[ADMIN] Wipe a user's entire inventory. Usage: .clearinv @user"""
+        await ctx.send(f"🚨 **WARNING**: This will wipe ALL items from {member.mention}'s inventory. Type `CONFIRM CLEAR` to proceed.")
+
+        def check(m):
+            return m.author == ctx.author and m.channel == ctx.channel and m.content == "CONFIRM CLEAR"
+
+        try:
+            import asyncio
+            await self.bot.wait_for("message", check=check, timeout=30.0)
+            await clear_user_inventory(member.id)
+            await ctx.send(f"🗑️ **INVENTORY WIPED.** {member.mention} is now empty-handed.")
+        except asyncio.TimeoutError:
+            await ctx.send("⌛ Clear cancelled.")
 
 async def setup(bot):
     await bot.add_cog(AdminCog(bot))

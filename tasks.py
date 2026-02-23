@@ -177,6 +177,23 @@ def setup_tasks(bot, guild_id: int):
 
     unified_cleanup_loop.start()
 
+    # --- 5. Daily Wealth Tax (24 hours) ---
+    @tasks.loop(hours=24)
+    async def wealth_tax_loop():
+        """Applies a 10% tax on balances over 1,000 tokens once per day."""
+        try:
+            await database.apply_wealth_tax(0.10, 1000)
+            logger.info("💸 Wealth tax applied to the treasury.")
+        except Exception as e:
+            logger.error(f"Error in wealth tax task: {e}", exc_info=True)
+
+    @wealth_tax_loop.before_loop
+    async def before_wealth_tax():
+        await bot.wait_until_ready()
+        logger.info("⏳ Wealth tax task started (every 24 hours)")
+
+    wealth_tax_loop.start()
+
     return daily_quote_of_the_day
 
 

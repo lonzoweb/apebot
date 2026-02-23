@@ -324,6 +324,44 @@ async def get_balance(user_id: int) -> int:
             return result[0] if result else 0
 
 
+async def get_top_balances(limit: int = 20) -> list:
+    """Returns a list of (user_id, balance) for the wealthiest users."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT user_id, balance FROM balances ORDER BY balance DESC LIMIT ?",
+            (limit,),
+        ) as cursor:
+            return await cursor.fetchall()
+
+
+async def cap_all_balances(max_bal: int):
+    """Enforces a hard cap on all user balances."""
+    async with get_db() as conn:
+        await conn.execute(
+            "UPDATE balances SET balance = ? WHERE balance > ?",
+            (max_bal, max_bal),
+        )
+
+
+async def clear_user_inventory(user_id: int):
+    """Wipes all items from a user's inventory."""
+    user_id_str = str(user_id)
+    async with get_db() as conn:
+        await conn.execute(
+            "DELETE FROM user_inventory WHERE user_id = ?",
+            (user_id_str,),
+        )
+
+
+async def apply_wealth_tax(tax_rate: float = 0.10, threshold: int = 1000):
+    """Deducts a percentage from balances over a certain threshold."""
+    async with get_db() as conn:
+        await conn.execute(
+            "UPDATE balances SET balance = CAST(balance * (1 - ?) AS INTEGER) WHERE balance > ?",
+            (tax_rate, threshold),
+        )
+
+
 async def update_balance(user_id: int, amount: int):
     """Update user's balance. Amount can be positive (earnings) or negative (costs)."""
     user_id_str = str(user_id)

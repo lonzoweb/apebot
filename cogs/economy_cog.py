@@ -285,6 +285,10 @@ class EconomyCog(commands.Cog):
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: The spirits have locked the exchange. Economy is currently disabled.", mention_author=False)
 
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
+
         if item_name is None or (item_name.lower() == "hidden" and has_authorized_role(ctx.author)):
             embed = discord.Embed(
                 title="🎰 APEIRON EXCHANGE",
@@ -414,6 +418,10 @@ class EconomyCog(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def inventory_command(self, ctx):
         """DMs the user their current items."""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
+
         inventory = await get_user_inventory(ctx.author.id)
 
         if not inventory:

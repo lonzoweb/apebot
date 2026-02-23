@@ -276,19 +276,16 @@ class GamesCog(commands.Cog):
         bot_dice = []
         while bot_rank == 0:
             # 🏠 CASINO LOGIC: High Roller Edge
-            # 1. 15% chance for bot to force 4-5-6 (Auto-Win)
-            # 2. 10% chance for player to force 1-2-3 (Auto-Loss) - Added per user request
+            # 1. 25% chance for bot to force 4-5-6 (Auto-Win) for high bets
+            # 2. 15% chance for player to force 1-2-3 (Auto-Loss) for high bets
             roll = random.random()
-            if bet > 1400:
-                if roll < 0.15 and not mod_advantage:
+            if bet > 1000:
+                if roll < 0.25 and not mod_advantage:
                     bot_dice = [4, 5, 6]
                     logger.info(f"HOUSE EDGE (BOT WIN) TRIGGERED: High bet of {bet} detected. Bot forced 4-5-6.")
-                elif roll < 0.25 and not mod_advantage: # 0.15 + 0.10 = 0.25
-                    # CRITICAL: We need to override the PLAYER'S dice here, but dice is passed in.
-                    # Instead, we force the BOT to win by checking this roll in the main loop logic.
-                    # Or, easier: Force bot to roll higher than player if this roll hits.
+                elif roll < 0.40 and not mod_advantage: # 0.25 + 0.15 = 0.40
                     bot_dice = [4, 5, 6] # Same outcome: player loses
-                    logger.info(f"HOUSE EDGE (PLAYER LOSS) TRIGGERED: High bet of {bet} detected. Bot forced 4-5-6.")
+                    logger.info(f"HOUSE EDGE (PLAYER LOSS) TRIGGERED: High bet of {bet} detected. Bot forced 1-2-3.")
                 else:
                     bot_dice = [random.randint(1, 6) for _ in range(3)]
             else:
@@ -501,16 +498,16 @@ class GamesCog(commands.Cog):
 
         if r1 == r2 == r3:
             if r1 in symbols["rare"]:
-                winnings = 100
+                winnings = 75 # Reduced from 100
                 final_msg = (
                     f"{r1} | {r2} | {r3}\n**JACKPOT!** {r1}\n{ctx.author.mention}"
                 )
             else:
-                winnings = 20
+                winnings = 15 # Reduced from 20
                 medium_msgs = ["**Hit!**", "**Score!**", "**Got em!**", "**Connect!**"]
                 final_msg = f"{r1} | {r2} | {r3}\n{random.choice(medium_msgs)} {r1}\n{ctx.author.mention}"
         elif r1 == r2 or r2 == r3 or r1 == r3:
-            winnings = 5
+            winnings = 3 # Reduced from 5
             winning_symbol = r1 if r1 == r2 else (r2 if r2 == r3 else r1)
             small_msgs = ["Push.", "Match.", "Pair.", "Almost."]
             final_msg = f"{r1} | {r2} | {r3}\n{random.choice(small_msgs)} {winning_symbol}\n{ctx.author.mention}"
@@ -754,12 +751,20 @@ class GamesCog(commands.Cog):
         await asyncio.sleep(1.5)
 
         outcome = random.choice(['h', 't'])
+        
+        # 📈 High Stakes Odds Adjustment (70/30 for bet > 2k)
+        if bet > 2000:
+            if random.random() < 0.70: # 70% chance to lose
+                outcome = 't' if side_clean == 'h' else 'h'
+            else:
+                outcome = side_clean
+
         win = side_clean == outcome
         
         side_name = "HEADS" if outcome == 'h' else "TAILS"
         
         if win:
-            reward = bet * 2
+            reward = int(bet * 1.8) # Reduced to 1.8x
             await update_balance(user_id, reward)
             await self.process_reaping(ctx)
             win_msgs = [
