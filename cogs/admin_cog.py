@@ -236,6 +236,9 @@ class AdminCog(commands.Cog):
         if limit > 100:
             limit = 100 # Safety cap
 
+        # Status message
+        status_msg = await ctx.send(f"🧹 **Cleaning {limit} interactions from chat...** requested by **{ctx.author.display_name}**")
+
         await ctx.message.delete() # Delete the .clean command itself first
 
         to_delete = []
@@ -243,6 +246,10 @@ class AdminCog(commands.Cog):
         
         # We search through a larger window to find the requested number of bot messages
         async for msg in ctx.channel.history(limit=limit * 4):
+            # Don't delete the status message we just sent
+            if msg.id == status_msg.id:
+                continue
+                
             if bot_found >= limit:
                 break
             
@@ -251,7 +258,6 @@ class AdminCog(commands.Cog):
                 bot_found += 1
                 
                 # Look for the "prompt" message
-                # 1. Check if it's a reply
                 if msg.reference and msg.reference.message_id:
                     try:
                         ref_msg = await ctx.channel.fetch_message(msg.reference.message_id)
@@ -260,8 +266,6 @@ class AdminCog(commands.Cog):
                     except:
                         pass
                 else:
-                    # 2. Otherwise, check the message immediately preceding it
-                    # We have to fetch history around this message to be sure
                     try:
                         async for prev_msg in ctx.channel.history(limit=1, before=msg):
                             if prev_msg.author.id != self.bot.user.id and prev_msg not in to_delete:
@@ -270,18 +274,16 @@ class AdminCog(commands.Cog):
                         pass
 
         if to_delete:
-            # Sort by ID to ensure correct deletion order (though bulk_delete handles it)
-            # and avoid deleting the same message twice if logic overlapped
             unique_to_delete = list(set(to_delete))
             
-            # Divide into chunks of 100 for bulk_delete (Discord limit)
+            # Divide into chunks of 100 for bulk_delete
             for i in range(0, len(unique_to_delete), 100):
                 chunk = unique_to_delete[i:i + 100]
                 await ctx.channel.delete_messages(chunk)
             
-            await ctx.send(f"🧹 **PURGED.** Cleared {bot_found} bot interactions ({len(unique_to_delete)} messages total).", delete_after=5)
+            await status_msg.edit(content=f"✅ **Successfully cleaned {bot_found} interactions from chat.** requested by **{ctx.author.display_name}**")
         else:
-            await ctx.send("🌑 No bot messages found to prune.", delete_after=5)
+            await status_msg.edit(content=f"🌑 **No bot messages found to prune.** requested by **{ctx.author.display_name}**")
 
 async def setup(bot):
     await bot.add_cog(AdminCog(bot))
