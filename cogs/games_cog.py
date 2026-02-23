@@ -716,6 +716,10 @@ class GamesCog(commands.Cog):
         if not amount or not side:
             return await ctx.reply("Usage: `.bt <amount> <h/t>`\n*\"Put some bread on the line... h or t?\"*", mention_author=False)
 
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
+
         user_id = ctx.author.id
         balance = await get_balance(user_id)
 
