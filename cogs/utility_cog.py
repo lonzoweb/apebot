@@ -684,7 +684,7 @@ class UtilityCog(commands.Cog):
                     await ctx.send(random.choice(cooldown_messages))
                     return
 
-        image_url = "https://i.imgur.com/ffL8H9v.png"
+        image_url = "https://i.imgur.com/GQxOYGn.png"
 
         await ctx.send(f"{ctx.author.display_name} ʰᵃˢ ᵖᵃᶦᵈ ᵗʳᶦᵇᵘᵗᵉ")
 
