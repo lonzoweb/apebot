@@ -52,6 +52,7 @@ class UtilityCog(commands.Cog):
         self.bot = bot
 
     @commands.command(name="gem")
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def gematria_command(self, ctx, *, text: str = None):
         """Calculate gematria values for text (costs 2 tokens)"""
         
@@ -683,31 +684,20 @@ class UtilityCog(commands.Cog):
                     await ctx.send(random.choice(cooldown_messages))
                     return
 
-        STICKER_ID = 1416504837436342324
+        image_url = "https://i.imgur.com/ffL8H9v.png"
 
-        try:
-            sticker = await ctx.guild.fetch_sticker(STICKER_ID)
+        await ctx.send(f"{ctx.author.display_name} ʰᵃˢ ᵖᵃᶦᵈ ᵗʳᶦᵇᵘᵗᵉ")
 
-            await ctx.send(f"{ctx.author.display_name} ʰᵃˢ ᵖᵃᶦᵈ ᵗʳᶦᵇᵘᵗᵉ")
+        count = 6 if (is_admin or is_capo) else 2
+        for _ in range(count):
+            await ctx.send(image_url)
 
-            sticker_count = 6 if (is_admin or is_capo) else 2
-            for _ in range(sticker_count):
-                await ctx.send(stickers=[sticker])
+        await update_balance(ctx.author.id, REWARD_AMOUNT)
 
-            await update_balance(ctx.author.id, REWARD_AMOUNT)
-
-            if not (is_admin or is_capo):
-                self.bot.key_global_last_used = current_time
-                last_used["key"] = current_time
-                self.bot.key_last_used = last_used
-
-        except discord.NotFound:
-            await ctx.reply(
-                "❌ Sticker not found! Make sure it's from this server.",
-                mention_author=False,
-            )
-        except discord.HTTPException as e:
-            await ctx.reply(f"❌ Failed to send sticker: {e}. My hands are tied!", mention_author=False)
+        if not (is_admin or is_capo):
+            self.bot.key_global_last_used = current_time
+            last_used["key"] = current_time
+            self.bot.key_last_used = last_used
 
     @commands.command(name="stats")
     async def stats_command(self, ctx):
