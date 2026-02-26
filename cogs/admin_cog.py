@@ -238,20 +238,20 @@ class AdminCog(commands.Cog):
         )
         
         embed.add_field(
-            name="🏛️ #forum (Basics)",
-            value="`.beg` / `.daily` / `.bal` / `.send` / `.key`",
+            name="🏛️ #forum",
+            value="`.beg` / `.daily` / `.bal` / `.send` / `.key` / `.tc` / `.gem` / `.moon` / `.w` / `.time` / `.8ball` / `.location` / `.roulette` ",
             inline=False
         )
         
         embed.add_field(
             name="🎰 #forum-livi (Economy & Games)",
-            value="`.buy` / `.shop` / `.inventory` / `.bt` / `.dice` / `.pull` / `.roulette` / `.fade` / `.torture` / `.use` / `.silencer` / `.pink` / `.cleanse` / `.gem` / `.rev` / `.moon` / `.lp` / `.crypto` / `.gifs` / `.stats` / `.time` / `.location` / `.ud` / `.flip` / `.roll` / `.8ball` / `.w` / `.rev`",
+            value="`.buy` / `.shop` / `.inventory` / `.bt` / `.dice` / `.pull` / `.fade` / `.torture` / `.use` / `.silencer` / `.pink` / `.cleanse` / `.rev` / `.lp` / `.crypto` / `.gifs` / `.flip` / `.roll` / `.rev` ",
             inline=False
         )
         
         embed.add_field(
             name="🛠️ Admin Only (Anywhere)",
-            value="`.top20` / `.max` / `.clearinv` / `.clean` / `.economy` / `.baladd` / `.balremove` / `.baledit` / `.reset_economy` / `.backup_economy` / `.invremove` / `.gr` / `.set` / `.help` ",
+            value="`.top20` / `.max` / `.clearinv` / `.clean` / `.economy` / `.baladd` / `.balremove` / `.baledit` / `.reset_economy` / `.backup_economy` / `.invremove` / `.gr` / `.set` / `.help` / `.stats` ",
             inline=False
         )
         

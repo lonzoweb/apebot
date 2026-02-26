@@ -586,9 +586,6 @@ class GamesCog(commands.Cog):
     @commands.command(name="roulette")
     async def roulette_command(self, ctx):
         """Join the Russian Roulette queue (20 buyout)"""
-        # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
-            return
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: The chamber is locked while the economy is disabled.", mention_author=False)
         
