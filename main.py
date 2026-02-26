@@ -303,7 +303,15 @@ async def globally_block_commands(ctx):
     """Block all commands except in allowed channels or if muzzled/uwud."""
     # Admins and Capos can use commands anywhere and are immune to curses/spam checks
     is_capo = any(role.name == "Capo" for role in ctx.author.roles)
-    if ctx.author.guild_permissions.administrator or is_capo:
+    is_admin = ctx.author.guild_permissions.administrator
+    
+    # Block if muzzled or uwud (Capos are no longer exempt from muzzle/uwu)
+    effects = await get_all_active_effects(ctx.author.id)
+    for effect_name, expiration in effects:
+        if time.time() < expiration and effect_name in ["muzzle", "uwu"]:
+            return False
+
+    if is_admin or is_capo:
         return True
 
     # Check debug mode
@@ -315,11 +323,6 @@ async def globally_block_commands(ctx):
     if ctx.channel.name not in ALLOWED_CHANNEL_NAMES:
         return False
 
-    # Block if muzzled or uwud
-    effects = await get_all_active_effects(ctx.author.id)
-    for effect_name, expiration in effects:
-        if time.time() < expiration and effect_name in ["muzzle", "uwu"]:
-            return False
 
     # YAP SYSTEM (20s Window)
     is_gold = await has_item(ctx.author.id, "gold_card")

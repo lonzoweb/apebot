@@ -553,6 +553,9 @@ class GamesCog(commands.Cog):
     @commands.command(name="torture")
     async def torture_command(self, ctx):
         """Display a random historical torture method"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
 
         torture_cooldowns = getattr(self.bot, "torture_cooldowns", {})
         user_id = ctx.author.id
@@ -583,6 +586,9 @@ class GamesCog(commands.Cog):
     @commands.command(name="roulette")
     async def roulette_command(self, ctx):
         """Join the Russian Roulette queue (20 buyout)"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: The chamber is locked while the economy is disabled.", mention_author=False)
         
@@ -793,10 +799,13 @@ class GamesCog(commands.Cog):
 
 
 
-    @commands.command(name="jugg")
+    @commands.command(name="jugg", aliases=["lick"])
     @commands.cooldown(1, 600, commands.BucketType.user)
     async def lick_command(self, ctx, target: discord.Member = None):
         """Hit a lick on a user or a random non-mod. (Cost: 357 tokens)"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
         try:
             logger.info(f"Lick triggered by {ctx.author.name}")
             if not await is_economy_on() and not ctx.author.guild_permissions.administrator:

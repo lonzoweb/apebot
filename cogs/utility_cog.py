@@ -55,6 +55,9 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def gematria_command(self, ctx, *, text: str = None):
         """Calculate gematria values for text (costs 2 tokens)"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
         
         if ctx.message.reference:
             reply_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
@@ -107,6 +110,9 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 30, commands.BucketType.user)
     async def reverse_command(self, ctx):
         """Reverse search the most relevant image in chat using Google Lens (costs 2 tokens)"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
         async with ctx.channel.typing():
             image_url = None
             if ctx.message.reference:
@@ -181,6 +187,9 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def urban_command(self, ctx, *, term: str):
         """Look up a term on Urban Dictionary"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
         if len(term) > 100:
             return await ctx.send("❌ Term too long (max 100 characters)")
 
@@ -207,6 +216,9 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def flip_command(self, ctx):
         """Flip a coin"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
         await asyncio.sleep(1)
         result = random.choice(["Heads", "Tails"])
         await ctx.send(f"🪙 **{result}**")
@@ -215,6 +227,9 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def roll_command(self, ctx):
         """Roll a random number between 1-33"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
         await asyncio.sleep(0.5)
         result = random.randint(1, 33)
         await ctx.send(f"{ctx.author.display_name} rolls 🎲 **{result}**")
@@ -223,6 +238,10 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 6, commands.BucketType.user)
     async def eightball_command(self, ctx, *, question: str = None):
         """Ask the magic 8-ball a question"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
+            
         if not question:
             return await ctx.send("❌ Ask a question cuh.")
 
@@ -256,6 +275,9 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def moon_command(self, ctx):
         """Show current moon phase and upcoming moons"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
         try:
             now = ephem.now()
             moon = ephem.Moon()
@@ -314,6 +336,9 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def lifepathnumber_command(self, ctx, date: str = None):
         """Calculate Life Path Number from birthdate with Chinese Zodiac"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
         if not date:
             return await ctx.send(
                 "❌ Please provide a date.\n"
@@ -394,6 +419,9 @@ class UtilityCog(commands.Cog):
     @commands.command(name="w")
     async def weather_command(self, ctx, *, location: str = None):
         """Gets current weather for a location (zip code, city, neighborhood, etc.)"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
 
         if self.bot.aiohttp_session is None or self.bot.aiohttp_session.closed:
             self.bot.aiohttp_session = aiohttp.ClientSession()
@@ -544,6 +572,9 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def crypto_command(self, ctx):
         """Displays real-time prices for the top 5 cryptocurrencies."""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
 
         loading_msg = await ctx.send("🌐 Fetching real-time crypto prices... ⏳")
 
@@ -601,6 +632,9 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def gifs_command(self, ctx):
         """Show top 10 most sent GIFs"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
         top_gifs = await get_top_gifs(limit=10)
 
         if not top_gifs:
@@ -650,6 +684,9 @@ class UtilityCog(commands.Cog):
     @commands.command(name="key")
     async def kek_command(self, ctx):
         """Sends a specific sticker 6 times (1 min cooldown for non-admins)"""
+        # Channel Restriction: Only forum
+        if ctx.channel.name != "forum" and not ctx.author.guild_permissions.administrator:
+            return
 
         REWARD_AMOUNT = 3
         last_used = getattr(self.bot, 'key_last_used', {})
@@ -723,6 +760,9 @@ class UtilityCog(commands.Cog):
     @commands.command(name="time")
     async def time_command(self, ctx, member: discord.Member = None):
         """Check time for a user"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
 
         if ctx.message.reference and not member:
             try:
@@ -753,6 +793,9 @@ class UtilityCog(commands.Cog):
     @commands.command(name="location")
     async def location_command(self, ctx, *, args: str = None):
         """Set your timezone location"""
+        # Channel Restriction: Only forum-livi
+        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+            return
         if not args:
             return await ctx.reply(
                 "❌ Please provide a location. Usage: `.location <city>`. Don't wander aimlessly!", mention_author=False

@@ -184,12 +184,19 @@ class EconomyCog(commands.Cog):
                 "🚫 You can only check your own balance or an admin can check others."
             )
 
+        # Channel Restriction: Only forum
+        if ctx.channel.name != "forum" and not ctx.author.guild_permissions.administrator:
+            return
+
         await economy.handle_balance_command(ctx, member)
 
     @commands.command(name="send", aliases=["gift", "give", "transfer"])
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def send_command(self, ctx, member: discord.Member, *, content: str):
         """Transfer tokens or items to another user. Usage: .send @user <amount/item>"""
+        # Channel Restriction: Only forum
+        if ctx.channel.name != "forum" and not ctx.author.guild_permissions.administrator:
+            return
         content = content.strip()
         
         # Try numeric (tokens) - extract first number and ignore trailing text
@@ -892,6 +899,14 @@ class EconomyCog(commands.Cog):
         channel_id = message.channel.id
         user_id = message.author.id
 
+        # Muzzle/UwU check to block rewards/listeners
+        from database import get_all_active_effects
+        effects = await get_all_active_effects(user_id)
+        import time
+        for effect_name, expiration in effects:
+            if time.time() < expiration and effect_name in ["muzzle", "uwu"]:
+                return
+
         # 💎 Re-entry Shard Reward
         if await can_claim_shard(user_id):
             await record_shard_claim(user_id)
@@ -945,6 +960,10 @@ class EconomyCog(commands.Cog):
         """Claim your daily 88 tokens."""
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: The treasury is sealed. Economy is disabled.", mention_author=False)
+
+        # Channel Restriction: Only forum
+        if ctx.channel.name != "forum" and not ctx.author.guild_permissions.administrator:
+            return
 
         if await can_claim_daily(ctx.author.id, "beg"):
             await update_balance(ctx.author.id, 88)

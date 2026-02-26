@@ -227,6 +227,37 @@ class AdminCog(commands.Cog):
         except asyncio.TimeoutError:
             await ctx.send("⌛ Clear cancelled.")
 
+    @commands.command(name="help")
+    @commands.has_permissions(administrator=True)
+    async def admin_help_command(self, ctx):
+        """[ADMIN] Displays channel-specific command guide."""
+        embed = discord.Embed(
+            title="🗺️ APEIRON COMMAND MAP",
+            description="Guide for public command channel affinity.",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="🏛️ #forum (Basics)",
+            value="`.beg` / `.daily` / `.bal` / `.send` / `.key`",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🎰 #forum-livi (Economy & Games)",
+            value="`.buy` / `.shop` / `.inventory` / `.bt` / `.dice` / `.pull` / `.roulette` / `.fade` / `.torture` / `.use` / `.silencer` / `.pink` / `.cleanse` / `.gem` / `.rev` / `.moon` / `.lp` / `.crypto` / `.gifs` / `.stats` / `.time` / `.location` / `.ud` / `.flip` / `.roll` / `.8ball` / `.w` / `.rev`",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🛠️ Admin Only (Anywhere)",
+            value="`.top20` / `.max` / `.clearinv` / `.clean` / `.economy` / `.baladd` / `.balremove` / `.baledit` / `.reset_economy` / `.backup_economy` / `.invremove` / `.gr` / `.set` / `.help` ",
+            inline=False
+        )
+        
+        embed.set_footer(text="Administrators are exempt from channel locks.")
+        await ctx.send(embed=embed)
+
     @commands.command(name="clean")
     @commands.has_permissions(administrator=True)
     async def clean_bot_messages(self, ctx, limit: int = 50):
