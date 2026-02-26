@@ -51,6 +51,25 @@ class UtilityCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    @commands.command(name="cmds", aliases=["commands"])
+    async def public_commands_list(self, ctx):
+        """Displays a concise list of channel-locked commands."""
+        embed = discord.Embed(
+            title="📜 APEIRON PUBLIC COMMANDS",
+            color=discord.Color.dark_grey()
+        )
+        embed.add_field(
+            name="#forum",
+            value="`.beg` `.daily` `.bal` `.send` `.key`",
+            inline=False
+        )
+        embed.add_field(
+            name="#forum-livi",
+            value="`.shop` `.inv` `.bt` `.dice` `.pull` `.roulette` `.jugg` `.gem` `.rev` `.ud` `.moon` `.lp` `.w` `.crypto` `.gifs` `.stats` `.time` `.location` `.flip` `.roll` `.8ball`",
+            inline=False
+        )
+        await ctx.send(embed=embed)
+
     @commands.command(name="gem")
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def gematria_command(self, ctx, *, text: str = None):
