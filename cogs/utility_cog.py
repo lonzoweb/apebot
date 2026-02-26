@@ -55,7 +55,7 @@ class UtilityCog(commands.Cog):
     async def public_commands_list(self, ctx):
         """Displays a concise list of channel-locked commands."""
         embed = discord.Embed(
-            title="📜 APEIRON PUBLIC COMMANDS",
+            title="public cmds",
             color=discord.Color.dark_grey()
         )
         embed.add_field(
