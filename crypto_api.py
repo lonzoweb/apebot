@@ -10,18 +10,27 @@ async def fetch_crypto_prices(session: aiohttp.ClientSession, limit: int = 5) ->
     """
     Fetches the top N cryptocurrencies sorted by market cap in USD using aiohttp.
     """
+    headers = {
+        "User-Agent": "ApeBot/1.0 (Discord Bot; contact: your_email@example.com)",
+        "accept": "application/json"
+    }
+
     params = {
         "vs_currency": "usd",
         "order": "market_cap_desc",
         "per_page": limit,
         "page": 1,
-        "sparkline": False,
+        "sparkline": "false",
         "price_change_percentage": "24h",
     }
 
     try:
-        async with session.get(COINGECKO_API_URL, params=params, timeout=10) as response:
-            response.raise_for_status()
+        async with session.get(COINGECKO_API_URL, params=params, headers=headers, timeout=10) as response:
+            if response.status != 200:
+                error_text = await response.text()
+                logger.error(f"CoinGecko API error: {response.status} - {error_text}")
+                return []
+            
             data = await response.json()
 
             results = []

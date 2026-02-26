@@ -580,6 +580,9 @@ class UtilityCog(commands.Cog):
         if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
 
+        if self.bot.aiohttp_session is None or self.bot.aiohttp_session.closed:
+            self.bot.aiohttp_session = aiohttp.ClientSession()
+
         loading_msg = await ctx.send("🌐 Fetching real-time crypto prices... ⏳")
 
         crypto_data = await crypto_api.fetch_crypto_prices(self.bot.aiohttp_session, 5)
