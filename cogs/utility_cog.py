@@ -60,12 +60,12 @@ class UtilityCog(commands.Cog):
         )
         embed.add_field(
             name="#forum",
-            value="`.beg` `.daily` `.bal` `.send` `.key` `.gem` `.moon` `.tc` `.w` `.time` `.8ball` `.location`",
+            value="`.beg` `.daily` `.bal` `.send` `.key` `.gem` `.moon` `.tc` `.w` `.time` `.8ball` `.location` `.roll`",
             inline=False
         )
         embed.add_field(
             name="#forum-livi",
-            value="`.shop` `.inv` `.bt` `.dice` `.pull` `.roulette` `.jugg` `.rev` `.ud` `.lp` `.crypto` `.gifs` `.flip` `.roll`",
+            value="`.shop` `.inv` `.bt` `.dice` `.pull` `.roulette` `.jugg` `.rev` `.ud` `.lp` `.crypto` `.gifs` `.flip`",
             inline=False
         )
         await ctx.send(embed=embed)
