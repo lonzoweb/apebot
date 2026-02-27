@@ -59,13 +59,13 @@ class UtilityCog(commands.Cog):
             color=discord.Color.dark_grey()
         )
         embed.add_field(
-            name="#forum",
-            value="`.beg` `.daily` `.bal` `.send` `.key` `.gem` `.moon` `.tc` `.w` `.time` `.8ball` `.location` `.roll`",
+            name="#forum (works in both channels)",
+            value="`.beg` `.daily` `.bal` `.send` `.key` `.gem` `.moon` `.tc` `.w` `.time` `.8ball` `.location` `.roll` `.roulette`",
             inline=False
         )
         embed.add_field(
-            name="#forum-livi",
-            value="`.shop` `.inv` `.bt` `.dice` `.pull` `.roulette` `.jugg` `.rev` `.ud` `.lp` `.crypto` `.gifs` `.flip`",
+            name="#forum-livi only",
+            value="`.shop` `.inv` `.bt` `.dice` `.pull` `.jugg` `.rev` `.ud` `.lp` `.crypto` `.gifs` `.flip`",
             inline=False
         )
         await ctx.send(embed=embed)
@@ -126,7 +126,7 @@ class UtilityCog(commands.Cog):
     async def reverse_command(self, ctx):
         """Reverse search the most relevant image in chat using Google Lens (costs 2 tokens)"""
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
         async with ctx.channel.typing():
             image_url = None
@@ -203,7 +203,7 @@ class UtilityCog(commands.Cog):
     async def urban_command(self, ctx, *, term: str):
         """Look up a term on Urban Dictionary"""
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
         if len(term) > 100:
             return await ctx.send("❌ Term too long (max 100 characters)")
@@ -232,7 +232,7 @@ class UtilityCog(commands.Cog):
     async def flip_command(self, ctx):
         """Flip a coin"""
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
         await asyncio.sleep(1)
         result = random.choice(["Heads", "Tails"])
@@ -243,7 +243,7 @@ class UtilityCog(commands.Cog):
     async def roll_command(self, ctx):
         """Roll a random number between 1-33"""
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
         await asyncio.sleep(0.5)
         result = random.randint(1, 33)
@@ -345,7 +345,7 @@ class UtilityCog(commands.Cog):
     async def lifepathnumber_command(self, ctx, date: str = None):
         """Calculate Life Path Number from birthdate with Chinese Zodiac"""
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
         if not date:
             return await ctx.send(
@@ -577,7 +577,7 @@ class UtilityCog(commands.Cog):
     async def crypto_command(self, ctx):
         """Displays real-time prices for the top 5 cryptocurrencies."""
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
 
         if self.bot.aiohttp_session is None or self.bot.aiohttp_session.closed:
@@ -640,7 +640,7 @@ class UtilityCog(commands.Cog):
     async def gifs_command(self, ctx):
         """Show top 10 most sent GIFs"""
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
         top_gifs = await get_top_gifs(limit=10)
 

@@ -136,7 +136,7 @@ class GamesCog(commands.Cog):
             return await ctx.reply("🌑 **System Notice**: The underground casinos are closed while the economy is disabled.", mention_author=False)
         
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
         
         # Handle help command
@@ -379,7 +379,7 @@ class GamesCog(commands.Cog):
             return await ctx.reply("🌑 **System Notice**: Slot machines are powered off. Economy is disabled.", mention_author=False)
 
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
 
         user_id = ctx.author.id
@@ -554,7 +554,7 @@ class GamesCog(commands.Cog):
     async def torture_command(self, ctx):
         """Display a random historical torture method"""
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
 
         torture_cooldowns = getattr(self.bot, "torture_cooldowns", {})
@@ -720,7 +720,7 @@ class GamesCog(commands.Cog):
             return await ctx.reply("Usage: `.bt <amount> <h/t>`\n*\"Put some bread on the line... h or t?\"*", mention_author=False)
 
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
 
         user_id = ctx.author.id
@@ -801,7 +801,7 @@ class GamesCog(commands.Cog):
     async def lick_command(self, ctx, target: discord.Member = None):
         """Hit a lick on a user or a random non-mod. (Cost: 357 tokens)"""
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
         try:
             logger.info(f"Lick triggered by {ctx.author.name}")

@@ -185,7 +185,7 @@ class EconomyCog(commands.Cog):
             )
 
         # Channel Restriction: Only forum
-        if ctx.channel.name != "forum" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() not in ["forum", "forum-livi"] and not ctx.author.guild_permissions.administrator:
             return
 
         await economy.handle_balance_command(ctx, member)
@@ -195,7 +195,7 @@ class EconomyCog(commands.Cog):
     async def send_command(self, ctx, member: discord.Member, *, content: str):
         """Transfer tokens or items to another user. Usage: .send @user <amount/item>"""
         # Channel Restriction: Only forum
-        if ctx.channel.name != "forum" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() not in ["forum", "forum-livi"] and not ctx.author.guild_permissions.administrator:
             return
         content = content.strip()
         
@@ -301,7 +301,7 @@ class EconomyCog(commands.Cog):
             return await ctx.reply("🌑 **System Notice**: The spirits have locked the exchange. Economy is currently disabled.", mention_author=False)
 
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
 
         if item_name is None or (item_name.lower() == "hidden" and has_authorized_role(ctx.author)):
@@ -434,7 +434,7 @@ class EconomyCog(commands.Cog):
     async def inventory_command(self, ctx):
         """DMs the user their current items."""
         # Channel Restriction: Only forum-livi
-        if ctx.channel.name != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
             return
 
         inventory = await get_user_inventory(ctx.author.id)
