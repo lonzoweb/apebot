@@ -691,8 +691,8 @@ class UtilityCog(commands.Cog):
     @commands.command(name="key")
     async def kek_command(self, ctx):
         """Sends a specific sticker 6 times (1 min cooldown for non-admins)"""
-        # Channel Restriction: Only forum
-        if ctx.channel.name != "forum" and not ctx.author.guild_permissions.administrator:
+        # Channel Restriction: forum and forum-livi
+        if ctx.channel.name not in ["forum", "forum-livi"] and not ctx.author.guild_permissions.administrator:
             return
 
         REWARD_AMOUNT = 3

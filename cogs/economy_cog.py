@@ -961,8 +961,8 @@ class EconomyCog(commands.Cog):
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: The treasury is sealed. Economy is disabled.", mention_author=False)
 
-        # Channel Restriction: Only forum
-        if ctx.channel.name != "forum" and not ctx.author.guild_permissions.administrator:
+        # Channel Restriction: forum and forum-livi
+        if ctx.channel.name not in ["forum", "forum-livi"] and not ctx.author.guild_permissions.administrator:
             return
 
         if await can_claim_daily(ctx.author.id, "beg"):
