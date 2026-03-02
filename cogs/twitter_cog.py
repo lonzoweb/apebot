@@ -6,6 +6,7 @@ Commands:
 """
 
 import os
+import json
 import logging
 import discord
 from discord.ext import commands
@@ -36,11 +37,26 @@ class TwitterCog(commands.Cog):
         except ImportError:
             raise RuntimeError("twikit is not installed. Run: pip install twikit")
 
+        # If the file doesn't exist, try writing it from the TWITTER_COOKIES_JSON env var
+        # (set this in Railway with the contents of twitter_cookies.json)
         if not os.path.exists(TWITTER_COOKIES_FILE):
-            raise RuntimeError(
-                f"Twitter cookies file not found: `{TWITTER_COOKIES_FILE}`. "
-                "Run the setup script to generate it."
-            )
+            cookies_json = os.getenv("TWITTER_COOKIES_JSON")
+            if cookies_json:
+                try:
+                    # Validate it's proper JSON before writing
+                    json.loads(cookies_json)
+                    os.makedirs(os.path.dirname(os.path.abspath(TWITTER_COOKIES_FILE)), exist_ok=True)
+                    with open(TWITTER_COOKIES_FILE, "w") as f:
+                        f.write(cookies_json)
+                    logger.info(f"✅ Wrote Twitter cookies from env var to {TWITTER_COOKIES_FILE}")
+                except Exception as e:
+                    raise RuntimeError(f"TWITTER_COOKIES_JSON env var is invalid: {e}")
+            else:
+                raise RuntimeError(
+                    f"Twitter cookies file not found: `{TWITTER_COOKIES_FILE}`. "
+                    "Either run setup_twitter.py locally and commit the file, "
+                    "or set the TWITTER_COOKIES_JSON environment variable on Railway."
+                )
 
         client = Client(language="en-US")
         client.load_cookies(TWITTER_COOKIES_FILE)
