@@ -344,7 +344,7 @@ class UtilityCog(commands.Cog):
 
             embed.add_field(
                 name="Current",
-                value=f"{phase_emoji} **{phase_name}** ({int(illumination * 100)}% illuminated)\nMoon in: **{current_sign}**",
+                value=f"{phase_emoji} **{phase_name}** ({int(illumination * 100)}% illuminated)\nMoon in: **{current_sign}**\n",
                 inline=False,
             )
 
@@ -352,7 +352,7 @@ class UtilityCog(commands.Cog):
                 name="Upcoming",
                 value=(
                     f"**Next New Moon:** {new_date_str} (in {time_to_new})\n"
-                    f"Moon in: **{new_moon_sign}**\n\n"
+                    f"Moon in: **{new_moon_sign}**\n"
                     f"**Next Full Moon:** {full_date_str} (in {time_to_full})\n"
                     f"Moon in: **{full_moon_sign}**"
                 ),
