@@ -8,3 +8,4 @@ google-genai
 google-auth
 pillow
 python-dotenv
+twikit

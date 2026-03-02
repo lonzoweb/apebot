@@ -17,6 +17,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 OPENCAGE_KEY = os.getenv("OPENCAGE_KEY")
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+TWITTER_COOKIES_FILE = os.getenv("TWITTER_COOKIES_FILE", "twitter_cookies.json")
 GOOGLE_CREDENTIALS_PATH = os.path.join(os.path.dirname(__file__), "google_credentials.json")
 GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 

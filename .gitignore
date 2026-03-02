@@ -1,5 +1,6 @@
 # Credentials
 google_credentials.json
+twitter_cookies.json
 .env
 
 # Python
