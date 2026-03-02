@@ -306,8 +306,8 @@ def aggressive_uwu(text: str) -> str:
     Transforms text into a readable, high-quality UWU style.
     Includes ANTI-CIRCUMVENTION logic to decode 'fancy fonts'.
     """
-    if not text:
-        return "..."
+    if not text or not text.strip():
+        return ""
 
     # 0. ANTI-CIRCUMVENTION (UNICODE NORMALIZATION)
     # This converts "𝐇𝐞𝐥𝐥𝐨", "𝘏𝘦𝘭𝘭𝘰", "𝐻𝑒𝑙𝑙𝑜" etc. back to standard "Hello"
@@ -385,10 +385,12 @@ def aggressive_uwu(text: str) -> str:
 
     text = " ".join(transformed_words)
 
-    if text:
-        text = text[0].upper() + text[1:]
+    if not text.strip():
+        return ""
 
-    return text.strip() + random.choice(CLEAN_FINAL_SLOP)
+    text = text.strip()
+    text = text[0].upper() + text[1:]
+    return text + random.choice(CLEAN_FINAL_SLOP)
 
 
 # ============================================================
