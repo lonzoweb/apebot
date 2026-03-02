@@ -90,7 +90,9 @@ def setup_tasks(bot, guild_id: int):
             if now_pt.hour == 10 and daily_quote_of_the_day is None:
                 quotes = await database.load_quotes_from_db()
                 if quotes:
-                    daily_quote_of_the_day = random.choice(quotes)
+                    # Use admin-picked quote if one was selected, otherwise random
+                    tomorrow = getattr(bot, "tomorrow_quote", None)
+                    daily_quote_of_the_day = tomorrow if tomorrow and tomorrow in quotes else random.choice(quotes)
                     embed = discord.Embed(
                         title="🌅 Blessings to Apeiron",
                         description=f"📜 {daily_quote_of_the_day}",
@@ -109,8 +111,29 @@ def setup_tasks(bot, guild_id: int):
                 for ch in target_channels:
                     await ch.send(embed=embed)
 
+                # After the 6pm repost, send 3 candidate quotes to #emperor
+                if emperor_channel:
+                    try:
+                        all_quotes = await database.load_quotes_from_db()
+                        pool = [q for q in all_quotes if q != daily_quote_of_the_day]
+                        candidates = random.sample(pool, min(3, len(pool)))
+                        bot.pending_quotes = candidates
+
+                        lines = "\n\n".join(f"**{i+1}.** {q}" for i, q in enumerate(candidates))
+                        pick_embed = discord.Embed(
+                            title="📋 Tomorrow's Quote — Choose One",
+                            description=lines,
+                            color=discord.Color.blurple(),
+                        )
+                        pick_embed.set_footer(text=".pickquote <1 / 2 / 3 / random>")
+                        await emperor_channel.send(embed=pick_embed)
+                    except Exception as e:
+                        logger.error(f"Error sending quote candidates: {e}")
+
             if now_pt.hour == 19:
                 daily_quote_of_the_day = None
+                bot.pending_quotes = []
+                bot.tomorrow_quote = None
 
         except Exception as e:
             logger.error(f"Error in daily_quote task: {e}", exc_info=True)
