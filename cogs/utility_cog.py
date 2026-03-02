@@ -242,8 +242,8 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def roll_command(self, ctx):
         """Roll a random number between 1-33"""
-        # Channel Restriction: Only forum-livi
-        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        # Channel Restriction: forum and forum-livi
+        if ctx.channel.name.lower() not in ["forum", "forum-livi"] and not ctx.author.guild_permissions.administrator:
             return
         await asyncio.sleep(0.5)
         result = random.randint(1, 33)
