@@ -249,5 +249,43 @@ class QuotesCog(commands.Cog):
             await ctx.reply("🚫 Peasant Detected. Begone!", mention_author=False)
 
 
+    @commands.command(name="pickquote")
+    @commands.has_permissions(administrator=True)
+    async def pickquote_command(self, ctx, choice: str = None):
+        """[Admin] Pick tomorrow's quote from the 3 evening candidates. Usage: .pickquote <1|2|3|random>"""
+        candidates = getattr(self.bot, "pending_quotes", [])
+        if not candidates:
+            return await ctx.reply(
+                "❌ No candidates available yet. They appear in #emperor after the 6pm daily quote.",
+                mention_author=False
+            )
+
+        if choice is None:
+            return await ctx.reply(
+                "Usage: `.pickquote <1 | 2 | 3 | random>`", mention_author=False
+            )
+
+        choice = choice.strip().lower()
+        if choice == "random":
+            picked = random.choice(candidates)
+        elif choice in ("1", "2", "3") and int(choice) <= len(candidates):
+            picked = candidates[int(choice) - 1]
+        else:
+            return await ctx.reply(
+                "❌ Invalid choice. Use `1`, `2`, `3`, or `random`.", mention_author=False
+            )
+
+        self.bot.tomorrow_quote = picked
+        self.bot.pending_quotes = []  # Clear so it can't be re-picked
+
+        embed = discord.Embed(
+            title="✅ Tomorrow's Quote — Locked In",
+            description=f"📜 {picked}",
+            color=discord.Color.green(),
+        )
+        embed.set_footer(text=f"Chosen by {ctx.author.display_name} · Posts at 10am & 6pm tomorrow")
+        await ctx.send(embed=embed)
+
+
 async def setup(bot):
     await bot.add_cog(QuotesCog(bot))
