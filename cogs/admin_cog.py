@@ -4,6 +4,7 @@ from database import (
     is_economy_on, set_economy_status, set_yap_level, get_yap_level,
     get_top_balances, cap_all_balances, clear_user_inventory
 )
+from main import remove_muzzle_role
 
 class AdminCog(commands.Cog):
     """Admin-only commands for system control."""
@@ -88,6 +89,7 @@ class AdminCog(commands.Cog):
         # Admin instant cleanse
         if ctx.author.guild_permissions.administrator:
             await remove_active_effect(member.id)
+            await remove_muzzle_role(member)
             effect_names = ", ".join([e[0] for e in effects])
             return await ctx.send(f"✨ **CLEANSED!** {member.mention} has been purified. Removed: {effect_names}")
         
@@ -121,6 +123,7 @@ class AdminCog(commands.Cog):
         # Check if we have enough votes
         if vote_count >= 4:
             await remove_active_effect(member.id)
+            await remove_muzzle_role(member)
             effect_names = ", ".join([e[0] for e in effects])
             self.cleanse_votes[target_id] = {}  # Clear votes
             return await ctx.send(f"✨ **DEMOCRATIC CLEANSE!** {member.mention} reached **4 votes** and has been purified. Removed: {effect_names}")

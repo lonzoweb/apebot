@@ -17,6 +17,7 @@ from database import (
 from helpers import has_authorized_role
 import economy
 import torture
+from main import assign_muzzle_role
 
 logger = logging.getLogger(__name__)
 
@@ -106,11 +107,17 @@ class GamesCog(commands.Cog):
             await remove_item_from_inventory(user_id, ward_used)
             duration = 100
             await add_active_effect(user_id, "uwu", duration)
+            member = self.bot.guilds[0].get_member(user_id) if self.bot.guilds else None
+            if member:
+                await assign_muzzle_role(member)
             return f"🛡️ **WARD SHATTERED.** {mention}'s protection absorbed most of the blast. (uwu for 1m 40s)"
         else:
             duration = 300
             await add_active_effect(user_id, "uwu", duration)
-            return f"� {mention} took the full shot. **uwu for 5m** applied."
+            member = self.bot.guilds[0].get_member(user_id) if self.bot.guilds else None
+            if member:
+                await assign_muzzle_role(member)
+            return f"🌸 {mention} took the full shot. **uwu for 5m** applied."
 
     def get_ceelo_score(self, dice):
         """Calculate Cee-lo score"""
@@ -1105,6 +1112,7 @@ class GamesCog(commands.Cog):
 
         # Penalty
         await add_active_effect(loser.id, "uwu", 60)
+        await assign_muzzle_role(loser)
 
         outcomes = [
             f"🦷  {loser.mention} got they teeth busted in and uwud, do better 🎀",

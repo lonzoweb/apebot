@@ -26,6 +26,7 @@ from helpers import has_authorized_role
 import database
 import shutil
 import os
+from main import assign_muzzle_role
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,11 @@ class SilencerView(discord.ui.View):
         target = self.active_users[winner_idx]
         
         await add_active_effect(target.id, "muzzle", 1200)
+        # Assign Discord role to block app commands
+        try:
+            await assign_muzzle_role(target)
+        except Exception:
+            pass  # Guild member may be unavailable from SilencerView context
         
         return discord.Embed(
             title="🤐 SILENCED",
@@ -574,6 +580,7 @@ class EconomyCog(commands.Cog):
                     # Reflect! Apply effect to the sender (ctx.author)
                     duration = item_info.get("duration_sec", 600)
                     await add_active_effect(ctx.author.id, official_name, duration)
+                    await assign_muzzle_role(ctx.author)
                     
                     return await ctx.send(
                         f"🔮 **REFLECTED!** {target.mention}'s Reversal Ward bounced the curse back! {ctx.author.mention} is hit with **{official_name}**!"
@@ -589,6 +596,7 @@ class EconomyCog(commands.Cog):
 
                 duration = item_info.get("duration_sec", 600)
                 await add_active_effect(target.id, official_name, duration)
+                await assign_muzzle_role(target)
                 await remove_item_from_inventory(ctx.author.id, official_name)
                 await ctx.send(
                     f"👹 **HEX APPLIED!** {item_info['feedback']}\nTarget: {target.mention}"
@@ -662,7 +670,10 @@ class EconomyCog(commands.Cog):
                             
                             # Muzzle the loser
                             try:
+                                loser_member = ctx.guild.get_member(loser_id)
                                 await add_active_effect(loser_id, "muzzle", 600)
+                                if loser_member:
+                                    await assign_muzzle_role(loser_member)
                                 await ctx.send(f"💥 **BOOM!** The potato exploded on <@{loser_id}>! They are now muzzled.")
                             except Exception as e:
                                 logger.error(f"Failed to muzzle potato loser: {e}")

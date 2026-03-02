@@ -91,6 +91,9 @@ bot.start_time = datetime.now()
 # Global state
 bot.DEBUG_MODE = False
 
+# Role name that denies "Use Application Commands" — must exist on the server
+MUZZLE_ROLE_NAME = "hexed"
+
 # ============================================================
 # YAP SYSTEM (Spam Enforcement)
 # ============================================================
@@ -184,6 +187,26 @@ async def on_ready():
 # ============================================================
 
 
+async def assign_muzzle_role(member: discord.Member):
+    """Assign the Muzzled role to suppress app commands (GIFs, slash cmds, etc.)"""
+    try:
+        role = discord.utils.get(member.guild.roles, name=MUZZLE_ROLE_NAME)
+        if role and role not in member.roles:
+            await member.add_roles(role, reason="Muzzle/UwU effect applied")
+    except Exception as e:
+        logger.warning(f"Could not assign muzzle role to {member}: {e}")
+
+
+async def remove_muzzle_role(member: discord.Member):
+    """Remove the Muzzled role when effects expire or are cleansed."""
+    try:
+        role = discord.utils.get(member.guild.roles, name=MUZZLE_ROLE_NAME)
+        if role and role in member.roles:
+            await member.remove_roles(role, reason="Muzzle/UwU effect expired/cleansed")
+    except Exception as e:
+        logger.warning(f"Could not remove muzzle role from {member}: {e}")
+
+
 async def get_or_create_webhook(channel):
     """Reuses existing webhook or creates one to mirror cursed users."""
     if not isinstance(channel, discord.TextChannel):
@@ -226,8 +249,16 @@ async def on_message(message):
     for effect_name, expiration_time in effects:
         if time.time() > expiration_time:
             await remove_active_effect(message.author.id, effect_name)
+            # Lift the Discord role when the last suppressing effect expires
+            remaining = await get_all_active_effects(message.author.id)
+            still_suppressed = any(
+                ename in ("muzzle", "uwu") and time.time() < exp
+                for ename, exp in remaining
+            )
+            if not still_suppressed:
+                await remove_muzzle_role(message.author)
             continue
-        
+
         if effect_name == "muzzle":
             is_muzzled = True
         elif effect_name == "uwu":
@@ -329,6 +360,7 @@ async def globally_block_commands(ctx):
     triggered, duration = bot.yap_manager.check_spam(ctx.author.id, is_gold)
     if triggered:
         await add_active_effect(ctx.author.id, "muzzle", duration)
+        await assign_muzzle_role(ctx.author)
         msg = "for yapping" if not is_gold else "for excessive yapping"
         mins = int(duration / 60)
         await ctx.reply(f"{ctx.author.mention} muzzled for {mins}m {msg}.", mention_author=False)

@@ -286,6 +286,31 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def moon_command(self, ctx):
         """Show current moon phase and upcoming moons"""
+
+        def format_time_to_event(ephem_date):
+            """Returns 'Xd Yh' countdown in LA local time."""
+            la_tz = ZoneInfo("America/Los_Angeles")
+            now_la = datetime.now(la_tz)
+            event_utc = ephem.Date(ephem_date).datetime().replace(
+                tzinfo=ZoneInfo("UTC")
+            )
+            event_la = event_utc.astimezone(la_tz)
+            delta = event_la - now_la
+            total_seconds = int(delta.total_seconds())
+            if total_seconds <= 0:
+                return "now"
+            days = total_seconds // 86400
+            hours = (total_seconds % 86400) // 3600
+            return f"{days}d {hours}h"
+
+        def event_date_la(ephem_date):
+            """Returns the event date string converted to LA local time."""
+            la_tz = ZoneInfo("America/Los_Angeles")
+            event_utc = ephem.Date(ephem_date).datetime().replace(
+                tzinfo=ZoneInfo("UTC")
+            )
+            return event_utc.astimezone(la_tz).strftime("%B %d, %Y")
+
         try:
             now = ephem.now()
             moon = ephem.Moon()
@@ -303,17 +328,17 @@ class UtilityCog(commands.Cog):
             new_moon.compute(next_new)
             new_moon_ecliptic = ephem.Ecliptic(new_moon)
             new_moon_sign = get_zodiac_sign(new_moon_ecliptic.lon)
-            days_to_new = int((ephem.Date(next_new) - ephem.Date(now)))
 
             next_full = ephem.next_full_moon(now)
             full_moon = ephem.Moon()
             full_moon.compute(next_full)
             full_moon_ecliptic = ephem.Ecliptic(full_moon)
             full_moon_sign = get_zodiac_sign(full_moon_ecliptic.lon)
-            days_to_full = int((ephem.Date(next_full) - ephem.Date(now)))
 
-            new_date_str = ephem.Date(next_new).datetime().strftime("%B %d, %Y")
-            full_date_str = ephem.Date(next_full).datetime().strftime("%B %d, %Y")
+            new_date_str = event_date_la(next_new)
+            full_date_str = event_date_la(next_full)
+            time_to_new = format_time_to_event(next_new)
+            time_to_full = format_time_to_event(next_full)
 
             embed = discord.Embed(title="Moon Phase", color=discord.Color.blue())
 
@@ -326,9 +351,9 @@ class UtilityCog(commands.Cog):
             embed.add_field(
                 name="Upcoming",
                 value=(
-                    f"**Next New Moon:** {new_date_str} (in {days_to_new} days)\n"
+                    f"**Next New Moon:** {new_date_str} (in {time_to_new})\n"
                     f"Moon in: **{new_moon_sign}**\n\n"
-                    f"**Next Full Moon:** {full_date_str} (in {days_to_full} days)\n"
+                    f"**Next Full Moon:** {full_date_str} (in {time_to_full})\n"
                     f"Moon in: **{full_moon_sign}**"
                 ),
                 inline=False,
