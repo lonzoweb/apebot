@@ -205,6 +205,19 @@ async def init_db():
                 """
             )
 
+            # 🐦 Twitter/X Follow Request Queue
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS follow_requests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    requester_id TEXT NOT NULL,
+                    username TEXT NOT NULL,
+                    requested_at REAL NOT NULL,
+                    status TEXT DEFAULT 'pending'
+                )
+                """
+            )
+
         logger.info("✅ Database tables initialized (all modules unified).")
     except Exception as e:
         logger.error(f"Error initializing database: {e}", exc_info=True)
@@ -1087,3 +1100,57 @@ async def has_item(user_id: int, item_name: str) -> bool:
         ) as cursor:
             row = await cursor.fetchone()
             return (row[0] > 0) if row else False
+
+
+# ============================================================
+# TWITTER/X FOLLOW REQUEST QUEUE
+# ============================================================
+
+
+async def add_follow_request(requester_id: int, username: str) -> int:
+    """Queue a follow request. Returns the new request ID."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "INSERT INTO follow_requests (requester_id, username, requested_at) VALUES (?, ?, ?)",
+            (str(requester_id), username.lower(), time.time()),
+        ) as cursor:
+            return cursor.lastrowid
+
+
+async def get_pending_follow_requests() -> list:
+    """Return all pending follow requests as (id, requester_id, username, requested_at)."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT id, requester_id, username, requested_at FROM follow_requests WHERE status = 'pending' ORDER BY requested_at ASC"
+        ) as cursor:
+            return await cursor.fetchall()
+
+
+async def get_follow_request(request_id: int):
+    """Return a single request row or None."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT id, requester_id, username, requested_at, status FROM follow_requests WHERE id = ?",
+            (request_id,),
+        ) as cursor:
+            return await cursor.fetchone()
+
+
+async def update_follow_request_status(request_id: int, status: str):
+    """Set status to 'approved' or 'denied'."""
+    async with get_db() as conn:
+        await conn.execute(
+            "UPDATE follow_requests SET status = ? WHERE id = ?",
+            (status, request_id),
+        )
+
+
+async def has_pending_follow_request(username: str) -> bool:
+    """Check if an account already has a pending request."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT id FROM follow_requests WHERE username = ? AND status = 'pending'",
+            (username.lower(),),
+        ) as cursor:
+            return await cursor.fetchone() is not None
+
