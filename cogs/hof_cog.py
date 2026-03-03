@@ -135,36 +135,34 @@ def _build_hof_data(
     message: discord.Message,
     emoji_counts: dict,
     jump_url: str,
-    force: bool = False,
+    trigger_emoji: str = None,
 ) -> tuple[str, discord.Embed]:
     """
     Final Aesthetic Layout:
-      💀 5 in [#channel](jump_url)  >  [�](jump_url)
-      [Gold Embed Box]
-        [Author avatar] AuthorName
-        Original message text
-        [Attached image]
+    [Embed Box]
+      [Author avatar] AuthorName
+      💀 5 in [#channel](jump_url)
+      
+      Original message text
+      [Attached image]
     """
-    # 1. Message Content (Header)
-    # Filter for emojis that actually have counts
-    reaction_parts = [f"{e} **{c}**" for e, c in emoji_counts.items() if c]
-    
-    # If forced and no reactions yet, we don't show specific "Inducted" text,
-    # but we need to ensure the header still shows the channel link.
-    reaction_part = "  ".join(reaction_parts)
-
-    # The channel "link" actually points to the specific message (jump_url)
-    channel_link = f"[#{message.channel.name}]({jump_url})"
-    
-    if reaction_part:
-        content_header = f"{reaction_part} in {channel_link}  >  [💬]({jump_url})"
+    # 1. Header Logic
+    if trigger_emoji:
+        count = emoji_counts.get(trigger_emoji, 1)
+        header = f"{trigger_emoji} **{count}** in [#{(message.channel.name or 'channel')}]({jump_url})"
     else:
-        # For forced entries with 0 reactions, just show the link
-        content_header = f"in {channel_link}  >  [💬]({jump_url})"
+        # Fallback if no specific trigger is passed
+        header = f"in [#{(message.channel.name or 'channel')}]({jump_url})"
 
-    # 2. Embed Box - Always Gold
+    # 2. Description construction
+    desc_parts = [header]
+    if message.content:
+        desc_parts.append("")
+        desc_parts.append(message.content[:3900])
+    
+    # 3. Embed Box - Always Gold
     embed = discord.Embed(
-        description=message.content[:4000] if message.content else "",
+        description="\n".join(desc_parts),
         color=0xFFD700,
         timestamp=message.created_at,
     )
@@ -177,7 +175,8 @@ def _build_hof_data(
     if image_url:
         embed.set_image(url=image_url)
 
-    return content_header, embed
+    # Empty string for content since masked links only work inside the embed desc
+    return "", embed
 
 
 def _jump_view(jump_url: str) -> discord.ui.View:
@@ -201,32 +200,31 @@ async def _post_or_update_hof(
     message: discord.Message,
     emoji_counts: dict,
     s: dict,
-    force: bool = False,
+    trigger_emoji: str = None,
 ):
-    """Post or update the HOF embed. Optionally force-post bypassing threshold."""
+    """Post or update the HOF embed."""
     hof_ch = guild.get_channel(int(s["channel_id"]))
     if not hof_ch:
         return
 
     entry          = await _get_entry(message.id)
     jump_url       = message.jump_url
-    content, embed = _build_hof_data(message, emoji_counts, jump_url, force=force)
-    view           = _jump_view(jump_url)
+    content, embed = _build_hof_data(message, emoji_counts, jump_url, trigger_emoji=trigger_emoji)
 
     hof_msg = None
     if entry and entry[3]:
         try:
             hof_msg = await hof_ch.fetch_message(int(entry[3]))
-            await hof_msg.edit(content=content, embed=embed, view=view)
+            await hof_msg.edit(content=content, embed=embed)
         except discord.NotFound:
             hof_msg = None
 
     if hof_msg is None:
-        hof_msg = await hof_ch.send(content=content, embed=embed, view=view)
-        # Bot self-reacts with all tracked emojis
-        for emoji in s["emojis"]:
+        hof_msg = await hof_ch.send(content=content, embed=embed)
+        # Bot self-reacts ONLY with the trigger emoji
+        if trigger_emoji:
             try:
-                await hof_msg.add_reaction(emoji)
+                await hof_msg.add_reaction(trigger_emoji)
             except Exception:
                 pass
 
@@ -286,7 +284,11 @@ class HofCog(commands.Cog):
         is_locked = str(payload.message_id) in s["locked_messages"]
 
         if total >= s["threshold"]:
-            await _post_or_update_hof(self.bot, guild, message, emoji_counts, s)
+            # Pick a trigger emoji (the one with the most counts, or the one just added)
+            # For simplicity, we'll pick the one from the payload if possible, 
+            # but since this handles both add/remove, we'll pick the max.
+            trigger = str(payload.emoji)
+            await _post_or_update_hof(self.bot, guild, message, emoji_counts, s, trigger_emoji=trigger)
 
         else:
             entry = await _get_entry(payload.message_id)
@@ -625,14 +627,16 @@ async def _force_to_hof(interaction: discord.Interaction, message: discord.Messa
         if str(r.emoji) in s["emojis"]:
             emoji_counts[str(r.emoji)] = r.count
 
-    await _force_post_to_hof(interaction.client, interaction.guild, message, emoji_counts, s)
+    # Choose a random emoji for the header/self-react if forced
+    trigger = random.choice(s["emojis"]) if s["emojis"] else None
+    await _force_post_to_hof(interaction.client, interaction.guild, message, emoji_counts, s, trigger)
 
     await interaction.response.send_message(
         f"✅ Message by **{message.author.display_name}** added to the Hall of Fame.", ephemeral=True
     )
 
 
-async def _force_post_to_hof(bot, guild, message, emoji_counts, s):
+async def _force_post_to_hof(bot, guild, message, emoji_counts, s, trigger_emoji):
     """Same as _post_or_update_hof but always posts regardless of threshold."""
     hof_ch = guild.get_channel(int(s["channel_id"]))
     if not hof_ch:
@@ -640,22 +644,21 @@ async def _force_post_to_hof(bot, guild, message, emoji_counts, s):
 
     entry          = await _get_entry(message.id)
     jump_url       = message.jump_url
-    content, embed = _build_hof_data(message, emoji_counts, jump_url, force=True)
-    view           = _jump_view(jump_url)
+    content, embed = _build_hof_data(message, emoji_counts, jump_url, trigger_emoji=trigger_emoji)
 
     hof_msg = None
     if entry and entry[3]:
         try:
             hof_msg = await hof_ch.fetch_message(int(entry[3]))
-            await hof_msg.edit(content=content, embed=embed, view=view)
+            await hof_msg.edit(content=content, embed=embed)
         except discord.NotFound:
             hof_msg = None
 
     if hof_msg is None:
-        hof_msg = await hof_ch.send(content=content, embed=embed, view=view)
-        for emoji in s["emojis"]:
+        hof_msg = await hof_ch.send(content=content, embed=embed)
+        if trigger_emoji:
             try:
-                await hof_msg.add_reaction(emoji)
+                await hof_msg.add_reaction(trigger_emoji)
             except Exception:
                 pass
 
