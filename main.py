@@ -208,12 +208,9 @@ async def on_ready():
 
 # --- Debug Commands ---
 @bot.command()
+@commands.has_permissions(administrator=True)
 async def sync(ctx):
-    """Manually sync commands — owner only."""
-    # Hardcoded owner check as fallback
-    if ctx.author.id != 154814148054745088 and not await bot.is_owner(ctx.author):
-        return await ctx.send("🚫 You are not the owner of this bot.")
-        
+    """Manually sync commands — admins only."""
     msg = await ctx.send("⌛ Syncing commands...")
     try:
         # Global sync
