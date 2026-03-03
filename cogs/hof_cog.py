@@ -247,14 +247,6 @@ class HofCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # ── CONTEXT MENU ──────────────────────────────────────────
-
-    @app_commands.context_menu(name="Add to Hall of Fame")
-    @app_commands.default_permissions(administrator=True)
-    async def _force_to_hof_context_menu(self, interaction: discord.Interaction, message: discord.Message):
-        """Right-click context menu: force any message into the Hall of Fame."""
-        await _force_to_hof(interaction, message)
-
     # ── REACTION HANDLING ─────────────────────────────────────
 
     @commands.Cog.listener()
@@ -690,4 +682,16 @@ def _parse_message_id(link: str) -> str | None:
 # ─────────────────────────────────────────────────────────────
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(HofCog(bot))
+    cog = HofCog(bot)
+    await bot.add_cog(cog)
+    
+    # Context menu must be added to the tree manually if not using the decorator inside a class (which failed)
+    ctx_menu = app_commands.ContextMenu(
+        name="Add to Hall of Fame",
+        callback=_force_to_hof,
+    )
+    # Ensure it's treated as an admin command
+    ctx_menu.default_permissions = discord.Permissions(administrator=True)
+    
+    bot.tree.add_command(ctx_menu)
+    bot.tree.add_command(cog.hall_group)
