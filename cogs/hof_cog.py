@@ -138,31 +138,23 @@ def _build_hof_data(
     trigger_emoji: str = None,
 ) -> tuple[str, discord.Embed]:
     """
-    Final Aesthetic Layout:
-    [Embed Box]
+    Final Layout:
+    [emoji] [count] in [#channel](jump_url)
+    [Gold Embed Box]
       [Author avatar] AuthorName
-      💀 5 in [#channel](jump_url)
-      
       Original message text
       [Attached image]
     """
-    # 1. Header Logic
+    # 1. Plain Text Header (above embed)
     if trigger_emoji:
         count = emoji_counts.get(trigger_emoji, 1)
-        header = f"{trigger_emoji} **{count}** in [#{(message.channel.name or 'channel')}]({jump_url})"
+        content_header = f"{trigger_emoji} **{count}** in [#{(message.channel.name or 'channel')}]({jump_url})"
     else:
-        # Fallback if no specific trigger is passed
-        header = f"in [#{(message.channel.name or 'channel')}]({jump_url})"
+        content_header = f"in [#{(message.channel.name or 'channel')}]({jump_url})"
 
-    # 2. Description construction
-    desc_parts = [header]
-    if message.content:
-        desc_parts.append("")
-        desc_parts.append(message.content[:3900])
-    
-    # 3. Embed Box - Always Gold
+    # 2. Embed Box - Always Gold
     embed = discord.Embed(
-        description="\n".join(desc_parts),
+        description=message.content[:4000] if message.content else None,
         color=0xFFD700,
         timestamp=message.created_at,
     )
@@ -175,19 +167,7 @@ def _build_hof_data(
     if image_url:
         embed.set_image(url=image_url)
 
-    # Empty string for content since masked links only work inside the embed desc
-    return "", embed
-
-
-def _jump_view(jump_url: str) -> discord.ui.View:
-    view = discord.ui.View()
-    view.add_item(discord.ui.Button(
-        label="Jump to message",
-        url=jump_url,
-        style=discord.ButtonStyle.link,
-        emoji="🔗",
-    ))
-    return view
+    return content_header, embed
 
 
 # ─────────────────────────────────────────────────────────────
