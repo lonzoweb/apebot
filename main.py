@@ -187,17 +187,14 @@ async def on_ready():
         # Give Discord a moment to populate guild info
         await asyncio.sleep(5)
         
-        # Sync and capture names
-        synced = await bot.tree.sync()
-        logger.info(f"✅ Global sync complete: {len(synced)} commands.")
-        
-        # Guild sync fallback (instant)
+        # 5b. Sync slash commands (Guild-only to avoid duplicates)
+        # Guild sync is instant — shows up immediately in the server
         if main_guild_id or GUILD_ID:
             gid = main_guild_id or GUILD_ID
             guild_obj = discord.Object(id=gid)
             bot.tree.copy_global_to(guild=guild_obj)
-            await bot.tree.sync(guild=guild_obj)
-            logger.info(f"✅ Guild {gid} synced instantly.")
+            synced = await bot.tree.sync(guild=guild_obj)
+            logger.info(f"✅ Guild {gid} synchronized: {len(synced)} commands.")
 
         logger.info(f"🎯 Registered Commands: {[c.name for c in bot.tree.get_commands()]}")
 
@@ -209,18 +206,27 @@ async def on_ready():
 # --- Debug Commands ---
 @bot.command()
 @commands.has_permissions(administrator=True)
-async def sync(ctx):
-    """Manually sync commands — admins only."""
-    msg = await ctx.send("⌛ Syncing commands...")
-    try:
-        # Global sync
-        fmt = await ctx.bot.tree.sync()
-        # Guild sync for current guild
+async def sync(ctx, spec: str = None):
+    """
+    Manually sync commands — admins only.
+    .sync          -> Sync to current guild
+    .sync global   -> Sync globally (slow)
+    .sync clear    -> Clear global commands
+    """
+    if spec == "global":
+        msg = await ctx.send("⌛ Syncing globally (can take up to 1 hour)...")
+        synced = await ctx.bot.tree.sync()
+        await msg.edit(content=f"✅ Global sync complete: {len(synced)} commands.")
+    elif spec == "clear":
+        msg = await ctx.send("⌛ Clearing global commands...")
+        ctx.bot.tree.clear_commands(guild=None)
+        await ctx.bot.tree.sync()
+        await msg.edit(content="✅ Global commands cleared. Run `.sync` for guild-only sync.")
+    else:
+        msg = await ctx.send("⌛ Syncing to this guild...")
         ctx.bot.tree.copy_global_to(guild=ctx.guild)
-        await ctx.bot.tree.sync(guild=ctx.guild)
-        await msg.edit(content=f"✅ Synced {len(fmt)} commands globally and updated this guild.")
-    except Exception as e:
-        await msg.edit(content=f"❌ Sync failed: {e}")
+        synced = await ctx.bot.tree.sync(guild=ctx.guild)
+        await msg.edit(content=f"✅ Guild sync complete: {len(synced)} commands.")
 
 
 # ============================================================
