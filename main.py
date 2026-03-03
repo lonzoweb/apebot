@@ -159,6 +159,7 @@ async def on_ready():
         "cogs.admin_cog",
         "cogs.image_cog",
         "cogs.twitter_cog",
+        "cogs.hof_cog",
         "activitycog",
     ]
 
@@ -179,6 +180,13 @@ async def on_ready():
     if main_guild_id:
         tasks.setup_tasks(bot, main_guild_id)
         logger.info(f"✅ Background tasks started for Guild ID: {main_guild_id}")
+
+    # 5b. Sync slash commands
+    try:
+        synced = await bot.tree.sync()
+        logger.info(f"✅ Slash commands synced: {len(synced)} commands")
+    except Exception as e:
+        logger.error(f"❌ Failed to sync slash commands: {e}")
 
     logger.info(f"✅ Bot ready! Logged in as {bot.user}")
 

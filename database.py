@@ -218,6 +218,39 @@ async def init_db():
                 """
             )
 
+            # 🏆 Hall of Fame — Settings
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS hof_settings (
+                    guild_id TEXT PRIMARY KEY,
+                    channel_id TEXT,
+                    threshold INTEGER DEFAULT 3,
+                    emojis TEXT DEFAULT '["⭐"]',
+                    autostar_channels TEXT DEFAULT '[]',
+                    ignored_channels TEXT DEFAULT '[]',
+                    locked_messages TEXT DEFAULT '[]',
+                    trashed_messages TEXT DEFAULT '[]'
+                )
+                """
+            )
+
+            # 🏆 Hall of Fame — Entries
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS hof_entries (
+                    orig_message_id TEXT PRIMARY KEY,
+                    orig_channel_id TEXT NOT NULL,
+                    author_id TEXT NOT NULL,
+                    hof_message_id TEXT,
+                    star_count INTEGER DEFAULT 0,
+                    content TEXT,
+                    image_url TEXT,
+                    jump_url TEXT,
+                    created_at REAL NOT NULL
+                )
+                """
+            )
+
         logger.info("✅ Database tables initialized (all modules unified).")
     except Exception as e:
         logger.error(f"Error initializing database: {e}", exc_info=True)

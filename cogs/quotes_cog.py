@@ -234,7 +234,7 @@ class QuotesCog(commands.Cog):
         if ctx.author.guild_permissions.administrator or any(
             role.name == DAILY_COMMAND_ROLE for role in ctx.author.roles
         ):
-            daily_quote = tasks.get_daily_quote()
+            daily_quote = await tasks.get_daily_quote_async()
             if daily_quote:
                 embed = discord.Embed(
                     title="🌅 Blessings to Apeiron",
@@ -249,13 +249,13 @@ class QuotesCog(commands.Cog):
             await ctx.reply("🚫 Peasant Detected. Begone!", mention_author=False)
 
 
-    @commands.command(name="pickquote")
+    @commands.command(name="pv", aliases=["pickquote"])
     @commands.has_permissions(administrator=True)
     async def pickquote_command(self, ctx, choice: str = None):
-        """[Admin] Pick tomorrow's quote. Usage: .pickquote <1|2|3|random|revote>"""
+        """[Admin] Pick tomorrow's quote. Usage: .pv <1|2|3|random|revote>"""
         if choice is None:
             return await ctx.reply(
-                "Usage: `.pickquote <1 | 2 | 3 | random | revote>`", mention_author=False
+                "Usage: `.pv <1 | 2 | 3 | random | revote>`", mention_author=False
             )
 
         choice = choice.strip().lower()
@@ -264,14 +264,16 @@ class QuotesCog(commands.Cog):
         if choice == "revote":
             try:
                 all_quotes = await load_quotes_from_db()
-                today = tasks.get_daily_quote()
+                today = await tasks.get_daily_quote_async()
                 pool = [q for q in all_quotes if q != today]
                 if not pool:
                     return await ctx.reply("❌ Not enough quotes in the pool to pick from.", mention_author=False)
 
                 candidates = random.sample(pool, min(3, len(pool)))
+                await tasks._set_pending_quotes(candidates)
+                await tasks._set_tomorrow_quote(None)
                 self.bot.pending_quotes = candidates
-                self.bot.tomorrow_quote = None  # Clear previous lock so it's open again
+                self.bot.tomorrow_quote = None
 
                 lines = "\n\n".join(f"**{i+1}.** {q}" for i, q in enumerate(candidates))
                 pick_embed = discord.Embed(
@@ -279,9 +281,8 @@ class QuotesCog(commands.Cog):
                     description=lines,
                     color=discord.Color.blurple(),
                 )
-                pick_embed.set_footer(text=".pickquote <1 / 2 / 3 / random> to choose")
+                pick_embed.set_footer(text=".pv <1 / 2 / 3 / random> to choose")
 
-                # Post to #emperor if possible, otherwise reply in current channel
                 guild = ctx.guild
                 emperor_channel = discord.utils.get(guild.text_channels, name="emperor") if guild else None
                 target = emperor_channel or ctx.channel
@@ -290,15 +291,19 @@ class QuotesCog(commands.Cog):
                 if emperor_channel and target != ctx.channel:
                     await ctx.reply(f"✅ New candidates posted in {emperor_channel.mention}.", mention_author=False)
             except Exception as e:
-                logger.error(f"Error in pickquote revote: {e}")
+                logger.error(f"Error in pv revote: {e}")
                 await ctx.reply("❌ Error generating new candidates.", mention_author=False)
             return
 
         # --- PICK: choose from pending candidates ---
-        candidates = getattr(self.bot, "pending_quotes", [])
+        # Load from DB first (reboot-resilient), fall back to bot attribute
+        candidates = await tasks._get_pending_quotes()
+        if not candidates:
+            candidates = getattr(self.bot, "pending_quotes", [])
+
         if not candidates:
             return await ctx.reply(
-                "❌ No candidates loaded. Use `.pickquote revote` to generate a fresh set.",
+                "❌ No candidates loaded. Use `.pv revote` to generate a fresh set.",
                 mention_author=False
             )
 
@@ -311,8 +316,10 @@ class QuotesCog(commands.Cog):
                 "❌ Invalid choice. Use `1`, `2`, `3`, `random`, or `revote`.", mention_author=False
             )
 
+        await tasks._set_tomorrow_quote(picked)
+        await tasks._set_pending_quotes([])  # Clear queue
         self.bot.tomorrow_quote = picked
-        self.bot.pending_quotes = []  # Clear so it can't be re-picked without a revote
+        self.bot.pending_quotes = []
 
         embed = discord.Embed(
             title="✅ Tomorrow's Quote — Locked In",
