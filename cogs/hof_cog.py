@@ -131,7 +131,7 @@ def _count_by_emoji_from_reactions(message: discord.Message, tracked: list) -> d
     return {str(r.emoji): r.count for r in message.reactions if str(r.emoji) in tracked}
 
 
-def _build_hof_data(
+async def _build_hof_data(
     message: discord.Message,
     emoji_counts: dict,
     jump_url: str,
@@ -142,6 +142,7 @@ def _build_hof_data(
     [emoji] [count] in [#channel](jump_url)
     [Gold Embed Box]
       [Author avatar] AuthorName
+      *Replying to @user: content...*
       Original message text
       [Attached image]
     """
@@ -152,9 +153,21 @@ def _build_hof_data(
     else:
         content_header = f"in [#{(message.channel.name or 'channel')}]({jump_url})"
 
-    # 2. Embed Box - Always Gold
+    # 2. Reply Context
+    reply_text = ""
+    if message.reference and message.reference.message_id:
+        try:
+            # Try to fetch from cache first if possible, but fetch is safer
+            ref_msg = await message.channel.fetch_message(message.reference.message_id)
+            snippet = ref_msg.content[:150] + ("..." if len(ref_msg.content) > 150 else "")
+            reply_text = f"⤷ *Replying to {ref_msg.author.mention}:* {snippet}\n\n"
+        except Exception:
+            # If we can't find it (deleted etc), just skip context
+            pass
+
+    # 3. Embed Box - Always Gold
     embed = discord.Embed(
-        description=message.content[:4000] if message.content else None,
+        description=f"{reply_text}{message.content[:3800]}" if message.content or reply_text else None,
         color=0xFFD700,
         timestamp=message.created_at,
     )
@@ -189,7 +202,7 @@ async def _post_or_update_hof(
 
     entry          = await _get_entry(message.id)
     jump_url       = message.jump_url
-    content, embed = _build_hof_data(message, emoji_counts, jump_url, trigger_emoji=trigger_emoji)
+    content, embed = await _build_hof_data(message, emoji_counts, jump_url, trigger_emoji=trigger_emoji)
 
     hof_msg = None
     if entry and entry[3]:
@@ -624,7 +637,7 @@ async def _force_post_to_hof(bot, guild, message, emoji_counts, s, trigger_emoji
 
     entry          = await _get_entry(message.id)
     jump_url       = message.jump_url
-    content, embed = _build_hof_data(message, emoji_counts, jump_url, trigger_emoji=trigger_emoji)
+    content, embed = await _build_hof_data(message, emoji_counts, jump_url, trigger_emoji=trigger_emoji)
 
     hof_msg = None
     if entry and entry[3]:
