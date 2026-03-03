@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 from database import (
     is_economy_on, set_economy_status, set_yap_level, get_yap_level,
@@ -318,6 +319,97 @@ class AdminCog(commands.Cog):
             await status_msg.edit(content=f"✅ **Successfully cleaned {bot_found} interactions from chat.** requested by **{ctx.author.display_name}**")
         else:
             await status_msg.edit(content=f"🌑 **No bot messages found to prune.** requested by **{ctx.author.display_name}**")
+
+    @app_commands.command(name="configure", description="[ADMIN] Modify system-wide bot settings")
+    @app_commands.describe(
+        economy="Enable or disable the global economy system",
+        yap_level="Adjust the bot's response detail level (low/high)"
+    )
+    @app_commands.choices(yap_level=[
+        app_commands.Choice(name="Low (Concise)", value="low"),
+        app_commands.Choice(name="High (Detailed)", value="high")
+    ])
+    @app_commands.default_permissions(administrator=True)
+    async def slash_configure(
+        self, 
+        interaction: discord.Interaction, 
+        economy: bool = None, 
+        yap_level: app_commands.Choice[str] = None
+    ):
+        changes = []
+
+        if economy is not None:
+            await set_economy_status(economy)
+            status_text = "ENABLED" if economy else "DISABLED"
+            changes.append(f"• Economy: **{status_text}**")
+
+        if yap_level is not None:
+            await set_yap_level(yap_level.value)
+            changes.append(f"• Yap Level: **{yap_level.name}**")
+
+        if not changes:
+            curr_econ = await is_economy_on()
+            curr_yap = await get_yap_level()
+            msg = (
+                "⚙️ **Current Configuration:**\n"
+                f"• Economy: **{'ENABLED' if curr_econ else 'DISABLED'}**\n"
+                f"• Yap Level: **{curr_yap.upper()}**\n\n"
+                "*Use options to change these settings.*"
+            )
+            return await interaction.response.send_message(msg, ephemeral=True)
+
+        await interaction.response.send_message(
+            "✅ **System Configuration Updated:**\n" + "\n".join(changes),
+            ephemeral=True
+        )
+
+    @app_commands.command(name="purge", description="[ADMIN] Modern cleanup for bot messages and prompts")
+    @app_commands.describe(limit="Number of bot interactions to remove (max 50)")
+    @app_commands.default_permissions(administrator=True)
+    async def slash_purge(self, interaction: discord.Interaction, limit: int = 15):
+        limit = max(1, min(limit, 50))
+        
+        # Defer because fetching history can take time
+        await interaction.response.defer(ephemeral=True)
+
+        to_delete = []
+        bot_found = 0
+        
+        async for msg in interaction.channel.history(limit=limit * 4):
+            if bot_found >= limit:
+                break
+            
+            if msg.author.id == self.bot.user.id:
+                to_delete.append(msg)
+                bot_found += 1
+                
+                # Check for prompt
+                if msg.reference and msg.reference.message_id:
+                    try:
+                        ref_msg = await interaction.channel.fetch_message(msg.reference.message_id)
+                        if ref_msg and ref_msg not in to_delete:
+                            to_delete.append(ref_msg)
+                    except:
+                        pass
+                else:
+                    try:
+                        async for prev_msg in interaction.channel.history(limit=1, before=msg):
+                            if prev_msg.author.id != self.bot.user.id and prev_msg not in to_delete:
+                                to_delete.append(prev_msg)
+                    except:
+                        pass
+
+        if to_delete:
+            unique_to_delete = list(set(to_delete))
+            # Delete in chunks
+            for i in range(0, len(unique_to_delete), 100):
+                chunk = unique_to_delete[i:i + 100]
+                await interaction.channel.delete_messages(chunk)
+            
+            await interaction.followup.send(f"✅ Successfully purged **{bot_found}** interactions.")
+        else:
+            await interaction.followup.send("🌑 No recent bot messages found to purge.")
+
 
 async def setup(bot):
     await bot.add_cog(AdminCog(bot))

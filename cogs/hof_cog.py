@@ -26,7 +26,7 @@ async def _get_settings(guild_id: int) -> dict:
     async with get_db() as conn:
         async with conn.execute(
             "SELECT channel_id, threshold, emojis, autostar_channels, "
-            "ignored_channels, locked_messages, trashed_messages "
+            "ignored_channels, locked_messages, trashed_messages, blacklisted_users "
             "FROM hof_settings WHERE guild_id = ?", (gid,)
         ) as cur:
             row = await cur.fetchone()
@@ -36,6 +36,7 @@ async def _get_settings(guild_id: int) -> dict:
             "emojis": ["⭐"],
             "autostar_channels": [], "ignored_channels": [],
             "locked_messages": [], "trashed_messages": [],
+            "blacklisted_users": [],
         }
     return {
         "channel_id": row[0],
@@ -45,6 +46,7 @@ async def _get_settings(guild_id: int) -> dict:
         "ignored_channels":  json.loads(row[4]),
         "locked_messages":   json.loads(row[5]),
         "trashed_messages":  json.loads(row[6]),
+        "blacklisted_users": json.loads(row[7]) if len(row) > 7 else [],
     }
 
 
@@ -58,8 +60,8 @@ async def _set_settings(guild_id: int, **fields):
             """
             INSERT INTO hof_settings
                 (guild_id, channel_id, threshold, emojis, autostar_channels,
-                 ignored_channels, locked_messages, trashed_messages)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ignored_channels, locked_messages, trashed_messages, blacklisted_users)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(guild_id) DO UPDATE SET
                 channel_id         = excluded.channel_id,
                 threshold          = excluded.threshold,
@@ -67,7 +69,8 @@ async def _set_settings(guild_id: int, **fields):
                 autostar_channels  = excluded.autostar_channels,
                 ignored_channels   = excluded.ignored_channels,
                 locked_messages    = excluded.locked_messages,
-                trashed_messages   = excluded.trashed_messages
+                trashed_messages   = excluded.trashed_messages,
+                blacklisted_users  = excluded.blacklisted_users
             """,
             (gid,
              s["channel_id"], s["threshold"],
@@ -75,7 +78,8 @@ async def _set_settings(guild_id: int, **fields):
              json.dumps(s["autostar_channels"]),
              json.dumps(s["ignored_channels"]),
              json.dumps(s["locked_messages"]),
-             json.dumps(s["trashed_messages"])),
+             json.dumps(s["trashed_messages"]),
+             json.dumps(s["blacklisted_users"])),
         )
 
 
@@ -254,6 +258,10 @@ class HofCog(commands.Cog):
         s = await _get_settings(payload.guild_id)
         if not s["channel_id"]:
             return
+
+        # Check blacklist (voter)
+        if str(payload.user_id) in s.get("blacklisted_users", []):
+            return
         if str(payload.emoji) not in s["emojis"]:
             return
         if str(payload.channel_id) == s["channel_id"]:
@@ -270,6 +278,10 @@ class HofCog(commands.Cog):
         try:
             message = await channel.fetch_message(payload.message_id)
         except Exception:
+            return
+
+        # Check blacklist (author)
+        if str(message.author.id) in s.get("blacklisted_users", []):
             return
 
         emoji_counts = _count_by_emoji_from_reactions(message, s["emojis"])
@@ -490,8 +502,8 @@ class HofCog(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @hall_group.command(name="leaderboard", description="Top users by cumulative Hall of Fame reactions")
-    @app_commands.describe(limit="How many users to show (default 10)")
-    async def slash_leaderboard(self, interaction: discord.Interaction, limit: int = 10):
+    @app_commands.describe(limit="How many users to show (default 15)")
+    async def slash_leaderboard(self, interaction: discord.Interaction, limit: int = 15):
         limit = max(1, min(limit, 25))
 
         async with get_db() as conn:
@@ -585,6 +597,110 @@ class HofCog(commands.Cog):
             file=file,
             ephemeral=True,
         )
+    @hall_group.command(name="random", description="Show a random entry from the Hall of Fame")
+    async def slash_random(self, interaction: discord.Interaction):
+        async with get_db() as conn:
+            async with conn.execute(
+                "SELECT jump_url FROM hof_entries WHERE hof_message_id IS NOT NULL ORDER BY RANDOM() LIMIT 1"
+            ) as cur:
+                row = await cur.fetchone()
+        
+        if not row:
+            return await interaction.response.send_message("❌ The Hall of Fame is empty.", ephemeral=True)
+        
+        await interaction.response.send_message(f"🎲 **Random Pick:** {row[0]}")
+
+    @hall_group.command(name="search", description="Search the Hall of Fame by keyword")
+    @app_commands.describe(query="Keywords to search for")
+    async def slash_search(self, interaction: discord.Interaction, query: str):
+        async with get_db() as conn:
+            async with conn.execute(
+                """
+                SELECT jump_url, content 
+                FROM hof_entries 
+                WHERE hof_message_id IS NOT NULL AND content LIKE ? 
+                LIMIT 5
+                """,
+                (f"%{query}%",)
+            ) as cur:
+                rows = await cur.fetchall()
+        
+        if not rows:
+            return await interaction.response.send_message(f"🔍 No entries found for `{query}`.", ephemeral=True)
+        
+        links = [f"• {row[0]}" for row in rows]
+        await interaction.response.send_message(f"🔍 **Search Results for `{query}`:**\n" + "\n".join(links))
+
+    @hall_group.command(name="stats", description="Show Hall of Fame statistics for a user")
+    @app_commands.describe(user="The user to check stats for")
+    async def slash_stats(self, interaction: discord.Interaction, user: discord.Member = None):
+        target = user or interaction.user
+        async with get_db() as conn:
+            async with conn.execute(
+                """
+                SELECT COUNT(*), SUM(star_count) 
+                FROM hof_entries 
+                WHERE author_id = ? AND hof_message_id IS NOT NULL
+                """,
+                (str(target.id),)
+            ) as cur:
+                row = await cur.fetchone()
+        
+        count = row[0] if row else 0
+        stars = row[1] if row and row[1] else 0
+        
+        embed = discord.Embed(
+            title=f"📊 HOF Stats: {target.display_name}",
+            color=0xFFD700
+        )
+        embed.add_field(name="🏛️ Inductions", value=f"`{count}`", inline=True)
+        embed.add_field(name="✨ Total Reactions", value=f"`{stars}`", inline=True)
+        embed.set_thumbnail(url=target.display_avatar.url)
+        
+        await interaction.response.send_message(embed=embed)
+
+    @hall_group.command(name="blacklist", description="[ADMIN] Prevent a user from appearing in the Hall of Fame")
+    @app_commands.describe(user="The user to blacklist (or unblacklist if already barred)")
+    @app_commands.default_permissions(administrator=True)
+    async def slash_blacklist(self, interaction: discord.Interaction, user: discord.Member):
+        s = await _get_settings(interaction.guild_id)
+        uid = str(user.id)
+        
+        if uid in s["blacklisted_users"]:
+            s["blacklisted_users"].remove(uid)
+            msg = f"✅ **{user.display_name}** has been removed from the HOF blacklist."
+        else:
+            s["blacklisted_users"].append(uid)
+            msg = f"🚫 **{user.display_name}** has been added to the HOF blacklist."
+        
+        await _set_settings(interaction.guild_id, blacklisted_users=s["blacklisted_users"])
+        await interaction.response.send_message(msg, ephemeral=True)
+
+    @hall_group.command(name="sync", description="[ADMIN] Manually scan and induct a message by its link")
+    @app_commands.describe(link="The link to the Discord message")
+    @app_commands.default_permissions(administrator=True)
+    async def slash_sync_msg(self, interaction: discord.Interaction, link: str):
+        msg_id = _parse_message_id(link)
+        if not msg_id:
+            return await interaction.response.send_message("❌ Invalid message link.", ephemeral=True)
+        
+        # We need to fetch the message. Usually links are guild/channel/message
+        # Format: https://discord.com/channels/GUILD_ID/CHANNEL_ID/MESSAGE_ID
+        parts = link.split("/")
+        if len(parts) < 3:
+             return await interaction.response.send_message("❌ Invalid link format.", ephemeral=True)
+        
+        try:
+            channel_id = int(parts[-2])
+            message_id = int(parts[-1])
+            channel = interaction.guild.get_channel(channel_id)
+            if not channel:
+                channel = await interaction.guild.fetch_channel(channel_id)
+            message = await channel.fetch_message(message_id)
+        except Exception as e:
+            return await interaction.response.send_message(f"❌ Error fetching message: {e}", ephemeral=True)
+
+        await _force_to_hof(interaction, message)
 
 
 

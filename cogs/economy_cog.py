@@ -4,6 +4,7 @@ Commands: balance, send, buy, inventory, use, baladd, balremove
 """
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 import logging
 import asyncio
@@ -195,6 +196,26 @@ class EconomyCog(commands.Cog):
             return
 
         await economy.handle_balance_command(ctx, member)
+
+    @app_commands.command(name="balance", description="View your current token balance")
+    @app_commands.describe(member="The user to check (Admin only)")
+    async def slash_balance(self, interaction: discord.Interaction, member: discord.Member = None):
+        if (
+            member
+            and member.id != interaction.user.id
+            and not interaction.user.guild_permissions.administrator
+        ):
+            return await interaction.response.send_message(
+                "🚫 You can only check your own balance or an admin can check others.", 
+                ephemeral=True
+            )
+
+        balance = await get_balance(member.id if member else interaction.user.id)
+        
+        target_name = interaction.user.mention if not member or member.id == interaction.user.id else f"**{member.display_name}**"
+        msg = f"💰 {target_name}, you're holding: **{economy.format_balance(balance)}**"
+        
+        await interaction.response.send_message(msg, ephemeral=True)
 
     @commands.command(name="send", aliases=["gift", "give", "transfer"])
     @commands.cooldown(1, 3, commands.BucketType.user)
@@ -467,6 +488,26 @@ class EconomyCog(commands.Cog):
             await ctx.reply(
                 f"⚠️ DMs are locked. Here's your stash:\n{msg}", mention_author=False
             )
+
+    @app_commands.command(name="inventory", description="View your current possessed items")
+    async def slash_inventory(self, interaction: discord.Interaction):
+        inventory = await get_user_inventory(interaction.user.id)
+
+        if not inventory:
+            return await interaction.response.send_message("🎒 Your inventory is empty.", ephemeral=True)
+
+        lines = ["🎒 **Your Inventory:**"]
+        for item, qty in inventory.items():
+            item_display = item.replace('_', ' ').title()
+            item_data = ITEM_REGISTRY.get(item, {})
+            max_uses = item_data.get("max_uses")
+            
+            if max_uses and max_uses > 1:
+                lines.append(f"• **{item_display}**: {qty}/{max_uses} uses")
+            else:
+                lines.append(f"• **{item_display}**: x{qty}")
+
+        await interaction.response.send_message("\n".join(lines), ephemeral=True)
 
     @commands.command(name="use")
     @commands.cooldown(1, 5, commands.BucketType.user)

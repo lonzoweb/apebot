@@ -219,6 +219,13 @@ async def init_db():
             )
 
             # 🏆 Hall of Fame — Settings
+            # Migration check: add blacklisted_users if missing
+            async with conn.execute("PRAGMA table_info(hof_settings)") as cursor:
+                columns = [row[1] for row in await cursor.fetchall()]
+                if columns and "blacklisted_users" not in columns:
+                    logger.info("Adding blacklisted_users to hof_settings...")
+                    await conn.execute("ALTER TABLE hof_settings ADD COLUMN blacklisted_users TEXT DEFAULT '[]'")
+
             await conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS hof_settings (
@@ -229,7 +236,8 @@ async def init_db():
                     autostar_channels TEXT DEFAULT '[]',
                     ignored_channels TEXT DEFAULT '[]',
                     locked_messages TEXT DEFAULT '[]',
-                    trashed_messages TEXT DEFAULT '[]'
+                    trashed_messages TEXT DEFAULT '[]',
+                    blacklisted_users TEXT DEFAULT '[]'
                 )
                 """
             )
