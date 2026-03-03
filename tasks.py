@@ -269,7 +269,6 @@ def setup_tasks(bot, guild_id: int):
 
             # ── 7:00 PM — reset for next day ──────────────────────────
             elif hour == 19 and minute == 0:
-                global _cached_quote
                 _cached_quote = None
                 bot.pending_quotes = []
                 bot.tomorrow_quote = None
