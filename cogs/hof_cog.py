@@ -535,6 +535,64 @@ class HofCog(commands.Cog):
         embed.set_footer(text="Cumulative reactions across all tracked emojis")
         await interaction.response.send_message(embed=embed)
 
+    @hall_group.command(name="export", description="Export the Hall of Fame as a CSV file")
+    async def slash_export(self, interaction: discord.Interaction):
+        """Generate a CSV of every HOF entry — author, content, reactions, media URL, jump link."""
+        import csv
+        import io
+        from datetime import datetime, timezone
+
+        await interaction.response.defer(ephemeral=True)
+
+        async with get_db() as conn:
+            async with conn.execute(
+                """
+                SELECT e.orig_message_id, e.author_id, e.star_count,
+                       e.content, e.image_url, e.jump_url, e.created_at
+                FROM hof_entries e
+                WHERE e.hof_message_id IS NOT NULL
+                ORDER BY e.star_count DESC
+                """
+            ) as cur:
+                rows = await cur.fetchall()
+
+        if not rows:
+            return await interaction.followup.send("❌ No Hall of Fame entries to export.", ephemeral=True)
+
+        # Resolve display names
+        output = io.StringIO()
+        writer = csv.writer(output, quoting=csv.QUOTE_ALL)
+        writer.writerow([
+            "rank", "author", "author_id", "reactions",
+            "message", "media_url", "jump_url", "date_added"
+        ])
+
+        for rank, (msg_id, author_id, star_count, content, image_url, jump_url, created_at) in enumerate(rows, 1):
+            member = interaction.guild.get_member(int(author_id))
+            author_name = member.display_name if member else f"User {author_id}"
+            date_str = datetime.fromtimestamp(created_at, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC") if created_at else ""
+            writer.writerow([
+                rank,
+                author_name,
+                author_id,
+                star_count,
+                (content or "").replace("\n", " "),
+                image_url or "",
+                jump_url or "",
+                date_str,
+            ])
+
+        output.seek(0)
+        filename = f"hall_of_fame_{interaction.guild.name.replace(' ', '_')}.csv"
+        file = discord.File(fp=io.BytesIO(output.getvalue().encode("utf-8")), filename=filename)
+
+        await interaction.followup.send(
+            f"📥 **Hall of Fame Export** — {len(rows)} entries",
+            file=file,
+            ephemeral=True,
+        )
+
+
 
 # ─────────────────────────────────────────────────────────────
 # CONTEXT MENU — right-click "Add to Hall of Fame"
