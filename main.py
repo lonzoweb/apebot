@@ -187,21 +187,55 @@ async def on_ready():
         # Give Discord a moment to populate guild info
         await asyncio.sleep(5)
         
-        # Guild sync is instant — shows up immediately in the server
-        guild_id = main_guild_id or GUILD_ID
-        if guild_id:
-            guild_obj = discord.Object(id=guild_id)
-            bot.tree.copy_global_to(guild=guild_obj)
-            guild_synced = await bot.tree.sync(guild=guild_obj)
-            logger.info(f"✅ Guild slash commands synced instantly ({guild_id}): {len(guild_synced)} commands")
+        # Log what's in the tree
+        all_tree_cmds = bot.tree.get_commands()
+        logger.info(f"🌳 Tree contains {len(all_tree_cmds)} global commands: {[c.name for c in all_tree_cmds]}")
+
+        # Sync to EVERY guild for instant availability
+        if not bot.guilds:
+            logger.warning("⚠️ No guilds found to sync commands to.")
         
-        # Global sync propagates within ~1 hour
+        sync_count = 0
+        for guild in bot.guilds:
+            try:
+                bot.tree.copy_global_to(guild=guild)
+                synced = await bot.tree.sync(guild=guild)
+                logger.info(f"✅ Synced {len(synced)} commands to Guild {guild.name} ({guild.id})")
+                sync_count += 1
+            except Exception as e:
+                logger.error(f"❌ Failed to sync to Guild {guild.id}: {e}")
+
+        # Global sync (propagates slowly)
         global_synced = await bot.tree.sync()
-        logger.info(f"✅ Global slash commands synced: {len(global_synced)} commands")
+        logger.info(f"✅ Global sync complete: {len(global_synced)} commands.")
+        
+        # Verify Context Menu presence
+        is_hof_registered = any(c.name == "Add to Hall of Fame" for c in bot.tree.get_commands())
+        if is_hof_registered:
+            logger.info("🎯 Context Menu 'Add to Hall of Fame' is REGISTERED in tree.")
+        else:
+            logger.warning("❌ Context Menu 'Add to Hall of Fame' is MISSING from tree!")
+
     except Exception as e:
-        logger.error(f"❌ Failed to sync slash commands: {e}")
+        logger.error(f"❌ Critical error during slash sync: {e}", exc_info=True)
 
     logger.info(f"✅ Bot ready! Logged in as {bot.user}")
+
+# --- Debug Commands ---
+@bot.command()
+@commands.is_owner()
+async def sync(ctx):
+    """Manually sync commands — owner only."""
+    msg = await ctx.send("⌛ Syncing commands...")
+    try:
+        # Global sync
+        fmt = await ctx.bot.tree.sync()
+        # Guild sync for current guild
+        ctx.bot.tree.copy_global_to(guild=ctx.guild)
+        await ctx.bot.tree.sync(guild=ctx.guild)
+        await msg.edit(content=f"✅ Synced {len(fmt)} commands globally and updated this guild.")
+    except Exception as e:
+        await msg.edit(content=f"❌ Sync failed: {e}")
 
 
 # ============================================================

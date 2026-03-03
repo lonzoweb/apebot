@@ -246,19 +246,13 @@ async def _post_or_update_hof(
 class HofCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.ctx_menu = app_commands.ContextMenu(
-            name="Add to Hall of Fame",
-            callback=self._force_to_hof_context_menu,
-        )
 
-    async def cog_load(self):
-        self.bot.tree.add_command(self.ctx_menu)
+    # ── CONTEXT MENU ──────────────────────────────────────────
 
-    async def cog_unload(self):
-        self.bot.tree.remove_command(self.ctx_menu.name, type=self.ctx_menu.type)
-
+    @app_commands.context_menu(name="Add to Hall of Fame")
+    @app_commands.default_permissions(administrator=True)
     async def _force_to_hof_context_menu(self, interaction: discord.Interaction, message: discord.Message):
-        """Bridge context menu to the force_to_hof function."""
+        """Right-click context menu: force any message into the Hall of Fame."""
         await _force_to_hof(interaction, message)
 
     # ── REACTION HANDLING ─────────────────────────────────────
