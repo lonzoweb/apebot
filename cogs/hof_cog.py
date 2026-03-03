@@ -690,6 +690,4 @@ def _parse_message_id(link: str) -> str | None:
 # ─────────────────────────────────────────────────────────────
 
 async def setup(bot: commands.Bot):
-    cog = HofCog(bot)
-    await bot.add_cog(cog)
-    bot.tree.add_command(cog.hall_group)
+    await bot.add_cog(HofCog(bot))

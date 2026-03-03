@@ -187,34 +187,19 @@ async def on_ready():
         # Give Discord a moment to populate guild info
         await asyncio.sleep(5)
         
-        # Log what's in the tree
-        all_tree_cmds = bot.tree.get_commands()
-        logger.info(f"🌳 Tree contains {len(all_tree_cmds)} global commands: {[c.name for c in all_tree_cmds]}")
-
-        # Sync to EVERY guild for instant availability
-        if not bot.guilds:
-            logger.warning("⚠️ No guilds found to sync commands to.")
+        # Sync and capture names
+        synced = await bot.tree.sync()
+        logger.info(f"✅ Global sync complete: {len(synced)} commands.")
         
-        sync_count = 0
-        for guild in bot.guilds:
-            try:
-                bot.tree.copy_global_to(guild=guild)
-                synced = await bot.tree.sync(guild=guild)
-                logger.info(f"✅ Synced {len(synced)} commands to Guild {guild.name} ({guild.id})")
-                sync_count += 1
-            except Exception as e:
-                logger.error(f"❌ Failed to sync to Guild {guild.id}: {e}")
+        # Guild sync fallback (instant)
+        if main_guild_id or GUILD_ID:
+            gid = main_guild_id or GUILD_ID
+            guild_obj = discord.Object(id=gid)
+            bot.tree.copy_global_to(guild=guild_obj)
+            await bot.tree.sync(guild=guild_obj)
+            logger.info(f"✅ Guild {gid} synced instantly.")
 
-        # Global sync (propagates slowly)
-        global_synced = await bot.tree.sync()
-        logger.info(f"✅ Global sync complete: {len(global_synced)} commands.")
-        
-        # Verify Context Menu presence
-        is_hof_registered = any(c.name == "Add to Hall of Fame" for c in bot.tree.get_commands())
-        if is_hof_registered:
-            logger.info("🎯 Context Menu 'Add to Hall of Fame' is REGISTERED in tree.")
-        else:
-            logger.warning("❌ Context Menu 'Add to Hall of Fame' is MISSING from tree!")
+        logger.info(f"🎯 Registered Commands: {[c.name for c in bot.tree.get_commands()]}")
 
     except Exception as e:
         logger.error(f"❌ Critical error during slash sync: {e}", exc_info=True)
@@ -223,9 +208,12 @@ async def on_ready():
 
 # --- Debug Commands ---
 @bot.command()
-@commands.is_owner()
 async def sync(ctx):
     """Manually sync commands — owner only."""
+    # Hardcoded owner check as fallback
+    if ctx.author.id != 154814148054745088 and not await bot.is_owner(ctx.author):
+        return await ctx.send("🚫 You are not the owner of this bot.")
+        
     msg = await ctx.send("⌛ Syncing commands...")
     try:
         # Global sync
