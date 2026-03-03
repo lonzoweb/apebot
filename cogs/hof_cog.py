@@ -691,4 +691,3 @@ async def setup(bot: commands.Bot):
     cog = HofCog(bot)
     await bot.add_cog(cog)
     bot.tree.add_command(force_to_hof_context_menu)
-    bot.tree.add_command(cog.hall_group)
