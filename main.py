@@ -92,6 +92,7 @@ bot.start_time = datetime.now()
 bot.DEBUG_MODE = False
 
 # Role name that denies "Use Application Commands" — must exist on the server
+GUILD_ID = 1167166210610298910  # From tasks.py
 MUZZLE_ROLE_NAME = "hexed"
 
 # ============================================================
@@ -183,12 +184,17 @@ async def on_ready():
 
     # 5b. Sync slash commands
     try:
+        # Give Discord a moment to populate guild info
+        await asyncio.sleep(5)
+        
         # Guild sync is instant — shows up immediately in the server
-        if main_guild_id:
-            guild_obj = discord.Object(id=main_guild_id)
+        guild_id = main_guild_id or GUILD_ID
+        if guild_id:
+            guild_obj = discord.Object(id=guild_id)
             bot.tree.copy_global_to(guild=guild_obj)
             guild_synced = await bot.tree.sync(guild=guild_obj)
-            logger.info(f"✅ Guild slash commands synced instantly: {len(guild_synced)} commands")
+            logger.info(f"✅ Guild slash commands synced instantly ({guild_id}): {len(guild_synced)} commands")
+        
         # Global sync propagates within ~1 hour
         global_synced = await bot.tree.sync()
         logger.info(f"✅ Global slash commands synced: {len(global_synced)} commands")
