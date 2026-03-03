@@ -186,6 +186,7 @@ async def on_ready():
         # Guild sync is instant — shows up immediately in the server
         if main_guild_id:
             guild_obj = discord.Object(id=main_guild_id)
+            bot.tree.copy_global_to(guild=guild_obj)
             guild_synced = await bot.tree.sync(guild=guild_obj)
             logger.info(f"✅ Guild slash commands synced instantly: {len(guild_synced)} commands")
         # Global sync propagates within ~1 hour
