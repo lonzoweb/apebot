@@ -559,6 +559,8 @@ if __name__ == "__main__":
     
     # Start Dashboard in background thread
     def run_dashboard():
+        import logging
+        logger = logging.getLogger(__name__)
         try:
             import uvicorn
             # Use string import to avoid naming conflicts and circular issues
