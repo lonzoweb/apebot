@@ -369,20 +369,22 @@ class LevelingCog(commands.Cog):
         # Multipliers
         user_multiplier = 1.0
         active_mults = []
+        multipliers = await get_level_multipliers()
         if not hide_mults:
-            multipliers = await get_level_multipliers()
             for target_id, mult in multipliers.items():
-                if any(role.id == int(target_id) for role in member.roles):
+                matched_role = next((r for r in member.roles if r.id == int(target_id)), None)
+                if matched_role:
                     user_multiplier *= mult
-                    active_mults.append(f"{mult}x (Role)")
+                    active_mults.append(f"{mult}x ({matched_role.name})")
                 elif interaction.channel.id == int(target_id):
+                    ch = interaction.guild.get_channel(int(target_id))
+                    ch_name = f"#{ch.name}" if ch else target_id
                     user_multiplier *= mult
-                    active_mults.append(f"{mult}x (Channel)")
+                    active_mults.append(f"{mult}x ({ch_name})")
         else:
-            # We still need user_multiplier for 'messages to go' accuracy, just hide display
-            multipliers = await get_level_multipliers()
+            # Still need user_multiplier for accuracy, just don't surface the labels
             for target_id, mult in multipliers.items():
-                if any(role.id == int(target_id) for role in member.roles):
+                if any(r.id == int(target_id) for r in member.roles):
                     user_multiplier *= mult
                 elif interaction.channel.id == int(target_id):
                     user_multiplier *= mult
