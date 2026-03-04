@@ -477,97 +477,152 @@ function App() {
         {activeTab === 'rewards' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div className="card">
-              <h2 style={{ marginBottom: '0.5rem' }}>Reward Roles</h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Automatically give roles to members when they reach certain levels. For free.</p>
+              <h2 style={{ marginBottom: '0.25rem' }}>Reward Roles</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Automatically give roles to members when they reach certain levels. For free.</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '1.5rem', fontStyle: 'italic' }}>Imagine if I tried to capitalize off a couple extra lines of code, haha that would be absolutely crazy</p>
               
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', marginBottom: '2rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label className="label">Reward</label>
-                  <input 
-                    className="input" placeholder="Role ID" 
-                    value={newReward.role_id}
-                    onChange={(e) => setNewReward({ ...newReward, role_id: e.target.value })}
-                  />
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.25rem' }}>
+                <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Add role</h4>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '200px' }}>
+                    <label className="label">Reward</label>
+                    <select
+                      className="input"
+                      value={newReward.role_id}
+                      onChange={(e) => setNewReward({ ...newReward, role_id: e.target.value })}
+                    >
+                      <option value="">(role)</option>
+                      {Object.keys(roles).sort((a,b) => (roles[b].position||0) - (roles[a].position||0)).map(rid => (
+                        <option key={rid} value={rid}>
+                          {roles[rid].name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ width: '130px' }}>
+                    <label className="label">at level</label>
+                    <input
+                      className="input" type="number" placeholder="1 - 1000"
+                      value={newReward.level}
+                      onChange={(e) => setNewReward({ ...newReward, level: e.target.value })}
+                    />
+                  </div>
+                  <button className="btn btn-primary" onClick={addReward} style={{ whiteSpace: 'nowrap' }}>Add</button>
                 </div>
-                <div style={{ width: '120px' }}>
-                  <label className="label">at level</label>
-                  <input 
-                    className="input" type="number" placeholder="1-1000"
-                    value={newReward.level}
-                    onChange={(e) => setNewReward({ ...newReward, level: e.target.value })}
-                  />
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem' }}>
+                  <div
+                    className={`toggle ${!newReward.stack_role ? 'active' : ''}`}
+                    onClick={() => setNewReward({ ...newReward, stack_role: !newReward.stack_role })}
+                  >
+                    <div className="toggle-handle"></div>
+                  </div>
+                  <span style={{ fontSize: '0.9rem' }}>Remove this role when a higher role is obtained</span>
                 </div>
-                <button className="btn btn-primary" onClick={addReward}>Add</button>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.75rem' }}>
-                <div 
-                  className={`toggle ${newReward.stack_role ? 'active' : ''}`}
-                  onClick={() => setNewReward({ ...newReward, stack_role: !newReward.stack_role })}
-                >
-                  <div className="toggle-handle"></div>
-                </div>
-                <span>Remove this role when a higher role is obtained</span>
+              <h3 style={{ marginBottom: '0.75rem' }}>Current rewards ({rewards.length})</h3>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Level</th>
+                      <th>Role</th>
+                      <th>Keep</th>
+                      <th>Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rewards.map(reward => {
+                      const roleInfo = roles[reward.role_id] || { name: reward.role_id, color: null };
+                      const hasColor = roleInfo.color && roleInfo.color !== 'inherit' && roleInfo.color !== '#000000';
+                      return (
+                        <tr key={reward.level}>
+                          <td style={{ fontWeight: 'bold' }}>{reward.level}</td>
+                          <td>
+                            <span style={{
+                              fontWeight: 'bold',
+                              color: hasColor ? roleInfo.color : 'var(--text-primary)',
+                            }}>
+                              {roleInfo.name}
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{ color: reward.stack_role ? 'var(--success)' : 'var(--danger)', fontWeight: 'bold' }}>
+                              {reward.stack_role ? 'Yes' : 'No'}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              className="btn"
+                              style={{ color: 'var(--danger)', background: 'transparent', padding: '0.25rem 0.5rem' }}
+                              onClick={() => deleteReward(reward.level)}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {rewards.length === 0 && (
+                      <tr><td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>No reward roles configured yet.</td></tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </div>
-
-            <h3 style={{ marginBottom: '1rem' }}>Current rewards ({rewards.length})</h3>
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Level</th>
-                    <th>Role</th>
-                    <th>Keep</th>
-                    <th>Delete</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rewards.map(reward => {
-                    const roleInfo = roles[reward.role_id] || { name: reward.role_id, color: 'inherit' };
-                    return (
-                      <tr key={reward.level}>
-                        <td style={{ fontWeight: 'bold' }}>{reward.level}</td>
-                        <td style={{ color: roleInfo.color !== '0' ? roleInfo.color : 'inherit', fontWeight: 'bold' }}>
-                          {roleInfo.name}
-                        </td>
-                        <td>
-                          <span style={{ color: reward.stack_role ? 'var(--success)' : 'var(--danger)', fontWeight: 'bold' }}>
-                            {reward.stack_role ? 'Yes' : 'No'}
-                          </span>
-                        </td>
-                        <td>
-                          <button 
-                            className="btn" 
-                            style={{ color: 'var(--danger)', background: 'transparent' }}
-                            onClick={() => deleteReward(reward.level)}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
             </div>
 
             <div className="card">
-              <h2 style={{ marginBottom: '0.5rem' }}>Reward Syncing</h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>By default, the bot will automatically sync level roles by adding missing ones and removing incorrect ones.</p>
+              <h2 style={{ marginBottom: '0.25rem' }}>Reward Syncing</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>By default, the bot will automatically sync level roles by adding missing ones and removing incorrect ones. Feel free to tweak this behaviour a little.</p>
               
-              <div className="grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
                 <div>
-                  <h4 style={{ margin: 0 }}>Automatic syncing</h4>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0.75rem 0' }}>Choose when the bot should automatically sync level roles</p>
-                  <select className="input" style={{ width: '100%' }}>
-                    <option>On level up</option>
+                  <h4 style={{ marginBottom: '0.25rem' }}>Automatic syncing</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Choose when the bot should automatically sync level roles</p>
+                  <select className="input" style={{ width: '100%' }}
+                    value={settings.reward_sync_mode || 'levelup'}
+                    onChange={(e) => updateSetting('reward_sync_mode', e.target.value)}
+                  >
+                    <option value="levelup">On level up</option>
+                    <option value="always">On every message</option>
+                    <option value="never">Never (manual only)</option>
                   </select>
                 </div>
                 <div>
-                  <h4 style={{ margin: 0 }}>Manual syncing</h4>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0.75rem 0' }}>If members should be able to manually sync their roles whenever they want</p>
-                  <div className="toggle"><div className="toggle-handle"></div></div>
+                  <h4 style={{ marginBottom: '0.25rem' }}>Manual syncing</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>If members should be able to manually sync their roles whenever they want</p>
+                  <div
+                    className={`toggle ${settings.reward_manual_sync === '1' ? 'active' : ''}`}
+                    onClick={() => updateSetting('reward_manual_sync', settings.reward_manual_sync === '1' ? '0' : '1')}
+                  >
+                    <div className="toggle-handle"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ height: '1px', background: 'rgba(255,255,255,0.07)', margin: '1.5rem 0' }} />
+
+              <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                <div>
+                  <h4 style={{ marginBottom: '0.25rem' }}>Show sync warning</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Displays a warning message in /rank if a member's roles aren't synced properly</p>
+                  <div
+                    className={`toggle ${settings.reward_sync_warning !== '0' ? 'active' : ''}`}
+                    onClick={() => updateSetting('reward_sync_warning', settings.reward_sync_warning === '0' ? '1' : '0')}
+                  >
+                    <div className="toggle-handle"></div>
+                  </div>
+                </div>
+                <div>
+                  <h4 style={{ marginBottom: '0.25rem' }}>Advanced: Exclude roles</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Prevent certain roles from being re-added or removed when syncing.</p>
+                  <div
+                    className={`toggle ${settings.reward_exclude_enabled === '1' ? 'active' : ''}`}
+                    onClick={() => updateSetting('reward_exclude_enabled', settings.reward_exclude_enabled === '1' ? '0' : '1')}
+                  >
+                    <div className="toggle-handle"></div>
+                  </div>
                 </div>
               </div>
             </div>

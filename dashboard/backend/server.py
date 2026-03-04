@@ -6,6 +6,8 @@ import aiosqlite
 import os
 import sys
 import json
+import time
+from contextlib import asynccontextmanager
 from typing import Dict, Any, Optional
 
 # Add parent dir to sys.path to import from database.py if needed, 
@@ -17,7 +19,14 @@ from database import calculate_level_for_xp, get_cached_roles, init_db, get_cach
 import logging
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Apebot Leveling Dashboard API")
+@asynccontextmanager
+async def lifespan(app):
+    """Run DB init on startup to ensure all tables exist."""
+    await init_db()
+    logger.info("✅ Dashboard DB tables verified on startup.")
+    yield
+
+app = FastAPI(title="Apebot Leveling Dashboard API", lifespan=lifespan)
 
 # Enable CORS for frontend
 app.add_middleware(
@@ -286,10 +295,7 @@ else:
             "attempted_path": frontend_path
         }
 
+if __name__ == "__main__":
     import uvicorn
-    # Ensure tables exist before starting (crucial for Railway)
-    import asyncio
-    asyncio.run(init_db())
-    
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
