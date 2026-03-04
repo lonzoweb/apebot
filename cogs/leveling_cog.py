@@ -417,35 +417,12 @@ class LevelingCog(commands.Cog):
         else:
             embed.add_field(name="✨ XP", value=f"{data['xp']:,} (lv. {current_level})", inline=True)
             embed.add_field(name="⏩ Next level", value=f"{int(progress_xp):,}/{int(needed_xp):,} XP", inline=True)
-
         if not hide_cooldown:
             embed.add_field(name="🕒 Cooldown", value=cooldown_status, inline=True)
-
         if active_mults and not hide_mults:
             embed.add_field(name="🚀 Multiplier", value=f"{user_multiplier:.2f}x ({', '.join(active_mults)})", inline=True)
-
-        # Progress bar — percentage in italics (smaller feel), bar spans full width
-        embed.add_field(
-            name="\u200b",
-            value=f"`{bar}` *({percentage:.1f}%)*",
-            inline=False
-        )
-
-        # Footer: messages to go (small gray text is perfect for this)
+        embed.add_field(name="\u200b", value=f"`{bar}` *({percentage:.1f}%)*", inline=False)
         embed.set_footer(text=f"{msg_min}–{msg_max} messages to go!")
-
-        # Sync warning: check if member is missing earned reward roles
-        if settings.get("reward_sync_warning", "1") == "1":
-            rewards_list = await get_reward_roles()
-            member_role_ids = {str(r.id) for r in member.roles}
-            missing = [r for r in rewards_list if r["level"] <= current_level and str(r["role_id"]) not in member_role_ids]
-            if missing:
-                embed.add_field(
-                    name="⚠️ Roles Out of Sync",
-                    value=f"You're missing {len(missing)} reward role(s). Use `/rolesync` to fix this!",
-                    inline=False
-                )
-
         await interaction.response.send_message(embed=embed, ephemeral=is_ephemeral)
 
     @app_commands.command(name="rolesync", description="Sync your level reward roles")
