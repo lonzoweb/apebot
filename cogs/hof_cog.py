@@ -87,30 +87,31 @@ async def _get_entry(msg_id: int):
     async with get_db() as conn:
         async with conn.execute(
             "SELECT orig_message_id, orig_channel_id, author_id, hof_message_id, "
-            "star_count, content, image_url, jump_url FROM hof_entries WHERE orig_message_id = ?",
+            "star_count, content, image_url, jump_url, voice_url FROM hof_entries WHERE orig_message_id = ?",
             (str(msg_id),)
         ) as cur:
             return await cur.fetchone()
 
 
 async def _upsert_entry(orig_msg_id, orig_ch_id, author_id, hof_msg_id,
-                        star_count, content, image_url, jump_url):
+                        star_count, content, image_url, jump_url, voice_url=None):
     async with get_db() as conn:
         await conn.execute(
             """
             INSERT INTO hof_entries
                 (orig_message_id, orig_channel_id, author_id, hof_message_id,
-                 star_count, content, image_url, jump_url, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 star_count, content, image_url, jump_url, voice_url, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(orig_message_id) DO UPDATE SET
                 hof_message_id = excluded.hof_message_id,
                 star_count     = excluded.star_count,
                 content        = excluded.content,
-                image_url      = excluded.image_url
+                image_url      = excluded.image_url,
+                voice_url      = excluded.voice_url
             """,
             (str(orig_msg_id), str(orig_ch_id), str(author_id),
              str(hof_msg_id) if hof_msg_id else None,
-             star_count, content, image_url, jump_url, time.time())
+             star_count, content, image_url, jump_url, voice_url, time.time())
         )
 
 
@@ -131,6 +132,15 @@ def _extract_image(message: discord.Message) -> str | None:
     return m.group(0) if m else None
 
 
+def _extract_voice(message: discord.Message) -> str | None:
+    """Return the URL of the first audio/video attachment (covers Discord voice notes)."""
+    for att in message.attachments:
+        ct = att.content_type or ""
+        if ct.startswith("audio/") or ct.startswith("video/"):
+            return att.url
+    return None
+
+
 def _count_by_emoji_from_reactions(message: discord.Message, tracked: list) -> dict:
     return {str(r.emoji): r.count for r in message.reactions if str(r.emoji) in tracked}
 
@@ -148,6 +158,7 @@ async def _build_hof_data(
       [Author avatar] AuthorName
       *Replying to @user: content...*
       Original message text
+      🎙️ [Voice Note]
       [Attached image]
     """
     # 1. Plain Text Header (above embed)
@@ -169,9 +180,16 @@ async def _build_hof_data(
             # If we can't find it (deleted etc), just skip context
             pass
 
-    # 3. Embed Box - Always Gold
+    # 3. Voice note line (Discord voice messages are audio attachments)
+    voice_url = _extract_voice(message)
+    voice_line = f"\n\n🎙️ [Voice Note]({voice_url})" if voice_url else ""
+
+    # 4. Embed Box - Always Gold
+    base_text = f"{reply_text}{message.content[:3800]}" if (message.content or reply_text) else ""
+    description = (base_text + voice_line).strip() or None
+
     embed = discord.Embed(
-        description=f"{reply_text}{message.content[:3800]}" if message.content or reply_text else None,
+        description=description,
         color=0xFFD700,
         timestamp=message.created_at,
     )
@@ -179,7 +197,7 @@ async def _build_hof_data(
         name=message.author.display_name,
         icon_url=message.author.display_avatar.url,
     )
-    
+
     image_url = _extract_image(message)
     if image_url:
         embed.set_image(url=image_url)
@@ -230,6 +248,7 @@ async def _post_or_update_hof(
         message.id, message.channel.id, message.author.id,
         hof_msg.id, total,
         message.content, _extract_image(message), jump_url,
+        voice_url=_extract_voice(message),
     )
 
 
@@ -319,6 +338,7 @@ class HofCog(commands.Cog):
                     message.id, channel.id, message.author.id,
                     None, total,
                     message.content, _extract_image(message), message.jump_url,
+                    voice_url=_extract_voice(message),
                 )
 
     # ── AUTO-STAR ─────────────────────────────────────────────
@@ -347,7 +367,7 @@ class HofCog(commands.Cog):
                 if arg and ctx.message.mentions:
                     uid = str(ctx.message.mentions[0].id)
                     async with conn.execute(
-                        "SELECT author_id, hof_message_id, star_count, content, image_url, jump_url "
+                        "SELECT author_id, hof_message_id, star_count, content, image_url, jump_url, voice_url "
                         "FROM hof_entries WHERE author_id = ? AND hof_message_id IS NOT NULL "
                         "ORDER BY RANDOM() LIMIT 1", (uid,)
                     ) as cur:
@@ -360,7 +380,7 @@ class HofCog(commands.Cog):
                         )
                 else:
                     async with conn.execute(
-                        "SELECT author_id, hof_message_id, star_count, content, image_url, jump_url "
+                        "SELECT author_id, hof_message_id, star_count, content, image_url, jump_url, voice_url "
                         "FROM hof_entries WHERE hof_message_id IS NOT NULL "
                         "ORDER BY RANDOM() LIMIT 1"
                     ) as cur:
@@ -371,11 +391,13 @@ class HofCog(commands.Cog):
                             mention_author=False
                         )
 
-            author_id, hof_msg_id, star_count, content, image_url, jump_url = row
+            author_id, hof_msg_id, star_count, content, image_url, jump_url, voice_url = row
             author = ctx.guild.get_member(int(author_id)) or await self.bot.fetch_user(int(author_id))
 
+            voice_line = f"\n\n🎙️ [Voice Note]({voice_url})" if voice_url else ""
+            description = (content[:4090] if content else "") + voice_line
             embed = discord.Embed(
-                description=content[:4090] if content else "*[no text]*",
+                description=description.strip() or "*[no text]*",
                 color=0xFFD700,
             )
             embed.set_author(
@@ -500,7 +522,7 @@ class HofCog(commands.Cog):
                     await (await hof_ch.fetch_message(int(entry[3]))).delete()
                 except discord.NotFound:
                     pass
-            await _upsert_entry(int(msg_id), entry[1], entry[2], None, entry[4], entry[5], entry[6], entry[7])
+            await _upsert_entry(int(msg_id), entry[1], entry[2], None, entry[4], entry[5], entry[6], entry[7], voice_url=entry[8] if len(entry) > 8 else None)
 
         await interaction.response.send_message("🗑️ Removed and blacklisted.", ephemeral=True)
 
@@ -621,7 +643,7 @@ class HofCog(commands.Cog):
     async def slash_random(self, interaction: discord.Interaction):
         async with get_db() as conn:
             async with conn.execute(
-                "SELECT author_id, star_count, content, image_url, jump_url "
+                "SELECT author_id, star_count, content, image_url, jump_url, voice_url "
                 "FROM hof_entries "
                 "WHERE hof_message_id IS NOT NULL AND star_count > 0 "
                 "ORDER BY RANDOM() LIMIT 1"
@@ -678,7 +700,7 @@ class HofCog(commands.Cog):
         s = await _get_settings(interaction.guild_id)
         emoji = s["emojis"][0] if s["emojis"] else "⭐"
 
-        author_id, star_count, content, image_url, jump_url = row
+        author_id, star_count, content, image_url, jump_url, voice_url = row
         member = interaction.guild.get_member(int(author_id))
         if member is None:
             try:
@@ -686,8 +708,10 @@ class HofCog(commands.Cog):
             except Exception:
                 member = None
 
+        voice_line = f"\n\n🎙️ [Voice Note]({voice_url})" if voice_url else ""
+        description = (content[:4090] if content else "") + voice_line
         embed = discord.Embed(
-            description=content[:4090] if content else "*[no text]*",
+            description=description.strip() or "*[no text]*",
             color=0xFFD700,
         )
         if member:
@@ -866,6 +890,7 @@ async def _force_post_to_hof(bot, guild, message, emoji_counts, s, trigger_emoji
         message.id, message.channel.id, message.author.id,
         hof_msg.id, total,
         message.content, _extract_image(message), jump_url,
+        voice_url=_extract_voice(message),
     )
 
 
@@ -912,7 +937,7 @@ async def trash_from_hof_context_menu(interaction: discord.Interaction, message:
                 await (await hof_ch.fetch_message(int(entry[3]))).delete()
             except discord.NotFound:
                 pass
-        await _upsert_entry(message.id, entry[1], entry[2], None, entry[4], entry[5], entry[6], entry[7])
+        await _upsert_entry(message.id, entry[1], entry[2], None, entry[4], entry[5], entry[6], entry[7], voice_url=entry[8] if len(entry) > 8 else None)
 
     await interaction.response.send_message(
         f"🗑️ **{message.author.display_name}'s** message removed from the Hall of Fame and blacklisted.",

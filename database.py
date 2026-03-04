@@ -243,6 +243,13 @@ async def init_db():
             )
 
             # 🏆 Hall of Fame — Entries
+            # Migration: add voice_url if missing
+            async with conn.execute("PRAGMA table_info(hof_entries)") as cursor:
+                hof_cols = [row[1] for row in await cursor.fetchall()]
+                if hof_cols and "voice_url" not in hof_cols:
+                    logger.info("Adding voice_url to hof_entries...")
+                    await conn.execute("ALTER TABLE hof_entries ADD COLUMN voice_url TEXT")
+
             await conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS hof_entries (
@@ -254,6 +261,7 @@ async def init_db():
                     content TEXT,
                     image_url TEXT,
                     jump_url TEXT,
+                    voice_url TEXT,
                     created_at REAL NOT NULL
                 )
                 """
