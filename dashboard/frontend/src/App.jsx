@@ -20,13 +20,19 @@ function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [stats, setStats] = useState({ total_users: 0, total_xp: 0 });
   const [settings, setSettings] = useState({});
+  const [pendingSettings, setPendingSettings] = useState({});
+  const [hasPending, setHasPending] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
   const [rewards, setRewards] = useState([]);
   const [multipliers, setMultipliers] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [roles, setRoles] = useState({});
   const [channels, setChannels] = useState({});
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
+  const [pruneThreshold, setPruneThreshold] = useState('100');
+  const [importOptions, setImportOptions] = useState({ importXP: true, importSettings: false });
+  const [importFile, setImportFile] = useState(null);
 
   // Form states for new entries
   const [newReward, setNewReward] = useState({ level: '', role_id: '', stack_role: true });
@@ -50,6 +56,8 @@ function App() {
       ]);
       setStats(sRes.data);
       setSettings(setRes.data);
+      setPendingSettings(setRes.data);
+      setHasPending(false);
       setRewards(rRes.data);
       setMultipliers(mRes.data);
       setLeaderboard(lRes.data);
@@ -61,23 +69,47 @@ function App() {
     setLoading(false);
   };
 
-  const updateSetting = async (key, value) => {
-    setSyncing(true);
-    try {
-      await axios.post(`${API_BASE}/settings`, { key, value: String(value) });
-      setSettings(prev => ({ ...prev, [key]: value }));
-    } catch (err) { alert("Update failed"); }
-    setTimeout(() => setSyncing(false), 500);
+  // --- Pending-save model: all setting changes go here first ---
+  const updateSetting = (key, value) => {
+    setPendingSettings(prev => ({ ...prev, [key]: value }));
+    setHasPending(true);
   };
 
-  const applyPreset = async (preset) => {
-    setSyncing(true);
+  const saveAllSettings = async () => {
+    setSaving(true);
+    setSaveMsg('');
     try {
-      const keys = ['c3', 'c2', 'c1', 'rounding'];
-      await Promise.all(keys.map(k => axios.post(`${API_BASE}/settings`, { key: k, value: String(preset[k]) })));
-      setSettings(prev => ({ ...prev, ...preset }));
-    } catch (err) { alert("Preset failed"); }
-    setTimeout(() => setSyncing(false), 500);
+      await axios.post(`${API_BASE}/settings/batch`, { settings: pendingSettings });
+      setSettings(pendingSettings);
+      setHasPending(false);
+      setSaveMsg('✅ Saved!');
+      setTimeout(() => setSaveMsg(''), 2500);
+    } catch (err) {
+      setSaveMsg('❌ Save failed');
+    }
+    setSaving(false);
+  };
+
+  const discardChanges = () => {
+    setPendingSettings(settings);
+    setHasPending(false);
+  };
+
+  // Detect which preset is currently active
+  const activePreset = CURVE_PRESETS.find(
+    p => String(p.c3) === String(pendingSettings.c3) &&
+         String(p.c2) === String(pendingSettings.c2) &&
+         String(p.c1) === String(pendingSettings.c1) &&
+         String(p.rounding) === String(pendingSettings.rounding)
+  );
+
+
+  const applyPreset = (preset) => {
+    const keys = ['c3', 'c2', 'c1', 'rounding'];
+    const updates = {};
+    keys.forEach(k => { updates[k] = String(preset[k]); });
+    setPendingSettings(prev => ({ ...prev, ...updates }));
+    setHasPending(true);
   };
 
   const addReward = async () => {
@@ -192,6 +224,36 @@ function App() {
         </div>
       </div>
 
+      {/* Floating Save Bar */}
+      {hasPending && (
+        <div style={{
+          position: 'fixed', bottom: '2rem', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(20, 20, 35, 0.98)', border: '1px solid rgba(99,102,241,0.4)',
+          borderRadius: '1rem', padding: '0.75rem 1.5rem',
+          display: 'flex', alignItems: 'center', gap: '1rem',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.6)', zIndex: 1000,
+          backdropFilter: 'blur(12px)'
+        }}>
+          <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>All done?</span>
+          <button
+            className="btn btn-primary"
+            onClick={saveAllSettings}
+            disabled={saving}
+            style={{ padding: '0.5rem 1.5rem', fontWeight: '700' }}
+          >
+            {saving ? '⏳ Saving...' : '💾 SAVE'}
+          </button>
+          <button
+            className="btn"
+            onClick={discardChanges}
+            style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', opacity: 0.7 }}
+          >
+            Discard
+          </button>
+          {saveMsg && <span style={{ fontSize: '0.85rem', color: saveMsg.startsWith('✅') ? 'var(--success)' : 'var(--danger)' }}>{saveMsg}</span>}
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="main-content">
         <header className="header">
@@ -264,7 +326,7 @@ function App() {
                 <label className="label">Coefficient C3 (Cubic)</label>
                 <input 
                   className="input" type="number" step="0.1"
-                  value={settings.c3 || 1} 
+                  value={pendingSettings.c3 || 1} 
                   onChange={(e) => updateSetting('c3', e.target.value)}
                 />
               </div>
@@ -272,7 +334,7 @@ function App() {
                 <label className="label">Coefficient C2 (Quadratic)</label>
                 <input 
                   className="input" type="number" step="1"
-                  value={settings.c2 || 50} 
+                  value={pendingSettings.c2 || 50} 
                   onChange={(e) => updateSetting('c2', e.target.value)}
                 />
               </div>
@@ -280,7 +342,7 @@ function App() {
                 <label className="label">Coefficient C1 (Linear)</label>
                 <input 
                   className="input" type="number" step="1"
-                  value={settings.c1 || 100} 
+                  value={pendingSettings.c1 || 100} 
                   onChange={(e) => updateSetting('c1', e.target.value)}
                 />
               </div>
@@ -288,7 +350,7 @@ function App() {
                 <label className="label">Rounding (Step)</label>
                 <input 
                   className="input" type="number"
-                  value={settings.rounding || 100} 
+                  value={pendingSettings.rounding || 100} 
                   onChange={(e) => updateSetting('rounding', e.target.value)}
                 />
               </div>
@@ -298,7 +360,7 @@ function App() {
                   <label className="label">Min XP per message</label>
                   <input 
                     className="input" type="number"
-                    value={settings.xp_min || 15} 
+                    value={pendingSettings.xp_min || 15} 
                     onChange={(e) => updateSetting('xp_min', e.target.value)}
                   />
                 </div>
@@ -306,7 +368,7 @@ function App() {
                   <label className="label">Max XP per message</label>
                   <input 
                     className="input" type="number"
-                    value={settings.xp_max || 25} 
+                    value={pendingSettings.xp_max || 25} 
                     onChange={(e) => updateSetting('xp_max', e.target.value)}
                   />
                 </div>
@@ -315,7 +377,7 @@ function App() {
                 <label className="label">Cooldown (seconds)</label>
                 <input 
                   className="input" type="number"
-                  value={settings.cooldown || 60} 
+                  value={pendingSettings.cooldown || 60} 
                   onChange={(e) => updateSetting('cooldown', e.target.value)}
                 />
               </div>
@@ -324,30 +386,34 @@ function App() {
             <div className="card" style={{ height: 'fit-content' }}>
               <h3 style={{ marginBottom: '1.5rem' }}>Curve Presets</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {CURVE_PRESETS.map(p => (
-                  <button 
-                    key={p.name}
-                    className="btn"
-                    style={{ background: 'rgba(255,255,255,0.05)', textAlign: 'left', color: 'var(--text-primary)', fontSize: '0.9rem' }}
-                    onClick={() => applyPreset(p)}
-                  >
-                    {p.name}
-                  </button>
-                ))}
+                {CURVE_PRESETS.map(p => {
+                  const isActive = activePreset?.name === p.name;
+                  return (
+                    <button 
+                      key={p.name}
+                      className="btn"
+                      style={{
+                        background: isActive ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
+                        textAlign: 'left', color: 'var(--text-primary)', fontSize: '0.9rem',
+                        border: isActive ? '1px solid rgba(99,102,241,0.5)' : '1px solid transparent',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                      }}
+                      onClick={() => applyPreset(p)}
+                    >
+                      <span>{p.name}</span>
+                      {isActive && <span style={{ color: 'var(--accent)', fontWeight: 'bold', fontSize: '1rem' }}>✓</span>}
+                    </button>
+                  );
+                })}
               </div>
               <div style={{ marginTop: '2rem', padding: '1rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '0.75rem' }}>
                 <p style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Sparkles size={14} /> ACTIVE CURVE
                 </p>
                 <p style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-                    {settings.c3}x³ + {settings.c2}x² + {settings.c1}x
+                    {pendingSettings.c3}x³ + {pendingSettings.c2}x² + {pendingSettings.c1}x
                 </p>
               </div>
-              {syncing && (
-                <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <RefreshCw size={14} className="spin" /> Syncing changes...
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -364,8 +430,8 @@ function App() {
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>When enabled, a message or DM will be sent whenever anyone levels up.</p>
                 </div>
                 <div 
-                  className={`toggle ${settings.lvl_msg_enabled === '1' ? 'active' : ''}`}
-                  onClick={() => updateSetting('lvl_msg_enabled', settings.lvl_msg_enabled === '1' ? '0' : '1')}
+                  className={`toggle ${pendingSettings.lvl_msg_enabled === '1' ? 'active' : ''}`}
+                  onClick={() => updateSetting('lvl_msg_enabled', pendingSettings.lvl_msg_enabled === '1' ? '0' : '1')}
                 >
                   <div className="toggle-handle"></div>
                 </div>
@@ -379,7 +445,7 @@ function App() {
               <textarea 
                 className="input" 
                 style={{ width: '100%', minHeight: '120px', fontFamily: 'monospace', fontSize: '0.9rem', padding: '1rem', marginBottom: '1.5rem' }}
-                value={settings.lvl_msg_template || ''}
+                value={pendingSettings.lvl_msg_template || ''}
                 onChange={(e) => setSettings({ ...settings, lvl_msg_template: e.target.value })}
                 onBlur={(e) => updateSetting('lvl_msg_template', e.target.value)}
               />
@@ -399,7 +465,7 @@ function App() {
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Which channel should the message be sent in?</p>
                   <select 
                     className="input" 
-                    value={settings.lvl_msg_channel || 'dm'}
+                    value={pendingSettings.lvl_msg_channel || 'dm'}
                     onChange={(e) => updateSetting('lvl_msg_channel', e.target.value)}
                   >
                     <option value="dm">Send in DMs</option>
@@ -419,8 +485,8 @@ function App() {
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>Send a fancy embed instead of a normal message (advanced!)</p>
                 </div>
                 <div 
-                  className={`toggle ${settings.lvl_msg_embed === '1' ? 'active' : ''}`}
-                  onClick={() => updateSetting('lvl_msg_embed', settings.lvl_msg_embed === '1' ? '0' : '1')}
+                  className={`toggle ${pendingSettings.lvl_msg_embed === '1' ? 'active' : ''}`}
+                  onClick={() => updateSetting('lvl_msg_embed', pendingSettings.lvl_msg_embed === '1' ? '0' : '1')}
                 >
                   <div className="toggle-handle"></div>
                 </div>
@@ -439,7 +505,7 @@ function App() {
                     <span>Every</span>
                     <input 
                       className="input" type="number" style={{ width: '80px' }}
-                      value={settings.lvl_msg_interval || 1}
+                      value={pendingSettings.lvl_msg_interval || 1}
                       onChange={(e) => updateSetting('lvl_msg_interval', e.target.value)}
                     />
                     <span>level(s)</span>
@@ -452,7 +518,7 @@ function App() {
                     <span>Level</span>
                     <input 
                       className="input" type="number" style={{ width: '80px' }}
-                      value={settings.lvl_msg_interval_stop || 0}
+                      value={pendingSettings.lvl_msg_interval_stop || 0}
                       onChange={(e) => updateSetting('lvl_msg_interval_stop', e.target.value)}
                     />
                   </div>
@@ -465,8 +531,8 @@ function App() {
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>Only send the level up message when obtaining a new reward role</p>
                 </div>
                 <div 
-                  className={`toggle ${settings.lvl_msg_reward_only === '1' ? 'active' : ''}`}
-                  onClick={() => updateSetting('lvl_msg_reward_only', settings.lvl_msg_reward_only === '1' ? '0' : '1')}
+                  className={`toggle ${pendingSettings.lvl_msg_reward_only === '1' ? 'active' : ''}`}
+                  onClick={() => updateSetting('lvl_msg_reward_only', pendingSettings.lvl_msg_reward_only === '1' ? '0' : '1')}
                 >
                   <div className="toggle-handle"></div>
                 </div>
@@ -582,7 +648,7 @@ function App() {
                   <h4 style={{ marginBottom: '0.25rem' }}>Automatic syncing</h4>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Choose when the bot should automatically sync level roles</p>
                   <select className="input" style={{ width: '100%' }}
-                    value={settings.reward_sync_mode || 'levelup'}
+                    value={pendingSettings.reward_sync_mode || 'levelup'}
                     onChange={(e) => updateSetting('reward_sync_mode', e.target.value)}
                   >
                     <option value="levelup">On level up</option>
@@ -594,8 +660,8 @@ function App() {
                   <h4 style={{ marginBottom: '0.25rem' }}>Manual syncing</h4>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>If members should be able to manually sync their roles whenever they want</p>
                   <div
-                    className={`toggle ${settings.reward_manual_sync === '1' ? 'active' : ''}`}
-                    onClick={() => updateSetting('reward_manual_sync', settings.reward_manual_sync === '1' ? '0' : '1')}
+                    className={`toggle ${pendingSettings.reward_manual_sync === '1' ? 'active' : ''}`}
+                    onClick={() => updateSetting('reward_manual_sync', pendingSettings.reward_manual_sync === '1' ? '0' : '1')}
                   >
                     <div className="toggle-handle"></div>
                   </div>
@@ -609,8 +675,8 @@ function App() {
                   <h4 style={{ marginBottom: '0.25rem' }}>Show sync warning</h4>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Displays a warning message in /rank if a member's roles aren't synced properly</p>
                   <div
-                    className={`toggle ${settings.reward_sync_warning !== '0' ? 'active' : ''}`}
-                    onClick={() => updateSetting('reward_sync_warning', settings.reward_sync_warning === '0' ? '1' : '0')}
+                    className={`toggle ${pendingSettings.reward_sync_warning !== '0' ? 'active' : ''}`}
+                    onClick={() => updateSetting('reward_sync_warning', pendingSettings.reward_sync_warning === '0' ? '1' : '0')}
                   >
                     <div className="toggle-handle"></div>
                   </div>
@@ -619,8 +685,8 @@ function App() {
                   <h4 style={{ marginBottom: '0.25rem' }}>Advanced: Exclude roles</h4>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Prevent certain roles from being re-added or removed when syncing.</p>
                   <div
-                    className={`toggle ${settings.reward_exclude_enabled === '1' ? 'active' : ''}`}
-                    onClick={() => updateSetting('reward_exclude_enabled', settings.reward_exclude_enabled === '1' ? '0' : '1')}
+                    className={`toggle ${pendingSettings.reward_exclude_enabled === '1' ? 'active' : ''}`}
+                    onClick={() => updateSetting('reward_exclude_enabled', pendingSettings.reward_exclude_enabled === '1' ? '0' : '1')}
                   >
                     <div className="toggle-handle"></div>
                   </div>
@@ -651,8 +717,8 @@ function App() {
                   </p>
                 </div>
                 <div
-                  className={`toggle ${settings.rank_enabled !== '0' ? 'active' : ''}`}
-                  onClick={() => updateSetting('rank_enabled', settings.rank_enabled === '0' ? '1' : '0')}
+                  className={`toggle ${pendingSettings.rank_enabled !== '0' ? 'active' : ''}`}
+                  onClick={() => updateSetting('rank_enabled', pendingSettings.rank_enabled === '0' ? '1' : '0')}
                 >
                   <div className="toggle-handle"></div>
                 </div>
@@ -667,8 +733,8 @@ function App() {
                   Prevents members from viewing the amount of time until they can gain XP again.
                 </p>
                 <div
-                  className={`toggle ${settings.rank_hide_cooldown === '1' ? 'active' : ''}`}
-                  onClick={() => updateSetting('rank_hide_cooldown', settings.rank_hide_cooldown === '1' ? '0' : '1')}
+                  className={`toggle ${pendingSettings.rank_hide_cooldown === '1' ? 'active' : ''}`}
+                  onClick={() => updateSetting('rank_hide_cooldown', pendingSettings.rank_hide_cooldown === '1' ? '0' : '1')}
                 >
                   <div className="toggle-handle"></div>
                 </div>
@@ -680,8 +746,8 @@ function App() {
                   Prevents members from viewing which roles have multipliers. (except 0x)
                 </p>
                 <div
-                  className={`toggle ${settings.rank_hide_multipliers === '1' ? 'active' : ''}`}
-                  onClick={() => updateSetting('rank_hide_multipliers', settings.rank_hide_multipliers === '1' ? '0' : '1')}
+                  className={`toggle ${pendingSettings.rank_hide_multipliers === '1' ? 'active' : ''}`}
+                  onClick={() => updateSetting('rank_hide_multipliers', pendingSettings.rank_hide_multipliers === '1' ? '0' : '1')}
                 >
                   <div className="toggle-handle"></div>
                 </div>
@@ -693,8 +759,8 @@ function App() {
                   Forces usages of /rank to always be hidden (ephemeral), meaning that only the member who typed the command can see the message.
                 </p>
                 <div
-                  className={`toggle ${settings.rank_force_hidden === '1' ? 'active' : ''}`}
-                  onClick={() => updateSetting('rank_force_hidden', settings.rank_force_hidden === '1' ? '0' : '1')}
+                  className={`toggle ${pendingSettings.rank_force_hidden === '1' ? 'active' : ''}`}
+                  onClick={() => updateSetting('rank_force_hidden', pendingSettings.rank_force_hidden === '1' ? '0' : '1')}
                 >
                   <div className="toggle-handle"></div>
                 </div>
@@ -706,8 +772,8 @@ function App() {
                   Changes the 'next level' section of /rank to start at 0 and only include XP from that level. e.g. If level 10 requires 2000 XP and level 11 requires 3000, it will display "500/1000 XP until level 11" for a member with 2500 XP.
                 </p>
                 <div
-                  className={`toggle ${settings.rank_relative_xp !== '0' ? 'active' : ''}`}
-                  onClick={() => updateSetting('rank_relative_xp', settings.rank_relative_xp === '0' ? '1' : '0')}
+                  className={`toggle ${pendingSettings.rank_relative_xp !== '0' ? 'active' : ''}`}
+                  onClick={() => updateSetting('rank_relative_xp', pendingSettings.rank_relative_xp === '0' ? '1' : '0')}
                 >
                   <div className="toggle-handle"></div>
                 </div>
@@ -783,35 +849,164 @@ function App() {
         )}
 
         {activeTab === 'data' && (
-          <div className="grid">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* Header */}
             <div className="card">
-              <h3 style={{ marginBottom: '1rem' }}>Download XP</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                Export everyone's XP and server settings into a Polaris-compliant file.
-              </p>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleExport}>
-                   <Download size={18} style={{ marginRight: '0.5rem' }} /> Export JSON
+              <h2 style={{ marginBottom: '0.35rem' }}>Data</h2>
+              <p style={{ color: 'var(--text-secondary)' }}>Settings related to the server's data.</p>
+            </div>
+
+            {/* Download section */}
+            <div className="card">
+              <h3 style={{ marginBottom: '0.35rem' }}>Download XP</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Exports everyone's XP into a single file (only contains user ID and XP)</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>Download all data if you wish to import your settings into an open-source fork of Stardust.</p>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button className="btn btn-primary" onClick={handleExport}>
+                  <Download size={16} style={{ marginRight: '0.4rem' }} /> Download all data
+                </button>
+                <button className="btn" style={{ background: 'rgba(255,255,255,0.07)' }} onClick={() => {
+                  window.open(`${API_BASE}/export`, '_blank');
+                }}>Download as .json</button>
+                <button className="btn" style={{ background: 'rgba(255,255,255,0.07)' }} onClick={() => {
+                  window.open(`${API_BASE}/export/csv`, '_blank');
+                }}>Download as .csv</button>
+                <button className="btn" style={{ background: 'rgba(255,255,255,0.07)' }} onClick={() => {
+                  window.open(`${API_BASE}/export/txt`, '_blank');
+                }}>Download as .txt</button>
+              </div>
+            </div>
+
+            {/* Danger zone 2-col grid */}
+            <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              <div className="card">
+                <h3 style={{ marginBottom: '0.4rem', color: 'var(--danger)' }}>Clear all XP</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', minHeight: '3.5rem' }}>
+                  Delete everyone's XP and start fresh. All XP will be reset to 0, but reward roles will not be removed unless done manually. <strong>This cannot be undone!</strong>
+                </p>
+                <button
+                  className="btn" style={{ background: 'var(--danger)', color: '#fff', fontWeight: '700' }}
+                  onClick={async () => {
+                    if (!window.confirm('Reset ALL user XP to 0? This cannot be undone!')) return;
+                    await axios.post(`${API_BASE}/clear-xp`);
+                    fetchData();
+                    alert('All XP cleared!');
+                  }}
+                >
+                  Reset!
+                </button>
+              </div>
+
+              <div className="card">
+                <h3 style={{ marginBottom: '0.4rem', color: 'var(--danger)' }}>Reset settings</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', minHeight: '3.5rem' }}>
+                  Restores the defaults for all configurable settings such as the curve, reward roles, multipliers, level up message, etc. XP will not be cleared. <strong>This cannot be undone!</strong>
+                </p>
+                <button
+                  className="btn" style={{ background: 'var(--danger)', color: '#fff', fontWeight: '700' }}
+                  onClick={async () => {
+                    if (!window.confirm('Reset ALL settings, reward roles and multipliers to defaults? This cannot be undone!')) return;
+                    await axios.post(`${API_BASE}/reset-settings`);
+                    fetchData();
+                    alert('Settings reset! Bot will reinitialize defaults on next startup.');
+                  }}
+                >
+                  Reset!
                 </button>
               </div>
             </div>
-            <div className="card">
-              <h3 style={{ marginBottom: '1rem' }}>Import Data</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                Upload a Polaris-compatible JSON file to migrate users and settings.
-              </p>
-              <label className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                <RefreshCw size={18} /> Select & Import
-                <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
-              </label>
+
+            {/* Prune */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              <div className="card">
+                <h3 style={{ marginBottom: '0.4rem' }}>Prune Members</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                  Deletes the data of everyone who has less than a certain amount of XP. Might speed up load times. <strong>This cannot be undone!</strong>
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Less than:</label>
+                  <input
+                    className="input" type="number" style={{ width: '100px' }}
+                    value={pruneThreshold}
+                    onChange={(e) => setPruneThreshold(e.target.value)}
+                  />
+                  <button
+                    className="btn" style={{ background: 'var(--danger)', color: '#fff', fontWeight: '700', whiteSpace: 'nowrap' }}
+                    onClick={async () => {
+                      if (!window.confirm(`Delete all users with less than ${pruneThreshold} XP? Cannot be undone!`)) return;
+                      const res = await axios.post(`${API_BASE}/prune`, { threshold: parseInt(pruneThreshold) });
+                      fetchData();
+                      alert(`Pruned ${res.data.deleted} members.`);
+                    }}
+                  >
+                    Prune!
+                  </button>
+                </div>
+              </div>
             </div>
+
+            {/* Import section */}
             <div className="card">
-              <h3 style={{ marginBottom: '1rem', color: 'var(--accent)' }}>Maintenance</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                Reconcile XP with Levels for all users based on current curve settings.
-              </p>
-              <button className="btn" style={{ width: '100%', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent)', border: '1px solid rgba(99, 102, 241, 0.2)' }} onClick={handleRecalculate}>
-                <RefreshCw size={18} style={{ marginRight: '0.5rem' }} /> Fix Levels
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                <h3 style={{ margin: 0 }}>Import settings and XP from</h3>
+                <select className="input" style={{ width: 'auto' }}>
+                  <option>.json file</option>
+                </select>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Copies XP and settings from another server using this bot. Requires server owner</p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>The expected .json format is the same as when you press "download all data" at the top of this</p>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                <label style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>Import from:</label>
+                <input
+                  type="file" accept=".json"
+                  style={{ flex: 1, padding: '0.4rem', background: 'rgba(255,255,255,0.05)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                  onChange={(e) => setImportFile(e.target.files[0])}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem', marginBottom: '0.75rem' }}>
+                <div
+                  className={`toggle ${importOptions.importXP ? 'active' : ''}`}
+                  onClick={() => setImportOptions(prev => ({ ...prev, importXP: !prev.importXP }))}
+                >
+                  <div className="toggle-handle"></div>
+                </div>
+                <span style={{ fontSize: '0.9rem' }}>Import XP (overwrites existing members!)</span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem', marginBottom: '1.25rem' }}>
+                <div
+                  className={`toggle ${importOptions.importSettings ? 'active' : ''}`}
+                  onClick={() => setImportOptions(prev => ({ ...prev, importSettings: !prev.importSettings }))}
+                >
+                  <div className="toggle-handle"></div>
+                </div>
+                <span style={{ fontSize: '0.9rem' }}>Import settings (cooldown, curve, level up message, etc) [requires bot owner for security reasons]</span>
+              </div>
+
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  if (!importFile) return alert('Please select a file first.');
+                  const reader = new FileReader();
+                  reader.onload = async (event) => {
+                    try {
+                      const jsonData = JSON.parse(event.target.result);
+                      if (!importOptions.importSettings) delete jsonData.settings;
+                      if (!importOptions.importXP) delete jsonData.users;
+                      const res = await axios.post(`${API_BASE}/import`, jsonData);
+                      alert(`Import Successful!\nDetails: ${res.data.details.join(', ')}`);
+                      fetchData();
+                    } catch (err) {
+                      alert('Import failed: ' + (err.response?.data?.detail || 'Invalid JSON'));
+                    }
+                  };
+                  reader.readAsText(importFile);
+                }}
+                style={{ fontWeight: '700' }}
+              >
+                Import!
               </button>
             </div>
           </div>

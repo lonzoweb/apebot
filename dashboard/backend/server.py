@@ -255,7 +255,6 @@ async def import_data(jsonData: Dict[str, Any]):
 async def recalculate_all_levels():
     """Recalculate levels for everyone based on current settings."""
     async with aiosqlite.connect(DB_FILE) as db:
-        # Get settings
         async with db.execute("SELECT key, value FROM level_settings") as cursor:
             rows = await cursor.fetchall()
             settings = {row[0]: row[1] for row in rows}
@@ -265,7 +264,6 @@ async def recalculate_all_levels():
         c1 = float(settings.get("c1", 100))
         r = int(settings.get("rounding", 100))
 
-        # Get all users
         async with db.execute("SELECT user_id, xp FROM users_xp") as cursor:
             users = await cursor.fetchall()
 
@@ -277,6 +275,72 @@ async def recalculate_all_levels():
             
         await db.commit()
     return {"status": "ok", "count": count}
+
+class BatchSettingsUpdate(BaseModel):
+    settings: Dict[str, str]
+
+@app.post("/settings/batch")
+async def batch_update_settings(update: BatchSettingsUpdate):
+    """Batch update multiple settings at once (for the save button)."""
+    async with aiosqlite.connect(DB_FILE) as db:
+        for key, value in update.settings.items():
+            await db.execute("INSERT OR REPLACE INTO level_settings (key, value) VALUES (?, ?)", (key, value))
+        await db.commit()
+    return {"status": "ok", "count": len(update.settings)}
+
+@app.post("/clear-xp")
+async def clear_all_xp():
+    """Reset all users' XP and level to 0."""
+    async with aiosqlite.connect(DB_FILE) as db:
+        await db.execute("UPDATE users_xp SET xp = 0, level = 0")
+        await db.commit()
+    return {"status": "ok"}
+
+@app.post("/reset-settings")
+async def reset_settings():
+    """Delete all level settings so the bot reinitializes defaults."""
+    async with aiosqlite.connect(DB_FILE) as db:
+        await db.execute("DELETE FROM level_settings")
+        await db.execute("DELETE FROM level_multipliers")
+        await db.execute("DELETE FROM reward_roles")
+        await db.commit()
+    return {"status": "ok"}
+
+class PruneRequest(BaseModel):
+    threshold: int = 100
+
+@app.post("/prune")
+async def prune_members(req: PruneRequest):
+    """Delete users with XP below the threshold."""
+    async with aiosqlite.connect(DB_FILE) as db:
+        async with db.execute("SELECT COUNT(*) FROM users_xp WHERE xp < ?", (req.threshold,)) as cursor:
+            row = await cursor.fetchone()
+            count = row[0] if row else 0
+        await db.execute("DELETE FROM users_xp WHERE xp < ?", (req.threshold,))
+        await db.commit()
+    return {"status": "ok", "deleted": count}
+
+@app.get("/export/csv")
+async def export_csv():
+    """Export user XP as CSV."""
+    from fastapi.responses import PlainTextResponse
+    async with aiosqlite.connect(DB_FILE) as db:
+        async with db.execute("SELECT user_id, xp, level FROM users_xp ORDER BY level DESC, xp DESC") as cursor:
+            rows = await cursor.fetchall()
+    lines = ["user_id,xp,level"] + [f"{r[0]},{r[1]},{r[2]}" for r in rows]
+    return PlainTextResponse("\n".join(lines), media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=apeiron_export.csv"})
+
+@app.get("/export/txt")
+async def export_txt():
+    """Export user XP as plain text."""
+    from fastapi.responses import PlainTextResponse
+    async with aiosqlite.connect(DB_FILE) as db:
+        async with db.execute("SELECT user_id, xp, level FROM users_xp ORDER BY level DESC, xp DESC") as cursor:
+            rows = await cursor.fetchall()
+    lines = [f"UserID: {r[0]} | XP: {r[1]} | Level: {r[2]}" for r in rows]
+    return PlainTextResponse("\n".join(lines), media_type="text/plain",
+        headers={"Content-Disposition": "attachment; filename=apeiron_export.txt"})
 
 # --- Serve Frontend ---
 # Search for frontend/dist relative to project root
