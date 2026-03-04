@@ -496,6 +496,7 @@ class LevelingCog(commands.Cog):
 
     @app_commands.command(name="level_edit", description="[ADMIN] Manually adjust a member's XP or Level")
     @app_commands.describe(member="Member to edit", xp="Set exact XP", level="Set exact Level")
+    @app_commands.default_permissions(administrator=True)
     @app_commands.checks.has_permissions(administrator=True)
     async def level_edit(self, interaction: discord.Interaction, member: discord.Member, xp: int = None, level: int = None):
         if xp is None and level is None:

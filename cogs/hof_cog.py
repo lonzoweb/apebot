@@ -386,11 +386,11 @@ class HofCog(commands.Cog):
     hall_group = app_commands.Group(
         name="hall",
         description="Hall of Fame — configure and view the starboard system",
-        default_permissions=discord.Permissions(administrator=True),
     )
 
     @hall_group.command(name="setup", description="Set the #hall-of-fame channel")
     @app_commands.describe(channel="Channel where starred messages appear")
+    @app_commands.default_permissions(administrator=True)
     async def slash_setup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         await _set_settings(interaction.guild_id, channel_id=str(channel.id))
         await interaction.response.send_message(
@@ -399,6 +399,7 @@ class HofCog(commands.Cog):
 
     @hall_group.command(name="threshold", description="Set how many reactions a message needs")
     @app_commands.describe(count="Reactions required (default: 3)")
+    @app_commands.default_permissions(administrator=True)
     async def slash_threshold(self, interaction: discord.Interaction, count: int):
         if count < 1:
             return await interaction.response.send_message("❌ Must be at least 1.", ephemeral=True)
@@ -407,6 +408,7 @@ class HofCog(commands.Cog):
 
     @hall_group.command(name="emojis", description="Set which emojis are tracked (space-separated)")
     @app_commands.describe(emojis="e.g.  ⭐ 🔥 💯")
+    @app_commands.default_permissions(administrator=True)
     async def slash_emojis(self, interaction: discord.Interaction, emojis: str):
         parsed = emojis.strip().split()
         if not parsed:
@@ -418,6 +420,7 @@ class HofCog(commands.Cog):
 
     @hall_group.command(name="ignore", description="Exclude a channel from the Hall of Fame")
     @app_commands.describe(channel="Channel to ignore")
+    @app_commands.default_permissions(administrator=True)
     async def slash_ignore(self, interaction: discord.Interaction, channel: discord.TextChannel):
         s = await _get_settings(interaction.guild_id)
         ignored = s["ignored_channels"]
@@ -428,6 +431,7 @@ class HofCog(commands.Cog):
 
     @hall_group.command(name="unignore", description="Re-allow a previously ignored channel")
     @app_commands.describe(channel="Channel to unignore")
+    @app_commands.default_permissions(administrator=True)
     async def slash_unignore(self, interaction: discord.Interaction, channel: discord.TextChannel):
         s = await _get_settings(interaction.guild_id)
         ignored = [c for c in s["ignored_channels"] if c != str(channel.id)]
@@ -436,6 +440,7 @@ class HofCog(commands.Cog):
 
     @hall_group.command(name="autostar", description="Toggle auto-react in a channel")
     @app_commands.describe(channel="Channel to toggle")
+    @app_commands.default_permissions(administrator=True)
     async def slash_autostar(self, interaction: discord.Interaction, channel: discord.TextChannel):
         s = await _get_settings(interaction.guild_id)
         asc = s["autostar_channels"]
@@ -451,6 +456,7 @@ class HofCog(commands.Cog):
 
     @hall_group.command(name="lock", description="Freeze a HOF entry (won't be removed if stars drop)")
     @app_commands.describe(message_link="Right-click a message → Copy Message Link")
+    @app_commands.default_permissions(administrator=True)
     async def slash_lock(self, interaction: discord.Interaction, message_link: str):
         msg_id = _parse_message_id(message_link)
         if not msg_id:
@@ -464,6 +470,7 @@ class HofCog(commands.Cog):
 
     @hall_group.command(name="trash", description="Remove from HOF and permanently blacklist the message")
     @app_commands.describe(message_link="Right-click a message → Copy Message Link")
+    @app_commands.default_permissions(administrator=True)
     async def slash_trash(self, interaction: discord.Interaction, message_link: str):
         msg_id = _parse_message_id(message_link)
         if not msg_id:
@@ -487,6 +494,7 @@ class HofCog(commands.Cog):
         await interaction.response.send_message("🗑️ Removed and blacklisted.", ephemeral=True)
 
     @hall_group.command(name="settings", description="Show current Hall of Fame configuration")
+    @app_commands.default_permissions(administrator=True)
     async def slash_settings(self, interaction: discord.Interaction):
         s = await _get_settings(interaction.guild_id)
         hof_ch  = f"<#{s['channel_id']}>" if s["channel_id"] else "❌ Not set"
@@ -542,6 +550,7 @@ class HofCog(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     @hall_group.command(name="export", description="Export the Hall of Fame as a CSV file")
+    @app_commands.default_permissions(administrator=True)
     async def slash_export(self, interaction: discord.Interaction):
         """Generate a CSV of every HOF entry — author, content, reactions, media URL, jump link."""
         import csv
@@ -633,6 +642,7 @@ class HofCog(commands.Cog):
 
     @hall_group.command(name="stats", description="Show Hall of Fame statistics for a user")
     @app_commands.describe(user="The user to check stats for")
+    @app_commands.default_permissions(administrator=True)
     async def slash_stats(self, interaction: discord.Interaction, user: discord.Member = None):
         target = user or interaction.user
         async with get_db() as conn:
