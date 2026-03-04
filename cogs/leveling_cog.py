@@ -48,11 +48,17 @@ class LevelingCog(commands.Cog):
             "lvl_msg_reward_only": "0",
             "lvl_msg_interval_stop": "0",
             # Reward Sync Settings
-            "reward_sync_mode": "levelup",     # "levelup", "always", "never"
-            "reward_manual_sync": "0",          # members can /rolesync
-            "reward_sync_warning": "1",         # show warning in /rank
-            "reward_exclude_enabled": "0",      # exclude roles from sync
-            "reward_exclude_roles": "",         # comma-separated role IDs
+            "reward_sync_mode": "levelup",
+            "reward_manual_sync": "0",
+            "reward_sync_warning": "1",
+            "reward_exclude_enabled": "0",
+            "reward_exclude_roles": "",
+            # Rank Card Settings
+            "rank_enabled": "1",
+            "rank_hide_cooldown": "0",
+            "rank_hide_multipliers": "0",
+            "rank_force_hidden": "0",
+            "rank_relative_xp": "1",
         }
         for k, v in defaults.items():
             if k not in settings:
@@ -321,8 +327,18 @@ class LevelingCog(commands.Cog):
     @app_commands.command(name="rank", description="Check your current level and XP")
     async def rank_slash(self, interaction: discord.Interaction, member: discord.Member = None):
         member = member or interaction.user
-        data = await get_user_xp_data(member.id)
         settings = await get_level_settings()
+
+        # --- Setting: rank_enabled ---
+        if settings.get("rank_enabled", "1") == "0" and member == interaction.user:
+            return await interaction.response.send_message("❌ Rank cards are disabled on this server.", ephemeral=True)
+
+        is_ephemeral = settings.get("rank_force_hidden") == "1"
+        hide_cooldown = settings.get("rank_hide_cooldown") == "1"
+        hide_mults = settings.get("rank_hide_multipliers") == "1"
+        relative_xp = settings.get("rank_relative_xp", "1") != "0"
+
+        data = await get_user_xp_data(member.id)
         
         # Sync profile on rank check
         await sync_user_profile(member.id, member.display_name, str(member.display_avatar.url))
@@ -352,15 +368,24 @@ class LevelingCog(commands.Cog):
         
         # Multipliers
         user_multiplier = 1.0
-        multipliers = await get_level_multipliers()
         active_mults = []
-        for target_id, mult in multipliers.items():
-            if any(role.id == int(target_id) for role in member.roles):
-                user_multiplier *= mult
-                active_mults.append(f"{mult}x (Role)")
-            elif interaction.channel.id == int(target_id):
-                user_multiplier *= mult
-                active_mults.append(f"{mult}x (Channel)")
+        if not hide_mults:
+            multipliers = await get_level_multipliers()
+            for target_id, mult in multipliers.items():
+                if any(role.id == int(target_id) for role in member.roles):
+                    user_multiplier *= mult
+                    active_mults.append(f"{mult}x (Role)")
+                elif interaction.channel.id == int(target_id):
+                    user_multiplier *= mult
+                    active_mults.append(f"{mult}x (Channel)")
+        else:
+            # We still need user_multiplier for 'messages to go' accuracy, just hide display
+            multipliers = await get_level_multipliers()
+            for target_id, mult in multipliers.items():
+                if any(role.id == int(target_id) for role in member.roles):
+                    user_multiplier *= mult
+                elif interaction.channel.id == int(target_id):
+                    user_multiplier *= mult
 
         # Cooldown
         last_xp = data.get("last_xp_time", 0)
@@ -386,15 +411,23 @@ class LevelingCog(commands.Cog):
         )
         embed.set_thumbnail(url=member.display_avatar.url)
         
-        # row 1
-        embed.add_field(name="✨ XP", value=f"{data['xp']:,} (lv. {current_level})", inline=True)
-        embed.add_field(name="⏩ Next Level", value=f"{int(progress_xp):,}/{int(needed_xp):,}\n({int(remaining_xp):,} more)", inline=True)
-        embed.add_field(name="🕒 Cooldown", value=cooldown_status, inline=True)
+        # row 1: XP field label changes based on relative_xp setting
+        if relative_xp:
+            # Show "progress_xp / needed_xp" (relative to current level)
+            embed.add_field(name="✨ Level", value=str(current_level), inline=True)
+            embed.add_field(name="⏩ Progress", value=f"{int(progress_xp):,}/{int(needed_xp):,} XP\n({int(remaining_xp):,} to go)", inline=True)
+        else:
+            # Show raw total XP
+            embed.add_field(name="✨ XP", value=f"{data['xp']:,} (lv. {current_level})", inline=True)
+            embed.add_field(name="⏩ Next Level", value=f"{int(progress_xp):,}/{int(needed_xp):,}\n({int(remaining_xp):,} more)", inline=True)
+
+        if not hide_cooldown:
+            embed.add_field(name="🕒 Cooldown", value=cooldown_status, inline=True)
         
         # row 2
         embed.add_field(name="📊 Progress", value=f"`{bar}` ({percentage:.1f}%)\n**{msg_min}-{msg_max} messages to go!**", inline=False)
         
-        if active_mults:
+        if active_mults and not hide_mults:
             embed.set_footer(text=f"Active Multipliers: {', '.join(active_mults)} Total: {user_multiplier:.2f}x")
 
         # Sync warning: check if member is missing earned reward roles
@@ -409,7 +442,7 @@ class LevelingCog(commands.Cog):
                     inline=False
                 )
 
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed, ephemeral=is_ephemeral)
 
     @app_commands.command(name="rolesync", description="Sync your level reward roles")
     async def rolesync(self, interaction: discord.Interaction):

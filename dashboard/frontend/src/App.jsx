@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   Home, Sparkles, Gift, Layers, Database, 
-  Settings, TrendingUp, Users, Trophy, Trash2, Plus, Save, Download, RefreshCw, Bell, Info, Mail
+  Settings, TrendingUp, Users, Trophy, Trash2, Plus, Save, Download, RefreshCw, Bell, Info, Mail, CreditCard
 } from 'lucide-react';
 
 const API_BASE = window.location.origin;
@@ -159,6 +159,7 @@ function App() {
     { id: 'xp', icon: Sparkles, label: 'XP Gain' },
     { id: 'notifications', icon: Bell, label: 'Notifications' },
     { id: 'rewards', icon: Gift, label: 'Reward Roles' },
+    { id: 'rank', icon: CreditCard, label: 'Rank Card' },
     { id: 'multipliers', icon: Layers, label: 'Multipliers' },
     { id: 'data', icon: Database, label: 'Data Management' },
   ];
@@ -624,6 +625,100 @@ function App() {
                     <div className="toggle-handle"></div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'rank' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* Header Card */}
+            <div className="card">
+              <h2 style={{ marginBottom: '0.25rem' }}>Rank Card</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Tweak the details shown on rank cards.</p>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Some settings may also apply to the online leaderboard.</p>
+              <button className="btn btn-primary" style={{ width: 'fit-content', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.35)', color: 'var(--accent)' }} onClick={() => setActiveTab('home')}>
+                Visit leaderboard
+              </button>
+
+              <div style={{ height: '1px', background: 'rgba(255,255,255,0.07)', margin: '1.5rem 0' }} />
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ margin: 0 }}>Enable rank cards</h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.35rem 0 0 0' }}>
+                    Allows members to check their XP with /rank. Disabling this will also hide most info in /calculate.
+                  </p>
+                </div>
+                <div
+                  className={`toggle ${settings.rank_enabled !== '0' ? 'active' : ''}`}
+                  onClick={() => updateSetting('rank_enabled', settings.rank_enabled === '0' ? '1' : '0')}
+                >
+                  <div className="toggle-handle"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2-col grid of options */}
+            <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              <div className="card">
+                <h3 style={{ marginBottom: '0.4rem' }}>Hide cooldown</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', minHeight: '2.5rem' }}>
+                  Prevents members from viewing the amount of time until they can gain XP again.
+                </p>
+                <div
+                  className={`toggle ${settings.rank_hide_cooldown === '1' ? 'active' : ''}`}
+                  onClick={() => updateSetting('rank_hide_cooldown', settings.rank_hide_cooldown === '1' ? '0' : '1')}
+                >
+                  <div className="toggle-handle"></div>
+                </div>
+              </div>
+
+              <div className="card">
+                <h3 style={{ marginBottom: '0.4rem' }}>Hide multipliers</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', minHeight: '2.5rem' }}>
+                  Prevents members from viewing which roles have multipliers. (except 0x)
+                </p>
+                <div
+                  className={`toggle ${settings.rank_hide_multipliers === '1' ? 'active' : ''}`}
+                  onClick={() => updateSetting('rank_hide_multipliers', settings.rank_hide_multipliers === '1' ? '0' : '1')}
+                >
+                  <div className="toggle-handle"></div>
+                </div>
+              </div>
+
+              <div className="card">
+                <h3 style={{ marginBottom: '0.4rem' }}>Force hidden</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', minHeight: '2.5rem' }}>
+                  Forces usages of /rank to always be hidden (ephemeral), meaning that only the member who typed the command can see the message.
+                </p>
+                <div
+                  className={`toggle ${settings.rank_force_hidden === '1' ? 'active' : ''}`}
+                  onClick={() => updateSetting('rank_force_hidden', settings.rank_force_hidden === '1' ? '0' : '1')}
+                >
+                  <div className="toggle-handle"></div>
+                </div>
+              </div>
+
+              <div className="card">
+                <h3 style={{ marginBottom: '0.4rem' }}>Relative XP</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', minHeight: '2.5rem' }}>
+                  Changes the 'next level' section of /rank to start at 0 and only include XP from that level. e.g. If level 10 requires 2000 XP and level 11 requires 3000, it will display "500/1000 XP until level 11" for a member with 2500 XP.
+                </p>
+                <div
+                  className={`toggle ${settings.rank_relative_xp !== '0' ? 'active' : ''}`}
+                  onClick={() => updateSetting('rank_relative_xp', settings.rank_relative_xp === '0' ? '1' : '0')}
+                >
+                  <div className="toggle-handle"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Customization placeholder */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              <div className="card" style={{ opacity: 0.6 }}>
+                <h3 style={{ marginBottom: '0.4rem' }}>Rank card customization</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Not my problem anymore lol</p>
               </div>
             </div>
           </div>
