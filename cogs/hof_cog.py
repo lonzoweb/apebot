@@ -610,14 +610,34 @@ class HofCog(commands.Cog):
     async def slash_random(self, interaction: discord.Interaction):
         async with get_db() as conn:
             async with conn.execute(
-                "SELECT jump_url FROM hof_entries WHERE hof_message_id IS NOT NULL ORDER BY RANDOM() LIMIT 1"
+                "SELECT author_id, star_count, content, image_url, jump_url "
+                "FROM hof_entries WHERE hof_message_id IS NOT NULL ORDER BY RANDOM() LIMIT 1"
             ) as cur:
                 row = await cur.fetchone()
-        
+
         if not row:
             return await interaction.response.send_message("❌ The Hall of Fame is empty.", ephemeral=True)
-        
-        await interaction.response.send_message(f"🎲 **Random Pick:** {row[0]}")
+
+        author_id, star_count, content, image_url, jump_url = row
+        member = interaction.guild.get_member(int(author_id))
+        if member is None:
+            try:
+                member = await self.bot.fetch_user(int(author_id))
+            except Exception:
+                member = None
+
+        embed = discord.Embed(
+            description=content[:4090] if content else "*[no text]*",
+            color=0xFFD700,
+        )
+        if member:
+            embed.set_author(name=getattr(member, "display_name", str(member)), icon_url=member.display_avatar.url)
+        if image_url:
+            embed.set_image(url=image_url)
+        embed.set_footer(text=f"⭐ {star_count} total reactions")
+
+        view = _jump_view(jump_url) if jump_url else None
+        await interaction.response.send_message(embed=embed, view=view)
 
     @hall_group.command(name="search", description="Search the Hall of Fame by keyword")
     @app_commands.describe(query="Keywords to search for")
@@ -808,7 +828,40 @@ async def force_to_hof_context_menu(interaction: discord.Interaction, message: d
     """Right-click context menu: force any message into the Hall of Fame."""
     await _force_to_hof(interaction, message)
 
+
+@app_commands.context_menu(name="Trash from Hall of Fame")
+@app_commands.default_permissions(administrator=True)
+async def trash_from_hof_context_menu(interaction: discord.Interaction, message: discord.Message):
+    """Right-click context menu: remove a message from the Hall of Fame and blacklist it."""
+    if not interaction.user.guild_permissions.administrator:
+        return await interaction.response.send_message("🚫 Admins only.", ephemeral=True)
+
+    s = await _get_settings(interaction.guild_id)
+    msg_id = str(message.id)
+
+    trashed = s["trashed_messages"]
+    if msg_id not in trashed:
+        trashed.append(msg_id)
+    await _set_settings(interaction.guild_id, trashed_messages=trashed)
+
+    entry = await _get_entry(message.id)
+    if entry and entry[3] and s["channel_id"]:
+        hof_ch = interaction.guild.get_channel(int(s["channel_id"]))
+        if hof_ch:
+            try:
+                await (await hof_ch.fetch_message(int(entry[3]))).delete()
+            except discord.NotFound:
+                pass
+        await _upsert_entry(message.id, entry[1], entry[2], None, entry[4], entry[5], entry[6], entry[7])
+
+    await interaction.response.send_message(
+        f"🗑️ **{message.author.display_name}'s** message removed from the Hall of Fame and blacklisted.",
+        ephemeral=True,
+    )
+
+
 async def setup(bot: commands.Bot):
     cog = HofCog(bot)
     await bot.add_cog(cog)
     bot.tree.add_command(force_to_hof_context_menu)
+    bot.tree.add_command(trash_from_hof_context_menu)
