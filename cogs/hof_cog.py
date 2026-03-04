@@ -622,13 +622,56 @@ class HofCog(commands.Cog):
         async with get_db() as conn:
             async with conn.execute(
                 "SELECT author_id, star_count, content, image_url, jump_url "
-                "FROM hof_entries WHERE hof_message_id IS NOT NULL ORDER BY RANDOM() LIMIT 1"
+                "FROM hof_entries "
+                "WHERE hof_message_id IS NOT NULL AND star_count > 0 "
+                "ORDER BY RANDOM() LIMIT 1"
             ) as cur:
                 row = await cur.fetchone()
 
         if not row:
             return await interaction.response.send_message("❌ The Hall of Fame is empty.", ephemeral=True)
 
+        await self._send_hof_embed(interaction, row)
+
+    @hall_group.command(name="lost", description="Show a random near-miss — reacted but never made it to the Hall")
+    async def slash_lost(self, interaction: discord.Interaction):
+        async with get_db() as conn:
+            async with conn.execute(
+                "SELECT author_id, star_count, content, image_url, jump_url "
+                "FROM hof_entries "
+                "WHERE hof_message_id IS NULL AND star_count >= 2 "
+                "ORDER BY RANDOM() LIMIT 1"
+            ) as cur:
+                row = await cur.fetchone()
+
+        if not row:
+            return await interaction.response.send_message(
+                "❌ No near-miss entries found yet.", ephemeral=True
+            )
+
+        author_id, star_count, content, image_url, jump_url = row
+        member = interaction.guild.get_member(int(author_id))
+        if member is None:
+            try:
+                member = await self.bot.fetch_user(int(author_id))
+            except Exception:
+                member = None
+
+        embed = discord.Embed(
+            description=content[:4090] if content else "*[no text]*",
+            color=0x808080,  # Grey — almost made it
+        )
+        if member:
+            embed.set_author(name=getattr(member, "display_name", str(member)), icon_url=member.display_avatar.url)
+        if image_url:
+            embed.set_image(url=image_url)
+        embed.set_footer(text=f"💀 {star_count} reaction(s) — no cigar")
+
+        view = _jump_view(jump_url) if jump_url else None
+        await interaction.response.send_message(embed=embed, view=view)
+
+    async def _send_hof_embed(self, interaction: discord.Interaction, row):
+        """Shared helper to build and send a gold HOF embed from a DB row."""
         author_id, star_count, content, image_url, jump_url = row
         member = interaction.guild.get_member(int(author_id))
         if member is None:
