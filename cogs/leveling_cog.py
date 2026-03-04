@@ -8,9 +8,10 @@ import logging
 import json
 import io
 from database import (
-    get_user_xp_data, update_user_xp, get_level_settings, 
-    get_level_multipliers, get_reward_roles, get_top_levels,
-    set_level_setting, set_reward_role, set_level_multiplier
+    get_db, update_user_xp, get_user_xp_data, get_top_levels, 
+    get_level_settings, get_level_multipliers, get_reward_roles,
+    sync_user_profile, calculate_level_for_xp,
+    set_level_setting, sync_server_roles
 )
 
 logger = logging.getLogger(__name__)
@@ -19,24 +20,83 @@ class LevelingCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.xp_cooldowns = {} # user_id -> last_xp_time
+        self.profile_sync_times = {} # user_id -> last_sync_time
+        
+        # Performance Cache
+        self.cache = {
+            "settings": {},
+            "multipliers": {},
+            "rewards": [],
+            "last_refresh": 0
+        }
+        
         self.bot.loop.create_task(self.initialize_settings())
 
     async def initialize_settings(self):
-        """Populate default Polaris settings if empty."""
+        """Populate default Polaris settings and notification templates if empty."""
         settings = await get_level_settings()
-        if not settings:
-            defaults = {
-                "c3": "1",
-                "c2": "50",
-                "c1": "100",
-                "rounding": "100",
-                "xp_min": "15",
-                "xp_max": "25",
-                "cooldown": "60"
-            }
-            for k, v in defaults.items():
+        defaults = {
+            "c3": "1", "c2": "50", "c1": "100", "rounding": "100",
+            "xp_min": "15", "xp_max": "25", "cooldown": "60",
+            # Message Settings
+            "lvl_msg_enabled": "1",
+            "lvl_msg_template": "Bravo [[DISPLAYNAME]], you've advanced to level [[LEVEL]] in [[SERVER]]!",
+            "lvl_msg_channel": "dm", # "dm" or "target_channel_id"
+            "lvl_msg_embed": "1",
+            "lvl_msg_interval": "1", # every X levels (1 = all)
+            "lvl_msg_reward_only": "0", # only msg on reward roles
+            "lvl_msg_interval_stop": "0" # stop intervals after level X
+        }
+        for k, v in defaults.items():
+            if k not in settings:
                 await set_level_setting(k, v)
-            logger.info("Initialized default Leveling settings (Polaris).")
+        logger.info("Initialized Leveling settings.")
+        
+        # Initial cache populate
+        await self.refresh_cache_now()
+        
+        # Start background tasks
+        self.bot.loop.create_task(self.role_sync_task())
+        self.bot.loop.create_task(self.cache_refresh_task())
+
+    async def refresh_cache_now(self):
+        """Forces an absolute refresh of the memory cache."""
+        try:
+            self.cache["settings"] = await get_level_settings()
+            self.cache["multipliers"] = await get_level_multipliers()
+            self.cache["rewards"] = await get_reward_roles()
+            self.cache["last_refresh"] = time.time()
+            logger.debug("Leveling Cache Refreshed.")
+        except Exception as e:
+            logger.error(f"Failed to refresh leveling cache: {e}")
+
+    async def cache_refresh_task(self):
+        """Periodically refresh the settings cache to stay in sync with Dashboard."""
+        await self.bot.wait_until_ready()
+        while not self.bot.is_closed():
+            await asyncio.sleep(300) # Every 5 minutes
+            await self.refresh_cache_now()
+
+    async def role_sync_task(self):
+        """Periodically sync server roles to cache for the dashboard."""
+        await self.bot.wait_until_ready()
+        while not self.bot.is_closed():
+            try:
+                for guild in self.bot.guilds:
+                    roles_data = []
+                    for role in guild.roles:
+                        if role.is_default(): continue # Skip @everyone
+                        roles_data.append((
+                            str(role.id), 
+                            role.name, 
+                            str(role.color), 
+                            role.position
+                        ))
+                    await sync_server_roles(roles_data)
+                logger.debug("Synced server roles to cache.")
+            except Exception as e:
+                logger.error(f"Error syncing roles: {e}")
+            await asyncio.sleep(3600) # Sync every hour
 
     def calculate_xp_for_level(self, level, settings):
         """
@@ -73,103 +133,232 @@ class LevelingCog(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        # XP Cooldown (Default 60s)
-        settings = await get_level_settings()
-        cooldown = int(settings.get("cooldown", 60))
+        settings = self.cache["settings"]
+        data = await get_user_xp_data(message.author.id)
         
-        now = time.time()
-        user_data = await get_user_xp_data(message.author.id)
-        last_xp_time = user_data["last_xp_time"]
-        
-        if now - last_xp_time < cooldown:
+        # XP Cooldown Check
+        cooldown = data.get("last_xp_time", 0)
+        cd_setting = float(settings.get("cooldown", 60))
+        if cooldown and (time.time() - cooldown) < cd_setting:
             return
 
-        # XP Gain (Default 15-25)
-        xp_min = int(settings.get("xp_min", 15))
-        xp_max = int(settings.get("xp_max", 25))
-        base_xp = random.randint(xp_min, xp_max)
+        # Base XP calculation
+        xp_min = float(settings.get("xp_min", 15))
+        xp_max = float(settings.get("xp_max", 25))
+        base_xp = random.randint(int(xp_min), int(xp_max))
         
-        xp_gain = await self.get_multiplied_xp(message, base_xp)
+        # Multiplier check
+        final_multiplier = 1.0
+        multipliers = self.cache["multipliers"]
+        for target_id, mult in multipliers.items():
+            if message.channel.id == int(target_id):
+                final_multiplier *= mult
+            elif any(role.id == int(target_id) for role in message.author.roles):
+                final_multiplier *= mult
+                
+        added_xp = int(base_xp * final_multiplier)
+        new_xp = data["xp"] + added_xp
         
-        new_xp = user_data["xp"] + xp_gain
-        current_level = user_data["level"]
-        
-        # Check level up
-        next_level_req = self.calculate_xp_for_level(current_level + 1, settings)
-        
-        leveled_up = False
-        while new_xp >= next_level_req:
-            current_level += 1
-            leveled_up = True
-            next_level_req = self.calculate_xp_for_level(current_level + 1, settings)
+        # Level calculation
+        c3 = float(settings.get("c3", 1))
+        c2 = float(settings.get("c2", 50))
+        c1 = float(settings.get("c1", 100))
+        rounding = int(settings.get("rounding", 100))
 
-        await update_user_xp(message.author.id, new_xp, current_level, now)
-
-        if leveled_up:
-            await self.handle_level_up(message, current_level)
-
-    async def handle_level_up(self, message, new_level):
-        # 1. Notify User
-        embed = discord.Embed(
-            title="✨ LEVEL UP!",
-            description=f"{message.author.mention}, you've ascended to **Level {new_level}**!",
-            color=discord.Color.gold()
-        )
-        await message.channel.send(embed=embed)
+        new_level = calculate_level_for_xp(new_xp, c3, c2, c1, rounding)
         
-        # 2. Reward Roles
-        rewards = await get_reward_roles()
-        role_id = rewards.get(new_level)
-        if role_id:
-            role = message.guild.get_role(int(role_id))
-            if role and role not in message.author.roles:
+        if new_level > data["level"]:
+            await self.handle_level_up(message, new_level, settings)
+            
+        await update_user_xp(message.author.id, new_xp, new_level, int(time.time()))
+        
+        # OPTIMIZED: Sync profile ONLY once every 12 hours or if missing
+        last_sync = self.profile_sync_times.get(message.author.id, 0)
+        if (time.time() - last_sync) > 43200: # 12 Hours
+            await sync_user_profile(
+                message.author.id, 
+                message.author.display_name, 
+                str(message.author.display_avatar.url)
+            )
+            self.profile_sync_times[message.author.id] = time.time()
+
+    async def handle_level_up(self, message, new_level, settings):
+        # 1. Reward Roles Logic
+        rewards = self.cache["rewards"]
+        new_reward = next((r for r in rewards if r["level"] == new_level), None)
+        earned_reward = False
+
+        if new_reward:
+            role = message.guild.get_role(int(new_reward["role_id"]))
+            if role:
                 try:
-                    await message.author.add_roles(role, reason=f"Level {new_level} Reward")
+                    # Add new role
+                    if role not in message.author.roles:
+                        await message.author.add_roles(role, reason=f"Level {new_level} Reward")
+                        earned_reward = True
+                    
+                    # Replace old roles if stacking is disabled for this level
+                    if not new_reward["stack_role"]:
+                        # Find other reward roles that should be removed
+                        to_remove = []
+                        for r in rewards:
+                            if r["level"] < new_level:
+                                old_role = message.guild.get_role(int(r["role_id"]))
+                                if old_role and old_role in message.author.roles:
+                                    to_remove.append(old_role)
+                        if to_remove:
+                            await message.author.remove_roles(*to_remove, reason="Level Role Replacement")
                 except discord.Forbidden:
-                    logger.warning(f"Failed to add reward role {role.name} to {message.author.name}")
+                    logger.warning(f"Forbidden: Cannot manage roles for {message.author}")
+
+        # 2. Notification Logic
+        if settings.get("lvl_msg_enabled") != "1":
+            return
+
+        # Filtering
+        interval = int(settings.get("lvl_msg_interval", 1))
+        stop_at = int(settings.get("lvl_msg_interval_stop", 0))
+        reward_only = settings.get("lvl_msg_reward_only") == "1"
+
+        should_notify = True
+        if reward_only and not earned_reward:
+            should_notify = False
+        elif interval > 1:
+            if stop_at > 0 and new_level > stop_at:
+                should_notify = True # All levels after stop_at
+            elif new_level % interval != 0:
+                should_notify = False
+
+        if not should_notify:
+            return
+
+        # Prepare message
+        template = settings.get("lvl_msg_template", "Level up!")
+        content = template.replace("[[DISPLAYNAME]]", message.author.display_name)\
+                          .replace("[[LEVEL]]", str(new_level))\
+                          .replace("[[SERVER]]", message.guild.name)
+
+        target = settings.get("lvl_msg_channel", "dm")
+        is_embed = settings.get("lvl_msg_embed") == "1"
+
+        msg_kwargs = {}
+        if is_embed:
+            embed = discord.Embed(title="✨ Level Up!", description=content, color=discord.Color.gold())
+            embed.set_thumbnail(url=message.author.display_avatar.url)
+            msg_kwargs["embed"] = embed
+        else:
+            msg_kwargs["content"] = content
+
+        try:
+            if target == "dm":
+                await message.author.send(**msg_kwargs)
+            else:
+                channel = message.guild.get_channel(int(target))
+                if channel:
+                    await channel.send(**msg_kwargs)
+                else:
+                    await message.channel.send(**msg_kwargs)
+        except Exception:
+            pass # Silently fail if DMs closed
 
     @app_commands.command(name="rank", description="Check your current level and XP")
-    @app_commands.describe(member="The member to check")
     async def rank_slash(self, interaction: discord.Interaction, member: discord.Member = None):
-        target = member or interaction.user
-        data = await get_user_xp_data(target.id)
+        member = member or interaction.user
+        data = await get_user_xp_data(member.id)
         settings = await get_level_settings()
         
-        current_xp = data["xp"]
-        current_level = data["level"]
-        xp_next = self.calculate_xp_for_level(current_level + 1, settings)
-        xp_prev = self.calculate_xp_for_level(current_level, settings)
+        # Sync profile on rank check
+        await sync_user_profile(member.id, member.display_name, str(member.display_avatar.url))
         
-        # XP in current level
-        level_xp = current_xp - xp_prev
-        req_xp = xp_next - xp_prev
+        # Formula variables
+        c3 = float(settings.get("c3", 1))
+        c2 = float(settings.get("c2", 50))
+        c1 = float(settings.get("c1", 100))
+        r = int(settings.get("rounding", 100))
         
-        percentage = min(100, int((level_xp / req_xp) * 100)) if req_xp > 0 else 100
+        # Ensure level is correct (Recalculate in case of 0 from import)
+        current_level = calculate_level_for_xp(data["xp"], c3, c2, c1, r)
         
-        embed = discord.Embed(title=f"Rank: {target.display_name}", color=discord.Color.blue())
-        embed.set_thumbnail(url=target.display_avatar.url)
-        embed.add_field(name="Level", value=f"**{current_level}**", inline=True)
-        embed.add_field(name="Total XP", value=f"{current_xp:,}", inline=True)
-        embed.add_field(name="Progress", value=f"{level_xp:,} / {req_xp:,} XP ({percentage}%)", inline=False)
+        # XP for current level start and next level start
+        def get_xp_for_l(L):
+            val = (c3 * (L**3) + c2 * (L**2) + c1 * L)
+            return round(val / r) * r if r > 0 else val
+
+        xp_current_start = get_xp_for_l(current_level)
+        xp_next_start = get_xp_for_l(current_level + 1)
         
+        progress_xp = data["xp"] - xp_current_start
+        needed_xp = xp_next_start - xp_current_start
+        remaining_xp = xp_next_start - data["xp"]
+        
+        percentage = min(100, max(0, (progress_xp / needed_xp) * 100)) if needed_xp > 0 else 100
+        
+        # Multipliers
+        user_multiplier = 1.0
+        multipliers = await get_level_multipliers()
+        active_mults = []
+        for target_id, mult in multipliers.items():
+            if any(role.id == int(target_id) for role in member.roles):
+                user_multiplier *= mult
+                active_mults.append(f"{mult}x (Role)")
+            elif interaction.channel.id == int(target_id):
+                user_multiplier *= mult
+                active_mults.append(f"{mult}x (Channel)")
+
+        # Cooldown
+        last_xp = data.get("last_xp_time", 0)
+        time_since = time.time() - last_xp
+        cd_val = float(settings.get("cooldown", 60))
+        cooldown_status = "None!" if time_since >= cd_val else f"{int(cd_val - time_since)}s"
+
+        # Messages to go
+        xp_min_setting = float(settings.get("xp_min", 15))
+        xp_max_setting = float(settings.get("xp_max", 25))
+        avg_xp = (xp_min_setting + xp_max_setting) / 2 * user_multiplier
+        msg_min = int(remaining_xp / (xp_max_setting * user_multiplier)) if (xp_max_setting * user_multiplier) > 0 else 0
+        msg_max = int(remaining_xp / (xp_min_setting * user_multiplier)) if (xp_min_setting * user_multiplier) > 0 else 0
+        
+        # Progress Bar
+        bar_len = 20
+        filled = int((percentage / 100) * bar_len)
+        bar = "█" * filled + "░" * (bar_len - filled)
+
+        embed = discord.Embed(
+            title=f"✨ {member.display_name}'s Progress",
+            color=member.color
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        
+        # row 1
+        embed.add_field(name="✨ XP", value=f"{data['xp']:,} (lv. {current_level})", inline=True)
+        embed.add_field(name="⏩ Next Level", value=f"{int(progress_xp):,}/{int(needed_xp):,}\n({int(remaining_xp):,} more)", inline=True)
+        embed.add_field(name="🕒 Cooldown", value=cooldown_status, inline=True)
+        
+        # row 2
+        embed.add_field(name="📊 Progress", value=f"`{bar}` ({percentage:.1f}%)\n**{msg_min}-{msg_max} messages to go!**", inline=False)
+        
+        if active_mults:
+            embed.set_footer(text=f"Active Multipliers: {', '.join(active_mults)} Total: {user_multiplier:.2f}x")
+
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="leaderboard", description="View the highest level users")
+    @app_commands.command(name="leaderboard", description="View the top 25 users")
     async def leaderboard_slash(self, interaction: discord.Interaction):
-        top_users = await get_top_levels(10)
+        top_users = await get_top_levels(25)
         
         if not top_users:
-            return await interaction.response.send_message("The halls are empty. No one has claimed any XP yet.")
+            return await interaction.response.send_message("The leaderboard is empty!")
 
-        lines = []
+        description = ""
         for i, (user_id, xp, level) in enumerate(top_users, 1):
-            user = self.bot.get_user(int(user_id))
-            name = user.name if user else f"User {user_id}"
-            lines.append(f"**{i}. {name}** — Lvl {level} ({xp:,} XP)")
-            
+            member = interaction.guild.get_member(int(user_id))
+            name = member.display_name if member else f"User {user_id}"
+            emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"`{i}.`"
+            description += f"{emoji} **{name}** - Level {level} ({xp:,} XP)\n"
+
         embed = discord.Embed(
-            title="🏆 GLOBAL LEADERBOARD",
-            description="\n".join(lines),
+            title="🏆 Global Leaderboard (Top 25)",
+            description=description,
             color=discord.Color.gold()
         )
         await interaction.response.send_message(embed=embed)

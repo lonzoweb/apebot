@@ -259,7 +259,6 @@ async def init_db():
                 """
             )
 
-            # 📈 Leveling System — Users XP
             await conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS users_xp (
@@ -270,6 +269,8 @@ async def init_db():
                 )
                 """
             )
+            # 🚀 Optimization: Index for Leaderboard
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_xp_leaderboard ON users_xp (level DESC, xp DESC)")
 
             # ⚙️ Leveling System — Settings (Coefficients, Rounding, Range, etc.)
             await conn.execute(
@@ -292,15 +293,36 @@ async def init_db():
             )
 
             # 🎁 Leveling System — Reward Roles
+            # Migration check: add stack_role if missing
+            async with conn.execute("PRAGMA table_info(reward_roles)") as cursor:
+                columns = [row[1] for row in await cursor.fetchall()]
+                if columns and "stack_role" not in columns:
+                    logger.info("Adding stack_role to reward_roles...")
+                    await conn.execute("ALTER TABLE reward_roles ADD COLUMN stack_role INTEGER DEFAULT 1")
+
             await conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS reward_roles (
                     level INTEGER PRIMARY KEY,
-                    role_id TEXT NOT NULL
+                    role_id TEXT NOT NULL,
+                    stack_role INTEGER DEFAULT 1
                 )
                 """
             )
 
+            # 🏷️ Leveling System — Server Roles Cache (For Dashboard)
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS server_roles_cache (
+                    role_id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    color TEXT,
+                    position INTEGER
+                )
+                """
+            )
+
+            await conn.commit()
         logger.info("✅ Database tables initialized (all modules unified).")
     except Exception as e:
         logger.error(f"Error initializing database: {e}", exc_info=True)
@@ -1313,20 +1335,20 @@ async def remove_level_multiplier(target_id: str):
         await conn.execute("DELETE FROM level_multipliers WHERE target_id = ?", (target_id,))
 
 
-async def get_reward_roles() -> dict:
-    """Returns all level-role rewards."""
+async def get_reward_roles() -> list:
+    """Returns list of all level-role rewards with stacking info."""
     async with get_db() as conn:
-        async with conn.execute("SELECT level, role_id FROM reward_roles") as cursor:
+        async with conn.execute("SELECT level, role_id, stack_role FROM reward_roles") as cursor:
             rows = await cursor.fetchall()
-            return {row[0]: row[1] for row in rows}
+            return [{"level": row[0], "role_id": row[1], "stack_role": bool(row[2])} for row in rows]
 
 
-async def set_reward_role(level: int, role_id: str):
+async def set_reward_role(level: int, role_id: str, stack_role: int = 1):
     """Sets a role reward for a specific level."""
     async with get_db() as conn:
         await conn.execute(
-            "INSERT OR REPLACE INTO reward_roles (level, role_id) VALUES (?, ?)",
-            (level, role_id),
+            "INSERT OR REPLACE INTO reward_roles (level, role_id, stack_role) VALUES (?, ?, ?)",
+            (level, role_id, stack_role),
         )
 
 
@@ -1344,3 +1366,67 @@ async def get_top_levels(limit: int = 50) -> list:
             (limit,),
         ) as cursor:
             return await cursor.fetchall()
+
+# ============================================================
+# SERVER ROLES CACHE (For Dashboard)
+# ============================================================
+
+async def sync_server_roles(roles_data: list):
+    """Update the cache of server roles. roles_data is list of (role_id, name, color, position)."""
+    async with get_db() as conn:
+        # Clear old cache for this server
+        await conn.execute("DELETE FROM server_roles_cache")
+        await conn.executemany(
+            "INSERT INTO server_roles_cache (role_id, name, color, position) VALUES (?, ?, ?, ?)",
+            roles_data
+        )
+        await conn.commit()
+
+async def get_cached_roles() -> dict:
+    """Returns dict of role_id -> {name, color, position}."""
+    async with get_db() as conn:
+        async with conn.execute("SELECT role_id, name, color, position FROM server_roles_cache") as cursor:
+            rows = await cursor.fetchall()
+            return {row[0]: {"name": row[1], "color": row[2], "position": row[3]} for row in rows}
+
+# ============================================================
+# USER PROFILE CACHE (For Dashboard)
+# ============================================================
+
+async def sync_user_profile(user_id: int, username: str, avatar_url: str):
+    """Update or insert a user's profile info into the cache."""
+    async with get_db() as conn:
+        await conn.execute(
+            """
+            INSERT INTO user_profile_cache (user_id, username, avatar_url, last_updated)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                username = excluded.username,
+                avatar_url = excluded.avatar_url,
+                last_updated = excluded.last_updated
+            """,
+            (str(user_id), username, avatar_url, int(time.time()))
+        )
+
+# ============================================================
+# LEVELING CALCULATIONS
+# ============================================================
+
+def calculate_level_for_xp(xp: int, c3: float, c2: float, c1: float, rounding: int) -> int:
+    """Calculate level from XP using the cubic formula."""
+    if xp <= 0: return 0
+    
+    # Simple iterative approach as solving cubic is complex and L is usually small (0-150)
+    level = 0
+    while True:
+        L = level + 1
+        req = (c3 * (L**3) + c2 * (L**2) + c1 * L)
+        if rounding > 0:
+            req = round(req / rounding) * rounding
+        
+        if xp >= req:
+            level += 1
+        else:
+            break
+            
+    return level

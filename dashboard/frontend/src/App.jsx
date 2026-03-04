@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   Home, Sparkles, Gift, Layers, Database, 
-  Settings, TrendingUp, Users, Trophy, Trash2, Plus, Save, Download, RefreshCw
+  Settings, TrendingUp, Users, Trophy, Trash2, Plus, Save, Download, RefreshCw, Bell, Info, Mail
 } from 'lucide-react';
 
 const API_BASE = window.location.origin;
@@ -23,11 +23,12 @@ function App() {
   const [rewards, setRewards] = useState([]);
   const [multipliers, setMultipliers] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [roles, setRoles] = useState({});
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
   // Form states for new entries
-  const [newReward, setNewReward] = useState({ level: '', role_id: '' });
+  const [newReward, setNewReward] = useState({ level: '', role_id: '', stack_role: true });
   const [newMultiplier, setNewMultiplier] = useState({ target_id: '', multiplier: '1.5' });
 
   useEffect(() => {
@@ -37,18 +38,20 @@ function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [sRes, setRes, rRes, mRes, lRes] = await Promise.all([
+      const [sRes, setRes, rRes, mRes, lRes, rlRes] = await Promise.all([
         axios.get(`${API_BASE}/stats`),
         axios.get(`${API_BASE}/settings`),
         axios.get(`${API_BASE}/rewards`),
         axios.get(`${API_BASE}/multipliers`),
         axios.get(`${API_BASE}/leaderboard`),
+        axios.get(`${API_BASE}/roles`),
       ]);
       setStats(sRes.data);
       setSettings(setRes.data);
       setRewards(rRes.data);
       setMultipliers(mRes.data);
       setLeaderboard(lRes.data);
+      setRoles(rlRes.data);
     } catch (err) {
       console.error("Failed to fetch data:", err);
     }
@@ -77,9 +80,10 @@ function App() {
   const addReward = async () => {
     if (!newReward.level || !newReward.role_id) return;
     try {
-      await axios.post(`${API_BASE}/rewards`, newReward);
-      setRewards(prev => [...prev, newReward].sort((a,b) => a.level - b.level));
-      setNewReward({ level: '', role_id: '' });
+      const payload = { ...newReward, stack_role: newReward.stack_role ? 1 : 0 };
+      await axios.post(`${API_BASE}/rewards`, payload);
+      setRewards(prev => [...prev, { ...newReward }].sort((a,b) => a.level - b.level));
+      setNewReward({ level: '', role_id: '', stack_role: true });
     } catch (err) { alert("Failed to add reward"); }
   };
 
@@ -136,9 +140,21 @@ function App() {
     reader.readAsText(file);
   };
 
+  const handleRecalculate = async () => {
+    if (!window.confirm("This will sweep the database and recalculate levels for EVERYONE based on current settings. Proceed?")) return;
+    setSyncing(true);
+    try {
+      const res = await axios.post(`${API_BASE}/recalculate`);
+      alert(`Success! Recalculated levels for ${res.data.count} users.`);
+      fetchData();
+    } catch (err) { alert("Recalculate failed"); }
+    setSyncing(false);
+  };
+
   const navItems = [
     { id: 'home', icon: Home, label: 'Overview' },
     { id: 'xp', icon: Sparkles, label: 'XP Gain' },
+    { id: 'notifications', icon: Bell, label: 'Notifications' },
     { id: 'rewards', icon: Gift, label: 'Reward Roles' },
     { id: 'multipliers', icon: Layers, label: 'Multipliers' },
     { id: 'data', icon: Database, label: 'Data Management' },
@@ -196,13 +212,13 @@ function App() {
               </div>
             </div>
 
-            <h2 style={{ marginBottom: '1.5rem' }}>Global Leaderboard</h2>
+            <h2 style={{ marginBottom: '1.5rem' }}>Global Leaderboard (Top 25)</h2>
             <div className="table-container">
               <table>
                 <thead>
                   <tr>
                     <th>Rank</th>
-                    <th>User ID</th>
+                    <th>User</th>
                     <th>Level</th>
                     <th>Total XP</th>
                   </tr>
@@ -210,8 +226,22 @@ function App() {
                 <tbody>
                   {leaderboard.map((user, i) => (
                     <tr key={user.user_id}>
-                      <td>#{i + 1}</td>
-                      <td><code>{user.user_id}</code></td>
+                      <td style={{ fontWeight: 'bold', color: i < 3 ? 'var(--accent)' : 'inherit' }}>
+                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <img 
+                            src={user.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'} 
+                            alt="" 
+                            style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#2d2d2d' }} 
+                          />
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontWeight: '600' }}>{user.username}</span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{user.user_id}</span>
+                          </div>
+                        </div>
+                      </td>
                       <td><span className="badge badge-success">Level {user.level}</span></td>
                       <td>{user.xp.toLocaleString()}</td>
                     </tr>
@@ -318,55 +348,221 @@ function App() {
           </div>
         )}
 
+        {activeTab === 'notifications' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div className="card">
+              <h2 style={{ marginBottom: '0.5rem' }}>Level up message</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Send an automatic message in the chat when a member levels up. How fun!</p>
+              
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.75rem' }}>
+                <div>
+                  <h4 style={{ margin: 0 }}>Enable message</h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>When enabled, a message or DM will be sent whenever anyone levels up.</p>
+                </div>
+                <div 
+                  className={`toggle ${settings.lvl_msg_enabled === '1' ? 'active' : ''}`}
+                  onClick={() => updateSetting('lvl_msg_enabled', settings.lvl_msg_enabled === '1' ? '0' : '1')}
+                >
+                  <div className="toggle-handle"></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="card">
+              <h2 style={{ marginBottom: '0.5rem' }}>Message</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>The message to send upon levelling up.</p>
+              
+              <textarea 
+                className="input" 
+                style={{ width: '100%', minHeight: '120px', fontFamily: 'monospace', fontSize: '0.9rem', padding: '1rem', marginBottom: '1.5rem' }}
+                value={settings.lvl_msg_template || ''}
+                onChange={(e) => setSettings({ ...settings, lvl_msg_template: e.target.value })}
+                onBlur={(e) => updateSetting('lvl_msg_template', e.target.value)}
+              />
+
+              <div className="grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div>
+                  <label className="label">Variables</label>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Spice up your message with dynamic variables!</p>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {['XP', 'Member', 'Server'].map(v => (
+                      <span key={v} className="badge" style={{ background: 'rgba(255,255,255,0.05)', cursor: 'help' }} title={`[[${v.toUpperCase()}]]`}>{v}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Channel</label>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Which channel should the message be sent in?</p>
+                  <select 
+                    className="input" 
+                    value={settings.lvl_msg_channel || 'dm'}
+                    onChange={(e) => updateSetting('lvl_msg_channel', e.target.value)}
+                  >
+                    <option value="dm">Send in DMs</option>
+                    <option value="current">Current Channel</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <h4 style={{ margin: 0 }}>Embed mode</h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>Send a fancy embed instead of a normal message (advanced!)</p>
+                </div>
+                <div 
+                  className={`toggle ${settings.lvl_msg_embed === '1' ? 'active' : ''}`}
+                  onClick={() => updateSetting('lvl_msg_embed', settings.lvl_msg_embed === '1' ? '0' : '1')}
+                >
+                  <div className="toggle-handle"></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="card">
+              <h2 style={{ marginBottom: '0.5rem' }}>Interval</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>How often the message should be sent (e.g. every 3rd level)</p>
+
+              <div className="grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div className="form-group">
+                  <label className="label">Multiple</label>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Level up messages will only send when reaching a multiple of this number</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span>Every</span>
+                    <input 
+                      className="input" type="number" style={{ width: '80px' }}
+                      value={settings.lvl_msg_interval || 1}
+                      onChange={(e) => updateSetting('lvl_msg_interval', e.target.value)}
+                    />
+                    <span>level(s)</span>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="label">Use multiple until</label>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Once a member reaches this level, the multiple is no longer used (set to 0 to disable)</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span>Level</span>
+                    <input 
+                      className="input" type="number" style={{ width: '80px' }}
+                      value={settings.lvl_msg_interval_stop || 0}
+                      onChange={(e) => updateSetting('lvl_msg_interval_stop', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <h4 style={{ margin: 0 }}>Reward roles only</h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>Only send the level up message when obtaining a new reward role</p>
+                </div>
+                <div 
+                  className={`toggle ${settings.lvl_msg_reward_only === '1' ? 'active' : ''}`}
+                  onClick={() => updateSetting('lvl_msg_reward_only', settings.lvl_msg_reward_only === '1' ? '0' : '1')}
+                >
+                  <div className="toggle-handle"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'rewards' && (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Level</th>
-                  <th>Role ID</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rewards.map(reward => (
-                  <tr key={reward.level}>
-                    <td>Level {reward.level}</td>
-                    <td><code>{reward.role_id}</code></td>
-                    <td>
-                      <button 
-                        className="btn" 
-                        style={{ color: 'var(--danger)', background: 'transparent' }}
-                        onClick={() => deleteReward(reward.level)}
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </td>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div className="card">
+              <h2 style={{ marginBottom: '0.5rem' }}>Reward Roles</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Automatically give roles to members when they reach certain levels. For free.</p>
+              
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', marginBottom: '2rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label className="label">Reward</label>
+                  <input 
+                    className="input" placeholder="Role ID" 
+                    value={newReward.role_id}
+                    onChange={(e) => setNewReward({ ...newReward, role_id: e.target.value })}
+                  />
+                </div>
+                <div style={{ width: '120px' }}>
+                  <label className="label">at level</label>
+                  <input 
+                    className="input" type="number" placeholder="1-1000"
+                    value={newReward.level}
+                    onChange={(e) => setNewReward({ ...newReward, level: e.target.value })}
+                  />
+                </div>
+                <button className="btn btn-primary" onClick={addReward}>Add</button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.75rem' }}>
+                <div 
+                  className={`toggle ${newReward.stack_role ? 'active' : ''}`}
+                  onClick={() => setNewReward({ ...newReward, stack_role: !newReward.stack_role })}
+                >
+                  <div className="toggle-handle"></div>
+                </div>
+                <span>Remove this role when a higher role is obtained</span>
+              </div>
+            </div>
+
+            <h3 style={{ marginBottom: '1rem' }}>Current rewards ({rewards.length})</h3>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Level</th>
+                    <th>Role</th>
+                    <th>Keep</th>
+                    <th>Delete</th>
                   </tr>
-                ))}
-                <tr>
-                  <td>
-                    <input 
-                      className="input" placeholder="Lvl" style={{ width: '80px' }} 
-                      value={newReward.level}
-                      onChange={(e) => setNewReward({ ...newReward, level: e.target.value })}
-                    />
-                  </td>
-                  <td>
-                    <input 
-                      className="input" placeholder="Role ID" 
-                      value={newReward.role_id}
-                      onChange={(e) => setNewReward({ ...newReward, role_id: e.target.value })}
-                    />
-                  </td>
-                  <td>
-                    <button className="btn btn-primary" onClick={addReward}>
-                      <Plus size={18} />
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rewards.map(reward => {
+                    const roleInfo = roles[reward.role_id] || { name: reward.role_id, color: 'inherit' };
+                    return (
+                      <tr key={reward.level}>
+                        <td style={{ fontWeight: 'bold' }}>{reward.level}</td>
+                        <td style={{ color: roleInfo.color !== '0' ? roleInfo.color : 'inherit', fontWeight: 'bold' }}>
+                          {roleInfo.name}
+                        </td>
+                        <td>
+                          <span style={{ color: reward.stack_role ? 'var(--success)' : 'var(--danger)', fontWeight: 'bold' }}>
+                            {reward.stack_role ? 'Yes' : 'No'}
+                          </span>
+                        </td>
+                        <td>
+                          <button 
+                            className="btn" 
+                            style={{ color: 'var(--danger)', background: 'transparent' }}
+                            onClick={() => deleteReward(reward.level)}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="card">
+              <h2 style={{ marginBottom: '0.5rem' }}>Reward Syncing</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>By default, the bot will automatically sync level roles by adding missing ones and removing incorrect ones.</p>
+              
+              <div className="grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div>
+                  <h4 style={{ margin: 0 }}>Automatic syncing</h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0.75rem 0' }}>Choose when the bot should automatically sync level roles</p>
+                  <select className="input" style={{ width: '100%' }}>
+                    <option>On level up</option>
+                  </select>
+                </div>
+                <div>
+                  <h4 style={{ margin: 0 }}>Manual syncing</h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0.75rem 0' }}>If members should be able to manually sync their roles whenever they want</p>
+                  <div className="toggle"><div className="toggle-handle"></div></div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -444,6 +640,15 @@ function App() {
                 <RefreshCw size={18} /> Select & Import
                 <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
               </label>
+            </div>
+            <div className="card">
+              <h3 style={{ marginBottom: '1rem', color: 'var(--accent)' }}>Maintenance</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+                Reconcile XP with Levels for all users based on current curve settings.
+              </p>
+              <button className="btn" style={{ width: '100%', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent)', border: '1px solid rgba(99, 102, 241, 0.2)' }} onClick={handleRecalculate}>
+                <RefreshCw size={18} style={{ marginRight: '0.5rem' }} /> Fix Levels
+              </button>
             </div>
           </div>
         )}

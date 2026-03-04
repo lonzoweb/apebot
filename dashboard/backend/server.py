@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional
 # but better to have standalone DB logic here for safety or import it.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from config import DB_FILE
+from database import calculate_level_for_xp, get_cached_roles
 
 import logging
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ class MultiplierUpdate(BaseModel):
 class RewardUpdate(BaseModel):
     level: int
     role_id: str
+    stack_role: int = 1
 
 @app.get("/stats")
 async def get_stats():
@@ -88,14 +90,17 @@ async def delete_multiplier(target_id: str):
 @app.get("/rewards")
 async def get_rewards():
     async with aiosqlite.connect(DB_FILE) as db:
-        async with db.execute("SELECT level, role_id FROM reward_roles") as cursor:
+        async with db.execute("SELECT level, role_id, stack_role FROM reward_roles") as cursor:
             rows = await cursor.fetchall()
-            return [{"level": row[0], "role_id": row[1]} for row in rows]
+            return [{"level": row[0], "role_id": row[1], "stack_role": bool(row[2])} for row in rows]
 
 @app.post("/rewards")
 async def update_reward(update: RewardUpdate):
     async with aiosqlite.connect(DB_FILE) as db:
-        await db.execute("INSERT OR REPLACE INTO reward_roles (level, role_id) VALUES (?, ?)", (update.level, update.role_id))
+        await db.execute(
+            "INSERT OR REPLACE INTO reward_roles (level, role_id, stack_role) VALUES (?, ?, ?)", 
+            (update.level, update.role_id, update.stack_role)
+        )
         await db.commit()
     return {"status": "ok"}
 
@@ -109,9 +114,30 @@ async def delete_reward(level: int):
 @app.get("/leaderboard")
 async def get_leaderboard(limit: int = 50):
     async with aiosqlite.connect(DB_FILE) as db:
-        async with db.execute("SELECT user_id, xp, level FROM users_xp ORDER BY level DESC, xp DESC LIMIT ?", (limit,)) as cursor:
+        # Join with profile cache to get usernames
+        query = """
+            SELECT u.user_id, u.xp, u.level, p.username, p.avatar_url 
+            FROM users_xp u
+            LEFT JOIN user_profile_cache p ON u.user_id = p.user_id
+            ORDER BY u.level DESC, u.xp DESC 
+            LIMIT ?
+        """
+        async with db.execute(query, (limit,)) as cursor:
             rows = await cursor.fetchall()
-            return [{"user_id": row[0], "xp": row[1], "level": row[2]} for row in rows]
+            return [
+                {
+                    "user_id": row[0], 
+                    "xp": row[1], 
+                    "level": row[2], 
+                    "username": row[3] or f"User {row[0]}", 
+                    "avatar": row[4]
+                } for row in rows
+            ]
+
+@app.get("/roles")
+async def get_roles():
+    """Returns cached server roles for resolution."""
+    return await get_cached_roles()
 
 @app.get("/export")
 async def export_data():
@@ -146,21 +172,28 @@ async def import_data(jsonData: Dict[str, Any]):
         users = jsonData
 
     async with aiosqlite.connect(DB_FILE) as db:
+        # Get settings for level calculation
+        async with db.execute("SELECT key, value FROM level_settings") as cursor:
+            rows = await cursor.fetchall()
+            settings = {row[0]: row[1] for row in rows}
+            
+        c3 = float(settings.get("c3", 1))
+        c2 = float(settings.get("c2", 50))
+        c1 = float(settings.get("c1", 100))
+        r = int(settings.get("rounding", 100))
+
         if users:
             for user_id, data in users.items():
-                # Polaris format: user_id is the key, data is {xp: ...}
                 xp = data.get("xp") if isinstance(data, dict) else data
                 if xp is not None:
-                    # We need to calculate level or just set it to 0 and let the bot fix it
-                    # For a clean import, setting level to 0 is safest, bot updates it on next message
-                    # Or we could implement the cubic formula here too.
+                    lvl = calculate_level_for_xp(int(xp), c3, c2, c1, r)
                     await db.execute(
                         """
                         INSERT INTO users_xp (user_id, xp, level, last_xp_time)
-                        VALUES (?, ?, 0, 0)
-                        ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp
+                        VALUES (?, ?, ?, 0)
+                        ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level
                         """,
-                        (str(user_id), int(xp))
+                        (str(user_id), int(xp), lvl)
                     )
                     imported_users += 1
             details.append(f"{imported_users} users")
@@ -185,6 +218,33 @@ async def import_data(jsonData: Dict[str, Any]):
         raise HTTPException(status_code=400, detail="No valid JSON data found!")
         
     return {"status": "ok", "details": details}
+
+@app.post("/recalculate")
+async def recalculate_all_levels():
+    """Recalculate levels for everyone based on current settings."""
+    async with aiosqlite.connect(DB_FILE) as db:
+        # Get settings
+        async with db.execute("SELECT key, value FROM level_settings") as cursor:
+            rows = await cursor.fetchall()
+            settings = {row[0]: row[1] for row in rows}
+            
+        c3 = float(settings.get("c3", 1))
+        c2 = float(settings.get("c2", 50))
+        c1 = float(settings.get("c1", 100))
+        r = int(settings.get("rounding", 100))
+
+        # Get all users
+        async with db.execute("SELECT user_id, xp FROM users_xp") as cursor:
+            users = await cursor.fetchall()
+
+        count = 0
+        for user_id, xp in users:
+            lvl = calculate_level_for_xp(xp, c3, c2, c1, r)
+            await db.execute("UPDATE users_xp SET level = ? WHERE user_id = ?", (lvl, user_id))
+            count += 1
+            
+        await db.commit()
+    return {"status": "ok", "count": count}
 
 # --- Serve Frontend ---
 # Search for frontend/dist relative to project root
