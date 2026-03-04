@@ -633,7 +633,7 @@ class HofCog(commands.Cog):
 
         await self._send_hof_embed(interaction, row)
 
-    @hall_group.command(name="lost", description="Show a random near-miss — reacted but never made it to the Hall")
+    @hall_group.command(name="lost", description="Show a random Hall of Fame reject message")
     async def slash_lost(self, interaction: discord.Interaction):
         async with get_db() as conn:
             async with conn.execute(
@@ -646,8 +646,11 @@ class HofCog(commands.Cog):
 
         if not row:
             return await interaction.response.send_message(
-                "❌ No near-miss entries found yet.", ephemeral=True
+                "❌ No lost entries found yet.", ephemeral=True
             )
+
+        s = await _get_settings(interaction.guild_id)
+        emoji = s["emojis"][0] if s["emojis"] else "⭐"
 
         author_id, star_count, content, image_url, jump_url = row
         member = interaction.guild.get_member(int(author_id))
@@ -659,19 +662,22 @@ class HofCog(commands.Cog):
 
         embed = discord.Embed(
             description=content[:4090] if content else "*[no text]*",
-            color=0x808080,  # Grey — almost made it
+            color=0x808080,
         )
         if member:
             embed.set_author(name=getattr(member, "display_name", str(member)), icon_url=member.display_avatar.url)
         if image_url:
             embed.set_image(url=image_url)
-        embed.set_footer(text=f"💀 {star_count} reaction(s) — no cigar")
+        embed.set_footer(text=f"{emoji} {star_count} — no cigar")
 
         view = _jump_view(jump_url) if jump_url else None
         await interaction.response.send_message(embed=embed, view=view)
 
     async def _send_hof_embed(self, interaction: discord.Interaction, row):
         """Shared helper to build and send a gold HOF embed from a DB row."""
+        s = await _get_settings(interaction.guild_id)
+        emoji = s["emojis"][0] if s["emojis"] else "⭐"
+
         author_id, star_count, content, image_url, jump_url = row
         member = interaction.guild.get_member(int(author_id))
         if member is None:
@@ -688,7 +694,7 @@ class HofCog(commands.Cog):
             embed.set_author(name=getattr(member, "display_name", str(member)), icon_url=member.display_avatar.url)
         if image_url:
             embed.set_image(url=image_url)
-        embed.set_footer(text=f"⭐ {star_count} total reactions")
+        embed.set_footer(text=f"{emoji} {star_count}")
 
         view = _jump_view(jump_url) if jump_url else None
         await interaction.response.send_message(embed=embed, view=view)
