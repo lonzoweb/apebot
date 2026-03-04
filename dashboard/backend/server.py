@@ -184,13 +184,21 @@ async def import_data(jsonData: Dict[str, Any]):
     return {"status": "ok", "details": details}
 
 # --- Serve Frontend ---
-frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+# Search for frontend/dist relative to project root
+base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+frontend_path = os.path.join(base_dir, "dashboard", "frontend", "dist")
+
 if os.path.exists(frontend_path):
+    logger.info(f"✅ Serving frontend from: {frontend_path}")
     app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
 else:
+    logger.warning(f"⚠️ Frontend 'dist' folder not found at {frontend_path}")
     @app.get("/")
     async def root():
-        return {"message": "API is running. Frontend 'dist' folder not found. Please build it."}
+        return {
+            "message": "API is running. Frontend 'dist' folder not found. Please build it.",
+            "attempted_path": frontend_path
+        }
 
 if __name__ == "__main__":
     import uvicorn
