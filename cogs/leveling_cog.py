@@ -431,6 +431,7 @@ class LevelingCog(commands.Cog):
         # Footer: progress bar + messages to go (small muted text, matching Polaris)
         footer_text = f"{bar_str}\n{msg_min}–{msg_max} messages to go!"
         embed.set_footer(text=footer_text)
+        await interaction.response.send_message(embed=embed, ephemeral=is_ephemeral)
 
     @app_commands.command(name="rolesync", description="Sync your level reward roles")
     async def rolesync(self, interaction: discord.Interaction):
