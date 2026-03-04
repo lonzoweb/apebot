@@ -410,19 +410,18 @@ class LevelingCog(commands.Cog):
         embed = discord.Embed(color=member.color if member.color.value else discord.Color.from_rgb(99, 102, 241))
         embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
 
-        # row 1: XP fields — keep each value single-line so the row stays compact
+        # row 1: XP fields — match reference: XP shows total, Next level shows progress+remaining
         if relative_xp:
             embed.add_field(name="✨ Level", value=str(current_level), inline=True)
-            embed.add_field(name="⏩ Next level", value=f"{int(progress_xp):,}/{int(needed_xp):,} XP", inline=True)
         else:
             embed.add_field(name="✨ XP", value=f"{data['xp']:,} (lv. {current_level})", inline=True)
-            embed.add_field(name="⏩ Next level", value=f"{int(progress_xp):,}/{int(needed_xp):,} XP", inline=True)
+        embed.add_field(name="⏩ Next level", value=f"{int(progress_xp):,}/{int(needed_xp):,} ({int(remaining_xp):,} more)", inline=True)
         if not hide_cooldown:
             embed.add_field(name="🕒 Cooldown", value=cooldown_status, inline=True)
         if active_mults and not hide_mults:
             embed.add_field(name="🚀 Multiplier", value=f"{user_multiplier:.2f}x ({', '.join(active_mults)})", inline=True)
-        embed.add_field(name="\u200b", value=f"`{bar}` *({percentage:.1f}%)*", inline=False)
-        embed.set_footer(text=f"{msg_min}–{msg_max} messages to go!")
+        # Bar: bold percentage, messages to go directly underneath (same field = no gap)
+        embed.add_field(name="\u200b", value=f"`{bar}` **({percentage:.1f}%)**\n{msg_min}–{msg_max} messages to go!", inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=is_ephemeral)
 
     @app_commands.command(name="rolesync", description="Sync your level reward roles")
