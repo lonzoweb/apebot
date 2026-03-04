@@ -5,7 +5,7 @@ import {
   Settings, TrendingUp, Users, Trophy, Trash2, Plus, Save, Download, RefreshCw
 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = window.location.origin;
 
 const CURVE_PRESETS = [
   { name: "Polaris (Default)", c3: 1, c2: 50, c1: 100, rounding: 100 },

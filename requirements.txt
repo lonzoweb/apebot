@@ -9,3 +9,7 @@ google-auth
 pillow
 python-dotenv
 twikit
+fastapi
+uvicorn
+python-multipart
+# Add any others if needed

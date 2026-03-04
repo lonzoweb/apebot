@@ -12,6 +12,7 @@ import colorlog
 import time
 import aiohttp
 import signal
+import threading
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -534,6 +535,10 @@ async def shutdown(sig, loop):
         await bot.aiohttp_session.close()
         logger.info("🌐 HTTP session closed.")
     
+    # 2.5 Stop dashboard (if active)
+    # Threaded uvicorn doesn't always stop cleanly without force, 
+    # but signal propagation usually handles it.
+
     # 3. Cancel all remaining tasks
     tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
     [task.cancel() for task in tasks]
@@ -552,6 +557,20 @@ async def shutdown(sig, loop):
 if __name__ == "__main__":
     logger.info("Starting bot...")
     
+    # Start Dashboard in background thread
+    def run_dashboard():
+        try:
+            import uvicorn
+            from dashboard.backend.main import app
+            port = int(os.getenv("PORT", 8000))
+            logger.info(f"🌐 Starting Dashboard API on port {port}...")
+            uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+        except Exception as e:
+            logger.error(f"❌ Failed to start dashboard: {e}")
+
+    dashboard_thread = threading.Thread(target=run_dashboard, daemon=True)
+    dashboard_thread.start()
+
     loop = asyncio.get_event_loop()
     
     # Register signal handlers for SIGINT (Ctrl+C) and SIGTERM (Railway/Docker)

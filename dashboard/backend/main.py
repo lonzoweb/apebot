@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import aiosqlite
 import os
@@ -182,6 +183,16 @@ async def import_data(jsonData: Dict[str, Any]):
         
     return {"status": "ok", "details": details}
 
+# --- Serve Frontend ---
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+else:
+    @app.get("/")
+    async def root():
+        return {"message": "API is running. Frontend 'dist' folder not found. Please build it."}
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
