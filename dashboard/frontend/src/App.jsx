@@ -18,6 +18,7 @@ const CURVE_PRESETS = [
 
 function App() {
   const [activeTab, setActiveTab] = useState('home');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stats, setStats] = useState({ total_users: 0, total_xp: 0 });
   const [settings, setSettings] = useState({});
   const [pendingSettings, setPendingSettings] = useState({});
@@ -196,21 +197,34 @@ function App() {
     { id: 'data', icon: Database, label: 'Data Management' },
   ];
 
+  const closeSidebar = () => setSidebarOpen(false);
+
   return (
     <div className="dashboard-container">
+      {/* Mobile topbar */}
+      <div className="mobile-topbar">
+        <button className="hamburger" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle menu">
+          <span /><span /><span />
+        </button>
+        <span className="mobile-topbar-title">APEIRON</span>
+      </div>
+
+      {/* Sidebar overlay (closes nav on tap outside) */}
+      <div className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`} onClick={closeSidebar} />
+
       {/* Sidebar */}
-      <div className="sidebar">
+      <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
           <TrendingUp size={28} color="#6366f1" />
           <span>APEIRON</span>
         </div>
         <nav>
           {navItems.map(item => (
-            <div 
-              key={item.id}
-              className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(item.id)}
-            >
+            <div
+            key={item.id}
+            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+            onClick={() => { setActiveTab(item.id); closeSidebar(); }}
+          >
               <item.icon size={20} />
               <span>{item.label}</span>
             </div>
@@ -226,7 +240,7 @@ function App() {
 
       {/* Floating Save Bar */}
       {hasPending && (
-        <div style={{
+        <div className="save-bar" style={{
           position: 'fixed', bottom: '2rem', left: '50%', transform: 'translateX(-50%)',
           background: 'rgba(20, 20, 35, 0.98)', border: '1px solid rgba(99,102,241,0.4)',
           borderRadius: '1rem', padding: '0.75rem 1.5rem',

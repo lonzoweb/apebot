@@ -41,7 +41,7 @@ h1, h2, h3, h4 {
   min-height: 100vh;
 }
 
-/* Sidebar */
+/* ── Sidebar ─────────────────────────────────────────────────── */
 .sidebar {
   width: var(--sidebar-width);
   background: var(--bg-surface);
@@ -51,6 +51,8 @@ h1, h2, h3, h4 {
   flex-direction: column;
   position: fixed;
   height: 100vh;
+  z-index: 200;
+  transition: transform 0.25s ease;
 }
 
 .sidebar-logo {
@@ -76,6 +78,7 @@ h1, h2, h3, h4 {
   transition: all 0.2s ease;
   margin-bottom: 0.5rem;
   cursor: pointer;
+  min-height: 44px;
 }
 
 .nav-item:hover {
@@ -88,7 +91,7 @@ h1, h2, h3, h4 {
   color: var(--accent);
 }
 
-/* Main Content */
+/* ── Main Content ────────────────────────────────────────────── */
 .main-content {
   flex: 1;
   margin-left: var(--sidebar-width);
@@ -110,7 +113,7 @@ h1, h2, h3, h4 {
   font-size: 1.1rem;
 }
 
-/* Grid Layout */
+/* ── Grid ────────────────────────────────────────────────────── */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -118,6 +121,7 @@ h1, h2, h3, h4 {
   margin-bottom: 3rem;
 }
 
+/* ── Card ────────────────────────────────────────────────────── */
 .card {
   background: var(--bg-card);
   backdrop-filter: blur(12px);
@@ -150,7 +154,7 @@ h1, h2, h3, h4 {
   font-family: 'Outfit', sans-serif;
 }
 
-/* Forms & Inputs */
+/* ── Forms & Inputs ──────────────────────────────────────────── */
 .form-group {
   margin-bottom: 1.5rem;
 }
@@ -188,6 +192,7 @@ h1, h2, h3, h4 {
   transition: all 0.2s ease;
   border: none;
   font-family: 'Outfit', sans-serif;
+  min-height: 44px;
 }
 
 .btn-primary {
@@ -200,17 +205,19 @@ h1, h2, h3, h4 {
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
-/* Table */
+/* ── Table ───────────────────────────────────────────────────── */
 .table-container {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 1.25rem;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 400px;
 }
 
 th {
@@ -255,7 +262,7 @@ tr:hover td {
   to { transform: rotate(360deg); }
 }
 
-/* Toggle Switch */
+/* ── Toggle Switch ───────────────────────────────────────────── */
 .toggle {
   position: relative;
   width: 48px;
@@ -265,10 +272,11 @@ tr:hover td {
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 3px;
+  flex-shrink: 0;
 }
 
 .toggle.active {
-  background: #f97316; /* Orange accent as per reference */
+  background: #f97316;
 }
 
 .toggle-handle {
@@ -284,7 +292,7 @@ tr:hover td {
   transform: translateX(24px);
 }
 
-/* Utility */
+/* ── Utility ─────────────────────────────────────────────────── */
 code {
   background: rgba(255, 255, 255, 0.05);
   padding: 0.2rem 0.4rem;
@@ -292,4 +300,119 @@ code {
   font-family: inherit;
   font-size: 0.85rem;
   color: var(--accent);
+}
+
+/* ── Mobile Topbar & Hamburger ───────────────────────────────── */
+.mobile-topbar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  padding: 0 1rem;
+  gap: 1rem;
+  z-index: 300;
+}
+
+.hamburger {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 0.5rem;
+  background: none;
+  border: none;
+}
+
+.hamburger span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--text-primary);
+  border-radius: 2px;
+}
+
+.mobile-topbar-title {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+/* Dim overlay behind sidebar when open on mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 190;
+}
+
+/* ── Responsive Breakpoints ──────────────────────────────────── */
+@media (max-width: 768px) {
+  .mobile-topbar {
+    display: flex;
+  }
+
+  /* Sidebar slides off-screen by default, slides in when .open */
+  .sidebar {
+    transform: translateX(-100%);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay.open {
+    display: block;
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 1.25rem 1rem;
+    padding-top: calc(56px + 1.25rem);
+    max-width: 100%;
+  }
+
+  .header {
+    margin-bottom: 1.5rem;
+  }
+
+  .header h1 {
+    font-size: 1.4rem;
+  }
+
+  .header p {
+    font-size: 0.9rem;
+  }
+
+  /* All CSS grids go single-column */
+  .grid,
+  [style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Floating save bar — full width */
+  .save-bar {
+    left: 0.75rem !important;
+    right: 0.75rem !important;
+    transform: none !important;
+    bottom: 0.75rem !important;
+    flex-wrap: wrap;
+  }
+
+  .card {
+    padding: 1.25rem;
+  }
+
+  /* Toggle rows: allow wrapping so label doesn't get cut off */
+  .toggle-row {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
 }
