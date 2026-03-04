@@ -234,6 +234,17 @@ async def _post_or_update_hof(
 
 
 # ─────────────────────────────────────────────────────────────
+# UI HELPERS
+# ─────────────────────────────────────────────────────────────
+
+class _jump_view(discord.ui.View):
+    """A simple View with a single 'Jump to message' link button."""
+    def __init__(self, url: str):
+        super().__init__()
+        self.add_item(discord.ui.Button(label="Jump to message", url=url, style=discord.ButtonStyle.link))
+
+
+# ─────────────────────────────────────────────────────────────
 # COG
 # ─────────────────────────────────────────────────────────────
 
