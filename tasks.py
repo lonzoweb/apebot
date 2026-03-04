@@ -343,11 +343,25 @@ def setup_tasks(bot, guild_id: int):
 
     daily_quote.start()
 
+    MUZZLE_EFFECTS = {"muzzle", "uwu"}
+
     async def handle_curse_expirations():
+        from main import remove_muzzle_role
         try:
             expired_curses = await database.get_all_expired_effects()
+            guild = bot.get_guild(guild_id)
             for user_id, effect_name in expired_curses:
                 await database.remove_active_effect(int(user_id), effect_name)
+                # If the expired effect held the hexed role, strip it now
+                if effect_name in MUZZLE_EFFECTS and guild:
+                    # Only remove the role if the user has no OTHER active muzzle-type effects
+                    remaining = await database.get_all_active_effects(int(user_id))
+                    still_muzzled = any(e[0] in MUZZLE_EFFECTS for e in remaining)
+                    if not still_muzzled:
+                        member = guild.get_member(int(user_id))
+                        if member:
+                            await remove_muzzle_role(member)
+                            logger.info(f"🔓 Hexed role removed from {member.display_name} (effect '{effect_name}' expired)")
         except Exception as e:
             logger.error(f"Error in curse cleanup: {e}")
 

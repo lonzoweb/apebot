@@ -869,5 +869,39 @@ class UtilityCog(commands.Cog):
             await ctx.reply("⌛ Timeout. Location setting cancelled. My patience wears thin!", mention_author=False)
 
 
+
+# ─────────────────────────────────────────────────────────────
+# AVATAR — slash command + context menu
+# ─────────────────────────────────────────────────────────────
+
+from discord import app_commands as _apc
+
+@_apc.context_menu(name="View Avatar")
+async def view_avatar_context_menu(interaction: discord.Interaction, member: discord.Member):
+    """Right-click a user → View Avatar."""
+    await _send_avatar(interaction, member)
+
+
+async def _send_avatar(interaction: discord.Interaction, target: discord.Member | discord.User):
+    avatar = target.display_avatar.with_size(1024)
+    embed = discord.Embed(color=target.accent_color or discord.Color.dark_grey())
+    embed.set_author(name=target.display_name, icon_url=avatar.url)
+    embed.set_image(url=avatar.url)
+    embed.add_field(name="Download", value=f"[Open full size]({avatar.url})", inline=False)
+    await interaction.response.send_message(embed=embed)
+
+
 async def setup(bot):
-    await bot.add_cog(UtilityCog(bot))
+    cog = UtilityCog(bot)
+    await bot.add_cog(cog)
+
+    # Register the "View Avatar" user context menu globally
+    bot.tree.add_command(view_avatar_context_menu)
+
+    # Register /avatar as a global slash command
+    @bot.tree.command(name="avatar", description="Show a user's avatar")
+    @_apc.describe(user="The user whose avatar to show (defaults to yourself)")
+    async def slash_avatar(interaction: discord.Interaction, user: discord.Member = None):
+        target = user or interaction.user
+        await _send_avatar(interaction, target)
+
