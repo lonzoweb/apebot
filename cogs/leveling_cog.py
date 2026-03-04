@@ -419,15 +419,15 @@ class LevelingCog(commands.Cog):
         if not hide_cooldown:
             embed.add_field(name="🕒 Cooldown", value=cooldown_status, inline=True)
 
+        if active_mults and not hide_mults:
+            embed.add_field(name="🚀 Multiplier", value=f"{user_multiplier:.2f}x\n({', '.join(active_mults)})", inline=True)
+
         # Progress bar line
         embed.add_field(
             name="\u200b",
             value=f"`{bar}` ({percentage:.1f}%)\n{msg_min}–{msg_max} messages to go!",
             inline=False
         )
-
-        if active_mults and not hide_mults:
-            embed.set_footer(text=f"Multipliers active: {', '.join(active_mults)} → {user_multiplier:.2f}x total")
 
         # Sync warning: check if member is missing earned reward roles
         if settings.get("reward_sync_warning", "1") == "1":
