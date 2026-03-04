@@ -259,6 +259,48 @@ async def init_db():
                 """
             )
 
+            # 📈 Leveling System — Users XP
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users_xp (
+                    user_id TEXT PRIMARY KEY,
+                    xp INTEGER DEFAULT 0,
+                    level INTEGER DEFAULT 0,
+                    last_xp_time REAL DEFAULT 0
+                )
+                """
+            )
+
+            # ⚙️ Leveling System — Settings (Coefficients, Rounding, Range, etc.)
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS level_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+                """
+            )
+
+            # ✖️ Leveling System — Multipliers (Role or Channel)
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS level_multipliers (
+                    target_id TEXT PRIMARY KEY,
+                    multiplier REAL DEFAULT 1.0
+                )
+                """
+            )
+
+            # 🎁 Leveling System — Reward Roles
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS reward_roles (
+                    level INTEGER PRIMARY KEY,
+                    role_id TEXT NOT NULL
+                )
+                """
+            )
+
         logger.info("✅ Database tables initialized (all modules unified).")
     except Exception as e:
         logger.error(f"Error initializing database: {e}", exc_info=True)
@@ -1195,3 +1237,110 @@ async def has_pending_follow_request(username: str) -> bool:
         ) as cursor:
             return await cursor.fetchone() is not None
 
+# ============================================================
+# LEVELING SYSTEM FUNCTIONS
+# ============================================================
+
+
+async def get_user_xp_data(user_id: int) -> dict:
+    """Returns (xp, level, last_xp_time) for a user."""
+    user_id_str = str(user_id)
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT xp, level, last_xp_time FROM users_xp WHERE user_id = ?",
+            (user_id_str,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return {"xp": row[0], "level": row[1], "last_xp_time": row[2]}
+            return {"xp": 0, "level": 0, "last_xp_time": 0}
+
+
+async def update_user_xp(user_id: int, xp: int, level: int, last_xp_time: float):
+    """Updates or inserts a user's XP data."""
+    user_id_str = str(user_id)
+    async with get_db() as conn:
+        await conn.execute(
+            """
+            INSERT INTO users_xp (user_id, xp, level, last_xp_time)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET 
+                xp = excluded.xp,
+                level = excluded.level,
+                last_xp_time = excluded.last_xp_time
+        """,
+            (user_id_str, xp, level, last_xp_time),
+        )
+
+
+async def get_level_settings() -> dict:
+    """Returns all leveling settings as a dict."""
+    async with get_db() as conn:
+        async with conn.execute("SELECT key, value FROM level_settings") as cursor:
+            rows = await cursor.fetchall()
+            return {row[0]: row[1] for row in rows}
+
+
+async def set_level_setting(key: str, value: str):
+    """Sets a leveling setting."""
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO level_settings (key, value) VALUES (?, ?)",
+            (key, value),
+        )
+
+
+async def get_level_multipliers() -> dict:
+    """Returns all role/channel multipliers."""
+    async with get_db() as conn:
+        async with conn.execute("SELECT target_id, multiplier FROM level_multipliers") as cursor:
+            rows = await cursor.fetchall()
+            return {row[0]: row[1] for row in rows}
+
+
+async def set_level_multiplier(target_id: str, multiplier: float):
+    """Sets a multiplier for a target (role/channel)."""
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO level_multipliers (target_id, multiplier) VALUES (?, ?)",
+            (target_id, multiplier),
+        )
+
+
+async def remove_level_multiplier(target_id: str):
+    """Removes a multiplier."""
+    async with get_db() as conn:
+        await conn.execute("DELETE FROM level_multipliers WHERE target_id = ?", (target_id,))
+
+
+async def get_reward_roles() -> dict:
+    """Returns all level-role rewards."""
+    async with get_db() as conn:
+        async with conn.execute("SELECT level, role_id FROM reward_roles") as cursor:
+            rows = await cursor.fetchall()
+            return {row[0]: row[1] for row in rows}
+
+
+async def set_reward_role(level: int, role_id: str):
+    """Sets a role reward for a specific level."""
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO reward_roles (level, role_id) VALUES (?, ?)",
+            (level, role_id),
+        )
+
+
+async def remove_reward_role(level: int):
+    """Removes a role reward."""
+    async with get_db() as conn:
+        await conn.execute("DELETE FROM reward_roles WHERE level = ?", (level,))
+
+
+async def get_top_levels(limit: int = 50) -> list:
+    """Returns top users by level and XP."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT user_id, xp, level FROM users_xp ORDER BY level DESC, xp DESC LIMIT ?",
+            (limit,),
+        ) as cursor:
+            return await cursor.fetchall()

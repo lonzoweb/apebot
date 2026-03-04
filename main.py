@@ -161,6 +161,7 @@ async def on_ready():
         "cogs.image_cog",
         "cogs.twitter_cog",
         "cogs.hof_cog",
+        "cogs.leveling_cog",
         "activitycog",
     ]
 
