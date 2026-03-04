@@ -561,10 +561,10 @@ if __name__ == "__main__":
     def run_dashboard():
         try:
             import uvicorn
-            from dashboard.backend.main import app
+            # Use string import to avoid naming conflicts and circular issues
             port = int(os.getenv("PORT", 8000))
             logger.info(f"🌐 Starting Dashboard API on port {port}...")
-            uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+            uvicorn.run("dashboard.backend.server:app", host="0.0.0.0", port=port, log_level="info")
         except Exception as e:
             logger.error(f"❌ Failed to start dashboard: {e}")
 
