@@ -13,6 +13,9 @@ from typing import Dict, Any, Optional
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from config import DB_FILE
 
+import logging
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Apebot Leveling Dashboard API")
 
 # Enable CORS for frontend
