@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional
 # but better to have standalone DB logic here for safety or import it.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from config import DB_FILE
-from database import calculate_level_for_xp, get_cached_roles, init_db
+from database import calculate_level_for_xp, get_cached_roles, init_db, get_cached_channels
 
 import logging
 logger = logging.getLogger(__name__)
@@ -138,6 +138,11 @@ async def get_leaderboard(limit: int = 50):
 async def get_roles():
     """Returns cached server roles for resolution."""
     return await get_cached_roles()
+
+@app.get("/channels")
+async def get_channels():
+    """Returns cached server channels for resolution."""
+    return await get_cached_channels()
 
 @app.get("/export")
 async def export_data():

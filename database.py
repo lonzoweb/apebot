@@ -322,6 +322,17 @@ async def init_db():
                 """
             )
 
+            # 📺 Leveling System — Server Channels Cache (For Dashboard)
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS server_channels_cache (
+                    channel_id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    type TEXT
+                )
+                """
+            )
+
             # 👤 Leveling System — User Profile Cache (For Dashboard)
             await conn.execute(
                 """
@@ -1372,12 +1383,16 @@ async def remove_reward_role(level: int):
 
 
 async def get_top_levels(limit: int = 50) -> list:
-    """Returns top users by level and XP."""
+    """Returns top users by level and XP, joining with profile cache."""
     async with get_db() as conn:
-        async with conn.execute(
-            "SELECT user_id, xp, level FROM users_xp ORDER BY level DESC, xp DESC LIMIT ?",
-            (limit,),
-        ) as cursor:
+        query = """
+            SELECT u.user_id, u.xp, u.level, p.username, p.avatar_url 
+            FROM users_xp u
+            LEFT JOIN user_profile_cache p ON u.user_id = p.user_id
+            ORDER BY u.level DESC, u.xp DESC 
+            LIMIT ?
+        """
+        async with conn.execute(query, (limit,)) as cursor:
             return await cursor.fetchall()
 
 # ============================================================
@@ -1387,10 +1402,9 @@ async def get_top_levels(limit: int = 50) -> list:
 async def sync_server_roles(roles_data: list):
     """Update the cache of server roles. roles_data is list of (role_id, name, color, position)."""
     async with get_db() as conn:
-        # Clear old cache for this server
-        await conn.execute("DELETE FROM server_roles_cache")
+        # Use OR REPLACE instead of global DELETE to be safer in multi-guild or partial syncs
         await conn.executemany(
-            "INSERT INTO server_roles_cache (role_id, name, color, position) VALUES (?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO server_roles_cache (role_id, name, color, position) VALUES (?, ?, ?, ?)",
             roles_data
         )
         await conn.commit()
@@ -1401,6 +1415,22 @@ async def get_cached_roles() -> dict:
         async with conn.execute("SELECT role_id, name, color, position FROM server_roles_cache") as cursor:
             rows = await cursor.fetchall()
             return {row[0]: {"name": row[1], "color": row[2], "position": row[3]} for row in rows}
+
+async def sync_server_channels(channels_data: list):
+    """Update the cache of server channels. channels_data is list of (channel_id, name, type)."""
+    async with get_db() as conn:
+        await conn.executemany(
+            "INSERT OR REPLACE INTO server_channels_cache (channel_id, name, type) VALUES (?, ?, ?)",
+            channels_data
+        )
+        await conn.commit()
+
+async def get_cached_channels() -> dict:
+    """Returns dict of channel_id -> {name, type}."""
+    async with get_db() as conn:
+        async with conn.execute("SELECT channel_id, name, type FROM server_channels_cache") as cursor:
+            rows = await cursor.fetchall()
+            return {row[0]: {"name": row[1], "type": row[2]} for row in rows}
 
 # ============================================================
 # USER PROFILE CACHE (For Dashboard)

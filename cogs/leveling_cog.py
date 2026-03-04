@@ -8,10 +8,11 @@ import logging
 import json
 import io
 from database import (
-    get_db, update_user_xp, get_user_xp_data, get_top_levels, 
+    update_user_xp, get_user_xp_data, get_top_levels, 
     get_level_settings, get_level_multipliers, get_reward_roles,
     sync_user_profile, calculate_level_for_xp,
-    set_level_setting, sync_server_roles
+    set_level_setting, sync_server_roles, sync_server_channels,
+    get_cached_roles, init_db, get_cached_channels
 )
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,7 @@ class LevelingCog(commands.Cog):
         
         # Start background tasks
         self.bot.loop.create_task(self.role_sync_task())
+        self.bot.loop.create_task(self.profile_sync_task())
         self.bot.loop.create_task(self.cache_refresh_task())
 
     async def refresh_cache_now(self):
@@ -83,20 +85,54 @@ class LevelingCog(commands.Cog):
         while not self.bot.is_closed():
             try:
                 for guild in self.bot.guilds:
-                    roles_data = []
-                    for role in guild.roles:
-                        if role.is_default(): continue # Skip @everyone
-                        roles_data.append((
-                            str(role.id), 
-                            role.name, 
-                            str(role.color), 
-                            role.position
-                        ))
-                    await sync_server_roles(roles_data)
-                logger.debug("Synced server roles to cache.")
+                    await self._sync_guild_roles(guild)
+                logger.info("Synced server roles to cache.")
             except Exception as e:
                 logger.error(f"Error syncing roles: {e}")
             await asyncio.sleep(3600) # Sync every hour
+
+    async def _sync_guild_roles(self, guild):
+        roles_data = []
+        for role in guild.roles:
+            if role.is_default(): continue
+            roles_data.append((
+                str(role.id), 
+                role.name, 
+                f"#{role.color.value:06x}" if role.color.value != 0 else "inherit", 
+                role.position
+            ))
+        await sync_server_roles(roles_data)
+        
+        channels_data = []
+        for channel in guild.channels:
+            if isinstance(channel, (discord.TextChannel, discord.VoiceChannel, discord.Thread)):
+                channels_data.append((
+                    str(channel.id),
+                    channel.name,
+                    str(channel.type)
+                ))
+        await sync_server_channels(channels_data)
+
+    async def profile_sync_task(self):
+        """Perform a full member profile sweep on startup and every 24h."""
+        await self.bot.wait_until_ready()
+        while not self.bot.is_closed():
+            try:
+                for guild in self.bot.guilds:
+                    logger.info(f"Starting full profile sync for {guild.name}...")
+                    count = 0
+                    for member in guild.members:
+                        if member.bot: continue
+                        await sync_user_profile(
+                            member.id, 
+                            member.display_name, 
+                            str(member.display_avatar.url)
+                        )
+                        count += 1
+                    logger.info(f"Synced {count} member profiles for {guild.name}.")
+            except Exception as e:
+                logger.error(f"Error in profile sync task: {e}")
+            await asyncio.sleep(86400) # Every 24 hours
 
     def calculate_xp_for_level(self, level, settings):
         """
@@ -350,16 +386,17 @@ class LevelingCog(commands.Cog):
             return await interaction.response.send_message("The leaderboard is empty!")
 
         description = ""
-        for i, (user_id, xp, level) in enumerate(top_users, 1):
-            member = interaction.guild.get_member(int(user_id))
-            name = member.display_name if member else f"User {user_id}"
-            emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"`{i}.`"
-            description += f"{emoji} **{name}** - Level {level} ({xp:,} XP)\n"
+        for i, (user_id, xp, level, username, avatar_url) in enumerate(top_users, 1):
+            name = username or f"User {user_id}"
+            
+            # Medal emojis for top 3
+            medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"`#{i}`"
+            description += f"{medal} **{name}** • Lvl {level} ({xp:,} XP)\n"
 
         embed = discord.Embed(
-            title="🏆 Global Leaderboard (Top 25)",
+            title="✨ Global Leaderboard (Top 25)",
             description=description,
-            color=discord.Color.gold()
+            color=discord.Color.blue()
         )
         await interaction.response.send_message(embed=embed)
 
@@ -380,6 +417,27 @@ class LevelingCog(commands.Cog):
         
         await update_user_xp(member.id, new_xp, new_level, data["last_xp_time"])
         await interaction.response.send_message(f"✅ Updated {member.mention}: Level **{new_level}**, XP **{new_xp:,}**", ephemeral=True)
+
+    @app_commands.command(name="level_sync", description="Force sync all members and roles to the dashboard cache")
+    @app_commands.default_permissions(administrator=True)
+    async def level_sync(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            # Sync Roles
+            for guild in self.bot.guilds:
+                await self._sync_guild_roles(guild)
+            
+            # Sync Members
+            count = 0
+            for guild in self.bot.guilds:
+                for member in guild.members:
+                    if member.bot: continue
+                    await sync_user_profile(member.id, member.display_name, str(member.display_avatar.url))
+                    count += 1
+            
+            await interaction.followup.send(f"✅ Sync complete! Cached {count} members and updated server roles.", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Sync failed: {e}", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(LevelingCog(bot))

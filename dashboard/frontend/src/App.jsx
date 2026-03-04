@@ -24,6 +24,7 @@ function App() {
   const [multipliers, setMultipliers] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [roles, setRoles] = useState({});
+  const [channels, setChannels] = useState({});
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
@@ -38,13 +39,14 @@ function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [sRes, setRes, rRes, mRes, lRes, rlRes] = await Promise.all([
+      const [sRes, setRes, rRes, mRes, lRes, rlRes, chRes] = await Promise.all([
         axios.get(`${API_BASE}/stats`),
         axios.get(`${API_BASE}/settings`),
         axios.get(`${API_BASE}/rewards`),
         axios.get(`${API_BASE}/multipliers`),
         axios.get(`${API_BASE}/leaderboard`),
         axios.get(`${API_BASE}/roles`),
+        axios.get(`${API_BASE}/channels`),
       ]);
       setStats(sRes.data);
       setSettings(setRes.data);
@@ -52,6 +54,7 @@ function App() {
       setMultipliers(mRes.data);
       setLeaderboard(lRes.data);
       setRoles(rlRes.data);
+      setChannels(chRes.data);
     } catch (err) {
       console.error("Failed to fetch data:", err);
     }
@@ -400,6 +403,11 @@ function App() {
                   >
                     <option value="dm">Send in DMs</option>
                     <option value="current">Current Channel</option>
+                    <optgroup label="Server Channels">
+                      {Object.keys(channels).map(id => (
+                        <option key={id} value={id}>#{channels[id].name}</option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
               </div>
@@ -577,21 +585,27 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {multipliers.map(m => (
-                  <tr key={m.target_id}>
-                    <td><code>{m.target_id}</code></td>
-                    <td><span className="badge badge-success">{m.multiplier}x</span></td>
-                    <td>
-                      <button 
-                        className="btn" 
-                        style={{ color: 'var(--danger)', background: 'transparent' }}
-                        onClick={() => deleteMultiplier(m.target_id)}
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {multipliers.map(m => {
+                  const targetInfo = roles[m.target_id] || channels[m.target_id] || { name: m.target_id, color: 'inherit' };
+                  const isChannel = !!channels[m.target_id];
+                  return (
+                    <tr key={m.target_id}>
+                      <td style={{ color: targetInfo.color && targetInfo.color !== '0' ? targetInfo.color : 'inherit', fontWeight: 'bold' }}>
+                        {isChannel ? '#' : ''}{targetInfo.name}
+                      </td>
+                      <td><span className="badge badge-success">{m.multiplier}x</span></td>
+                      <td>
+                        <button 
+                          className="btn" 
+                          style={{ color: 'var(--danger)', background: 'transparent' }}
+                          onClick={() => deleteMultiplier(m.target_id)}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
                 <tr>
                   <td>
                     <input 
