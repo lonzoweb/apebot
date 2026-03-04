@@ -884,10 +884,11 @@ async def view_avatar_context_menu(interaction: discord.Interaction, member: dis
 
 async def _send_avatar(interaction: discord.Interaction, target: discord.Member | discord.User):
     avatar = target.display_avatar.with_size(1024)
-    embed = discord.Embed(color=target.accent_color or discord.Color.dark_grey())
-    embed.set_author(name=target.display_name, icon_url=avatar.url)
+    embed = discord.Embed(
+        description=f"**{target.name}**",
+        color=target.accent_color or discord.Color.dark_grey(),
+    )
     embed.set_image(url=avatar.url)
-    embed.add_field(name="Download", value=f"[Open full size]({avatar.url})", inline=False)
     await interaction.response.send_message(embed=embed)
 
 
