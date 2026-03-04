@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional
 # but better to have standalone DB logic here for safety or import it.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from config import DB_FILE
-from database import calculate_level_for_xp, get_cached_roles
+from database import calculate_level_for_xp, get_cached_roles, init_db
 
 import logging
 logger = logging.getLogger(__name__)
@@ -195,6 +195,24 @@ async def import_data(jsonData: Dict[str, Any]):
                         """,
                         (str(user_id), int(xp), lvl)
                     )
+                    
+                    # 👤 Capture username/avatar if available in the migration JSON
+                    if isinstance(data, dict):
+                        username = data.get("username") or data.get("name")
+                        avatar = data.get("avatar") or data.get("avatar_url")
+                        if username:
+                            await db.execute(
+                                """
+                                INSERT INTO user_profile_cache (user_id, username, avatar_url, last_updated)
+                                VALUES (?, ?, ?, ?)
+                                ON CONFLICT(user_id) DO UPDATE SET 
+                                    username = excluded.username, 
+                                    avatar_url = excluded.avatar_url,
+                                    last_updated = excluded.last_updated
+                                """,
+                                (str(user_id), str(username), str(avatar) if avatar else None, int(time.time()))
+                            )
+
                     imported_users += 1
             details.append(f"{imported_users} users")
 
@@ -263,7 +281,10 @@ else:
             "attempted_path": frontend_path
         }
 
-if __name__ == "__main__":
     import uvicorn
+    # Ensure tables exist before starting (crucial for Railway)
+    import asyncio
+    asyncio.run(init_db())
+    
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)

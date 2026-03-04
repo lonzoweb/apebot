@@ -322,6 +322,19 @@ async def init_db():
                 """
             )
 
+            # 👤 Leveling System — User Profile Cache (For Dashboard)
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_profile_cache (
+                    user_id TEXT PRIMARY KEY,
+                    username TEXT NOT NULL,
+                    avatar_url TEXT,
+                    last_updated INTEGER
+                )
+                """
+            )
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_profile_updated ON user_profile_cache (last_updated)")
+
             await conn.commit()
         logger.info("✅ Database tables initialized (all modules unified).")
     except Exception as e:
