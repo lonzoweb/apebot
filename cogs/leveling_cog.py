@@ -407,21 +407,22 @@ class LevelingCog(commands.Cog):
         filled = int((percentage / 100) * bar_len)
         bar = "▓" * filled + "░" * (bar_len - filled)
 
-        embed = discord.Embed(color=member.color if member.color.value else discord.Color.from_rgb(99, 102, 241))
-        embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
-
-        # row 1: XP fields — match reference: XP shows total, Next level shows progress+remaining
-        if relative_xp:
-            embed.add_field(name="✨ Level", value=str(current_level), inline=True)
-        else:
-            embed.add_field(name="✨ XP", value=f"{data['xp']:,} (lv. {current_level})", inline=True)
-        embed.add_field(name="⏩ Next level", value=f"{int(progress_xp):,}/{int(needed_xp):,} ({int(remaining_xp):,} more)", inline=True)
+        cd_display = f"{int(cd_val - time_since)}s" if time_since < cd_val else "0s"
+        line1_parts = [f"Lv. {current_level}", f"{int(remaining_xp):,} xp to level up"]
         if not hide_cooldown:
-            embed.add_field(name="🕒 Cooldown", value=cooldown_status, inline=True)
+            line1_parts.append(f"{cd_display} cooldown")
         if active_mults and not hide_mults:
-            embed.add_field(name="🚀 Multiplier", value=f"{user_multiplier:.2f}x ({', '.join(active_mults)})", inline=True)
-        # Bar: bold percentage, messages to go directly underneath (same field = no gap)
-        embed.add_field(name="\u200b", value=f"`{bar}` **({percentage:.1f}%)**\n{msg_min}–{msg_max} messages to go!", inline=False)
+            line1_parts.append(', '.join(active_mults))
+
+        embed = discord.Embed(
+            description=(
+                f"{' — '.join(line1_parts)}\n"
+                f"`{bar}` **({percentage:.1f}%)**\n"
+                f"{msg_min}–{msg_max} messages to go!"
+            ),
+            color=member.color if member.color.value else discord.Color.from_rgb(99, 102, 241)
+        )
+        embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
         await interaction.response.send_message(embed=embed, ephemeral=is_ephemeral)
 
     @app_commands.command(name="rolesync", description="Sync your level reward roles")
