@@ -42,11 +42,17 @@ class LevelingCog(commands.Cog):
             # Message Settings
             "lvl_msg_enabled": "1",
             "lvl_msg_template": "Bravo [[DISPLAYNAME]], you've advanced to level [[LEVEL]] in [[SERVER]]!",
-            "lvl_msg_channel": "dm", # "dm" or "target_channel_id"
+            "lvl_msg_channel": "dm",
             "lvl_msg_embed": "1",
-            "lvl_msg_interval": "1", # every X levels (1 = all)
-            "lvl_msg_reward_only": "0", # only msg on reward roles
-            "lvl_msg_interval_stop": "0" # stop intervals after level X
+            "lvl_msg_interval": "1",
+            "lvl_msg_reward_only": "0",
+            "lvl_msg_interval_stop": "0",
+            # Reward Sync Settings
+            "reward_sync_mode": "levelup",     # "levelup", "always", "never"
+            "reward_manual_sync": "0",          # members can /rolesync
+            "reward_sync_warning": "1",         # show warning in /rank
+            "reward_exclude_enabled": "0",      # exclude roles from sync
+            "reward_exclude_roles": "",         # comma-separated role IDs
         }
         for k, v in defaults.items():
             if k not in settings:
@@ -218,34 +224,49 @@ class LevelingCog(commands.Cog):
             )
             self.profile_sync_times[message.author.id] = time.time()
 
-    async def handle_level_up(self, message, new_level, settings):
-        # 1. Reward Roles Logic
-        rewards = self.cache["rewards"]
-        new_reward = next((r for r in rewards if r["level"] == new_level), None)
+    async def apply_reward_roles(self, member, level, settings, rewards):
+        """Core logic for syncing reward roles for a member at given level. Returns True if a new role was granted."""
         earned_reward = False
-
+        
+        # Get excluded role IDs if the feature is enabled
+        excluded_ids = set()
+        if settings.get("reward_exclude_enabled") == "1":
+            raw = settings.get("reward_exclude_roles", "")
+            excluded_ids = {rid.strip() for rid in raw.split(",") if rid.strip()}
+        
+        new_reward = next((r for r in rewards if r["level"] == level), None)
+        
         if new_reward:
-            role = message.guild.get_role(int(new_reward["role_id"]))
-            if role:
+            role = member.guild.get_role(int(new_reward["role_id"]))
+            if role and str(role.id) not in excluded_ids:
                 try:
-                    # Add new role
-                    if role not in message.author.roles:
-                        await message.author.add_roles(role, reason=f"Level {new_level} Reward")
+                    if role not in member.roles:
+                        await member.add_roles(role, reason=f"Level {level} Reward")
                         earned_reward = True
                     
-                    # Replace old roles if stacking is disabled for this level
+                    # Remove old reward roles if stacking is disabled
                     if not new_reward["stack_role"]:
-                        # Find other reward roles that should be removed
                         to_remove = []
                         for r in rewards:
-                            if r["level"] < new_level:
-                                old_role = message.guild.get_role(int(r["role_id"]))
-                                if old_role and old_role in message.author.roles:
+                            if r["level"] < level:
+                                old_role = member.guild.get_role(int(r["role_id"]))
+                                if old_role and old_role in member.roles and str(old_role.id) not in excluded_ids:
                                     to_remove.append(old_role)
                         if to_remove:
-                            await message.author.remove_roles(*to_remove, reason="Level Role Replacement")
+                            await member.remove_roles(*to_remove, reason="Level Role Replacement")
                 except discord.Forbidden:
-                    logger.warning(f"Forbidden: Cannot manage roles for {message.author}")
+                    logger.warning(f"Forbidden: Cannot manage roles for {member}")
+        
+        return earned_reward
+
+    async def handle_level_up(self, message, new_level, settings):
+        rewards = self.cache["rewards"]
+        
+        # 1. Reward Roles — obey sync mode setting
+        sync_mode = settings.get("reward_sync_mode", "levelup")
+        earned_reward = False
+        if sync_mode in ("levelup", "always"):
+            earned_reward = await self.apply_reward_roles(message.author, new_level, settings, rewards)
 
         # 2. Notification Logic
         if settings.get("lvl_msg_enabled") != "1":
@@ -376,7 +397,54 @@ class LevelingCog(commands.Cog):
         if active_mults:
             embed.set_footer(text=f"Active Multipliers: {', '.join(active_mults)} Total: {user_multiplier:.2f}x")
 
+        # Sync warning: check if member is missing earned reward roles
+        if settings.get("reward_sync_warning", "1") == "1":
+            rewards_list = await get_reward_roles()
+            member_role_ids = {str(r.id) for r in member.roles}
+            missing = [r for r in rewards_list if r["level"] <= current_level and str(r["role_id"]) not in member_role_ids]
+            if missing:
+                embed.add_field(
+                    name="⚠️ Roles Out of Sync",
+                    value=f"You're missing {len(missing)} reward role(s). Use `/rolesync` to fix this!",
+                    inline=False
+                )
+
         await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="rolesync", description="Sync your level reward roles")
+    async def rolesync(self, interaction: discord.Interaction):
+        settings = await get_level_settings()
+        if settings.get("reward_manual_sync") != "1":
+            return await interaction.response.send_message("❌ Manual role syncing is disabled on this server.", ephemeral=True)
+
+        await interaction.response.defer(ephemeral=True)
+        member = interaction.user
+        data = await get_user_xp_data(member.id)
+
+        c3 = float(settings.get("c3", 1))
+        c2 = float(settings.get("c2", 50))
+        c1 = float(settings.get("c1", 100))
+        r_val = int(settings.get("rounding", 100))
+        current_level = calculate_level_for_xp(data["xp"], c3, c2, c1, r_val)
+
+        rewards_list = await get_reward_roles()
+        member_role_ids = {str(r.id) for r in member.roles}
+
+        synced = 0
+        for reward in rewards_list:
+            if reward["level"] <= current_level and str(reward["role_id"]) not in member_role_ids:
+                role = member.guild.get_role(int(reward["role_id"]))
+                if role:
+                    try:
+                        await member.add_roles(role, reason="Manual /rolesync")
+                        synced += 1
+                    except discord.Forbidden:
+                        pass
+
+        if synced:
+            await interaction.followup.send(f"✅ Synced! Added {synced} missing reward role(s).", ephemeral=True)
+        else:
+            await interaction.followup.send("✅ Your roles are already up to date!", ephemeral=True)
 
     @app_commands.command(name="leaderboard", description="View the top 25 users")
     async def leaderboard_slash(self, interaction: discord.Interaction):
