@@ -400,35 +400,34 @@ class LevelingCog(commands.Cog):
         msg_min = int(remaining_xp / (xp_max_setting * user_multiplier)) if (xp_max_setting * user_multiplier) > 0 else 0
         msg_max = int(remaining_xp / (xp_min_setting * user_multiplier)) if (xp_min_setting * user_multiplier) > 0 else 0
         
-        # Progress Bar
-        bar_len = 20
+        # Progress Bar — use ▓/░ at width 30 for crisp Discord rendering
+        bar_len = 28
         filled = int((percentage / 100) * bar_len)
-        bar = "█" * filled + "░" * (bar_len - filled)
+        bar = "▓" * filled + "░" * (bar_len - filled)
 
-        embed = discord.Embed(
-            title=f"✨ {member.display_name}'s Progress",
-            color=member.color
-        )
-        embed.set_thumbnail(url=member.display_avatar.url)
-        
-        # row 1: XP field label changes based on relative_xp setting
+        embed = discord.Embed(color=member.color if member.color.value else discord.Color.from_rgb(99, 102, 241))
+        embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
+
+        # row 1: XP fields
         if relative_xp:
-            # Show "progress_xp / needed_xp" (relative to current level)
             embed.add_field(name="✨ Level", value=str(current_level), inline=True)
-            embed.add_field(name="⏩ Progress", value=f"{int(progress_xp):,}/{int(needed_xp):,} XP\n({int(remaining_xp):,} to go)", inline=True)
+            embed.add_field(name="⏩ Next level", value=f"{int(progress_xp):,}/{int(needed_xp):,}\n({int(remaining_xp):,} more)", inline=True)
         else:
-            # Show raw total XP
             embed.add_field(name="✨ XP", value=f"{data['xp']:,} (lv. {current_level})", inline=True)
-            embed.add_field(name="⏩ Next Level", value=f"{int(progress_xp):,}/{int(needed_xp):,}\n({int(remaining_xp):,} more)", inline=True)
+            embed.add_field(name="⏩ Next level", value=f"{int(progress_xp):,}/{int(needed_xp):,}\n({int(remaining_xp):,} more)", inline=True)
 
         if not hide_cooldown:
             embed.add_field(name="🕒 Cooldown", value=cooldown_status, inline=True)
-        
-        # row 2
-        embed.add_field(name="📊 Progress", value=f"`{bar}` ({percentage:.1f}%)\n**{msg_min}-{msg_max} messages to go!**", inline=False)
-        
+
+        # Progress bar line
+        embed.add_field(
+            name="\u200b",
+            value=f"`{bar}` ({percentage:.1f}%)\n{msg_min}–{msg_max} messages to go!",
+            inline=False
+        )
+
         if active_mults and not hide_mults:
-            embed.set_footer(text=f"Active Multipliers: {', '.join(active_mults)} Total: {user_multiplier:.2f}x")
+            embed.set_footer(text=f"Multipliers active: {', '.join(active_mults)} → {user_multiplier:.2f}x total")
 
         # Sync warning: check if member is missing earned reward roles
         if settings.get("reward_sync_warning", "1") == "1":
