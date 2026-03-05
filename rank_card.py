@@ -217,8 +217,8 @@ def build_rank_card(
     # ── Load fonts ────────────────────────────────────────────────────────────
     # Custom font: username + all stat labels + all stat values
     f_user  = _load_font(font_name, 52)   # username
-    f_label = _load_font(font_name, 28)   # stat labels
-    f_val   = _load_font(font_name, 40)   # stat values — now custom font & 40px
+    f_label = _load_font(font_name, 21)   # stat labels — down 7px from 28
+    f_val   = _load_font(font_name, 33)   # stat values — down from 40
     # Mono for persistent UI elements
     f_level = _load_mono(70)              # big level number top-right
     f_star  = _load_mono(56)              # ★
@@ -237,10 +237,15 @@ def build_rank_card(
 
     # ── USERNAME ──────────────────────────────────────────────────────────────
     uy = 20
+    # Truncate to 17 characters
+    display_name = username
+    if len(display_name) > 17:
+        display_name = display_name[:14] + "..."
+    
     # shadow
-    draw.text((STATS_X + 2, uy + 2), username.upper(), font=f_user,
+    draw.text((STATS_X + 2, uy + 2), display_name.upper(), font=f_user,
               fill=(acc[0]//5, acc[1]//5, acc[2]//5))
-    draw.text((STATS_X, uy), username.upper(), font=f_user, fill=pri)
+    draw.text((STATS_X, uy), display_name.upper(), font=f_user, fill=pri)
 
     # ── 2 × 2 STAT GRID ──────────────────────────────────────────────────────
     # Row 1 y=92 (label), row 2 y=182 (label)  — value 50px below each label
@@ -249,9 +254,9 @@ def build_rank_card(
     cells = [
         # (col_x, label_y,  label_text,              value_text)
         (STATS_X, LABEL_Y1, "RANK",    f"#{server_rank:,}"),
-        (COL2_X,  LABEL_Y1, "BALANCE", f"{balance:,} \U0001f48e"),
+        (COL2_X,  LABEL_Y1, "BALANCE", f"{balance:,} 💎"),
         (STATS_X, LABEL_Y2, "EXP",     f"{int(progress_xp):,} / {int(needed_xp):,}"),
-        (COL2_X,  LABEL_Y2, "MEMBER",  f"{member_days:,} days"),
+        (COL2_X,  LABEL_Y2, "MEMBER",  f"{member_days:,}d"),
     ]
 
     for col_x, lbl_y, label, value in cells:
@@ -262,8 +267,8 @@ def build_rank_card(
         draw.text((col_x + lbl_w + 15, lbl_y - 12), value, font=f_val, fill=pri)
 
     # ── XP PROGRESS BAR ───────────────────────────────────────────────────────
-    bar_h  = 12
-    bar_y  = H - 30
+    bar_h  = 24   # was 12
+    bar_y  = H - 42
     bar_x0, bar_x1 = STATS_X, W - 20
     bar_r  = bar_h // 2
 
@@ -276,8 +281,11 @@ def build_rank_card(
 
     pct_str = f"{bar_pct:.1f}%"
     px = bar_x0 + (bar_x1 - bar_x0) // 2 - int(draw.textlength(pct_str, font=f_pct)) // 2
+    # Adjust py slightly to center text in the thicker bar
+    py = bar_y + (bar_h // 2) - 8
+    
     luma = 0.299*theme["bar_fill"][0] + 0.587*theme["bar_fill"][1] + 0.114*theme["bar_fill"][2]
-    draw.text((px, bar_y - 1), pct_str, font=f_pct,
+    draw.text((px, py), pct_str, font=f_pct,
               fill=(10, 10, 10) if luma > 140 else (230, 230, 230))
 
     # ── Watermark ─────────────────────────────────────────────────────────────

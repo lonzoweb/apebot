@@ -336,7 +336,7 @@ class LevelingCog(commands.Cog):
     # ──────────────────────────────────────────────────────────────────────────
     # /rank  — unified command
     # ──────────────────────────────────────────────────────────────────────────
-    async def _build_and_send_card(self, interaction: discord.Interaction, member: discord.Member, invoker_id: int):
+    async def _build_and_send_card(self, interaction: discord.Interaction, member: discord.Member, invoker_id: int, display_name: str):
         """Shared helper: gathers data, renders Pillow image, sends it."""
         settings = await get_level_settings()
         is_ephemeral = settings.get("rank_force_hidden") == "1"
@@ -392,7 +392,7 @@ class LevelingCog(commands.Cog):
         loop = asyncio.get_event_loop()
         img_buf = await loop.run_in_executor(
             None, rc.build_rank_card,
-            member.name, current_level, server_rank, balance,
+            display_name, current_level, server_rank, balance,
             data["xp"], progress_xp, needed_xp, percentage,
             avatar_bytes, prefs["font"], prefs["theme"],
             member_days
@@ -408,6 +408,7 @@ class LevelingCog(commands.Cog):
         member="User to check (defaults to yourself)",
         font="Update your rank card font style",
         theme="Update your rank card colour theme",
+        display="Switch between showing your Discord username or server nickname",
     )
     async def rank_slash(
         self,
@@ -415,12 +416,13 @@ class LevelingCog(commands.Cog):
         member: discord.Member = None,
         font: Literal["Avenger", "Disney", "Chalice", "Truckin", "StarWars", "Pokemon"] = None,
         theme: Literal["matrix", "cyberpunk", "vampire", "ghost", "obsidian", "aurora", "crimson", "void"] = None,
+        display: Literal["username", "nickname"] = None,
     ):
         invoker_id = interaction.user.id
         target = member or interaction.user
 
-        # 10-second cooldown when viewing own card (and not just updating font/theme)
-        if target.id == invoker_id and not (font or theme):
+        # 10-second cooldown when viewing own card (and not just updating font/theme/display)
+        if target.id == invoker_id and not (font or theme or display):
             now  = time.time()
             last = self._rank_cooldowns.get(invoker_id, 0)
             if now - last < 10:
@@ -433,17 +435,28 @@ class LevelingCog(commands.Cog):
         if settings.get("rank_enabled", "1") == "0" and target == interaction.user:
             return await interaction.response.send_message("❌ Rank cards are disabled on this server.", ephemeral=True)
 
-        # Handle font/theme updates
-        if font or theme:
-            await set_rank_card_prefs(invoker_id, font=font, theme=theme)
+        # Handle font/theme/display updates
+        if font or theme or display:
+            await set_rank_card_prefs(invoker_id, font=font, theme=theme, display_type=display)
             # Notify but then proceed to show the card
-            update_msg = "✅ Preferences updated! Showing your new card:"
+            update_msg = "✅ Preferences updated! Showing your updated card:"
             if not interaction.response.is_done():
                 await interaction.response.send_message(update_msg, ephemeral=True)
             else:
                 await interaction.followup.send(update_msg, ephemeral=True)
 
-        await self._build_and_send_card(interaction, target, invoker_id)
+        # Fetch prefs for the target (we use THEIR display preference, but INVOKER'S theme if viewing own?)
+        # Actually, let's use the target's preference for name, but invoker's theme for the card frame?
+        # Usually, rank cards show the target's custom style.
+        target_prefs = await get_rank_card_prefs(target.id)
+        
+        # Determine name to display based on target's preference
+        if target_prefs["display_type"] == "nickname":
+            display_name = target.nick or target.display_name
+        else:
+            display_name = target.name
+
+        await self._build_and_send_card(interaction, target, invoker_id, display_name)
 
 
 

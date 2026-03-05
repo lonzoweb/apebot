@@ -358,9 +358,10 @@ async def init_db():
             await conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS rank_card_prefs (
-                    user_id TEXT PRIMARY KEY,
-                    font    TEXT DEFAULT 'Avenger',
-                    theme   TEXT DEFAULT 'matrix'
+                    user_id      TEXT PRIMARY KEY,
+                    font         TEXT DEFAULT 'Avenger',
+                    theme        TEXT DEFAULT 'matrix',
+                    display_type TEXT DEFAULT 'username'
                 )
                 """
             )
@@ -385,24 +386,26 @@ async def get_user_rank(user_id: int) -> int:
 async def get_rank_card_prefs(user_id: int) -> dict:
     async with get_db() as conn:
         async with conn.execute(
-            "SELECT font, theme FROM rank_card_prefs WHERE user_id = ?",
+            "SELECT font, theme, display_type FROM rank_card_prefs WHERE user_id = ?",
             (str(user_id),),
         ) as cur:
             row = await cur.fetchone()
             if row:
-                return {"font": row[0], "theme": row[1]}
-            return {"font": "Avenger", "theme": "matrix"}
+                return {"font": row[0], "theme": row[1], "display_type": row[2] or "username"}
+            return {"font": "Avenger", "theme": "matrix", "display_type": "username"}
 
 
-async def set_rank_card_prefs(user_id: int, font: str = None, theme: str = None):
+async def set_rank_card_prefs(user_id: int, font: str = None, theme: str = None, display_type: str = None):
     prefs = await get_rank_card_prefs(user_id)
     new_font  = font  if font  else prefs["font"]
     new_theme = theme if theme else prefs["theme"]
+    new_disp  = display_type if display_type else prefs["display_type"]
     async with get_db() as conn:
         await conn.execute(
-            "INSERT OR REPLACE INTO rank_card_prefs (user_id, font, theme) VALUES (?, ?, ?)",
-            (str(user_id), new_font, new_theme),
+            "INSERT OR REPLACE INTO rank_card_prefs (user_id, font, theme, display_type) VALUES (?, ?, ?, ?)",
+            (str(user_id), new_font, new_theme, new_disp),
         )
+        await conn.commit()
 
 
 # ============================================================
