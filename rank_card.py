@@ -217,23 +217,28 @@ def build_rank_card(
     # ── Load fonts ────────────────────────────────────────────────────────────
     # Custom font: username + all stat labels + all stat values
     f_user  = _load_font(font_name, 46)   # username — down 6px from 52
-    f_label = _load_font(font_name, 21)   # stat labels — down 7px from 28
-    f_val   = _load_font(font_name, 33)   # stat values — down from 40
-    # Mono for persistent UI elements
-    f_level = _load_mono(70)              # big level number top-right
-    f_star  = _load_mono(56)              # ★
-    f_pct   = _load_mono(14)             # % inside bar
+    f_label = _load_font(font_name, 21)   # stat labels
+    f_val   = _load_font(font_name, 33)   # stat values
+    f_level = _load_font(font_name, 46)   # level — now same as username
+    
+    # Mono for persistent UI elements (star is being replaced)
+    f_pct   = _load_mono(18, bold=True)  # % inside bar — made larger/bolder
     f_wmark = _load_mono(13)             # theme watermark
 
-    # ── ★ LEVEL — top-right ───────────────────────────────────────────────────
-    star_str  = "★"
-    level_str = str(level)
-    star_w = draw.textlength(star_str, font=f_star)
-    lvl_w  = draw.textlength(level_str, font=f_level)
-    sx = W - int(star_w + 10 + lvl_w) - 16
-    sy = 8
-    draw.text((sx, sy),                  star_str,  font=f_star,  fill=acc)
-    draw.text((sx + star_w + 10, sy + 6), level_str, font=f_level, fill=acc)
+    # ── LEVEL CIRCLE ── top-right
+    lvl_str = str(level)
+    circ_size = 80
+    cx, cy = W - circ_size - 25, 20
+    # draw circle
+    draw.ellipse([cx, cy, cx+circ_size, cy+circ_size], outline=acc, width=3)
+    # text centering
+    l_w = draw.textlength(lvl_str, font=f_level)
+    tx = cx + (circ_size - l_w) // 2
+    ty = cy + (circ_size - 46) // 2 - 4
+    draw.text((tx, ty), lvl_str, font=f_level, fill=pri)
+    # Small "LVL" tag above or inside? Let's put it tiny inside
+    f_tiny = _load_mono(10)
+    draw.text((cx + (circ_size - 20)//2, cy + 10), "LVL", font=f_tiny, fill=sec)
 
     # ── USERNAME ──────────────────────────────────────────────────────────────
     uy = 20
@@ -248,8 +253,7 @@ def build_rank_card(
     draw.text((STATS_X, uy), display_name.upper(), font=f_user, fill=pri)
 
     # ── 2 × 2 STAT GRID ──────────────────────────────────────────────────────
-    # Row 1 y=92 (label), row 2 y=182 (label)  — value 50px below each label
-    LABEL_Y1, LABEL_Y2 = 95, 185
+    LABEL_Y1, LABEL_Y2 = 105, 165  # Tighter row gap
 
     cells = [
         # (col_x, label_y,  label_text,              value_text)
@@ -280,13 +284,16 @@ def build_rank_card(
                                 radius=bar_r, fill=theme["bar_fill"])
 
     pct_str = f"{bar_pct:.1f}%"
-    px = bar_x0 + (bar_x1 - bar_x0) // 2 - int(draw.textlength(pct_str, font=f_pct)) // 2
-    # Adjust py to center text in the 35px bar
-    py = bar_y + (bar_h // 2) - 8
+    p_w = draw.textlength(pct_str, font=f_pct)
+    px = bar_x0 + (bar_x1 - bar_x0) // 2 - int(p_w) // 2
+    py = bar_y + (bar_h // 2) - 11
     
+    # Shadow for pure readability
+    draw.text((px+1, py+1), pct_str, font=f_pct, fill=(0,0,0,180))
+    # High contrast color logic
     luma = 0.299*theme["bar_fill"][0] + 0.587*theme["bar_fill"][1] + 0.114*theme["bar_fill"][2]
     draw.text((px, py), pct_str, font=f_pct,
-              fill=(10, 10, 10) if luma > 140 else (230, 230, 230))
+              fill=(10, 10, 10) if luma > 150 else (255, 255, 255))
 
     # ── Watermark ─────────────────────────────────────────────────────────────
     draw.text((AVATAR_X, H - 16), theme.get("label", ""), font=f_wmark,
