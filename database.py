@@ -359,7 +359,7 @@ async def init_db():
                 """
                 CREATE TABLE IF NOT EXISTS rank_card_prefs (
                     user_id TEXT PRIMARY KEY,
-                    font    TEXT DEFAULT 'Halo',
+                    font    TEXT DEFAULT 'Avenger',
                     theme   TEXT DEFAULT 'matrix'
                 )
                 """
@@ -391,7 +391,7 @@ async def get_rank_card_prefs(user_id: int) -> dict:
             row = await cur.fetchone()
             if row:
                 return {"font": row[0], "theme": row[1]}
-            return {"font": "Halo", "theme": "matrix"}
+            return {"font": "Avenger", "theme": "matrix"}
 
 
 async def set_rank_card_prefs(user_id: int, font: str = None, theme: str = None):

@@ -137,7 +137,7 @@ AVATAR_SIZE  = 200
 AVATAR_X     = 25
 AVATAR_Y     = (H - AVATAR_SIZE) // 2   # vertically centered
 STATS_X      = AVATAR_X + AVATAR_SIZE + 28   # left edge of text area
-COL2_X       = STATS_X + 330                 # second column of 2x2 grid
+COL2_X       = STATS_X + 380                 # second column of 2x2 grid — was 330
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ def build_rank_card(
     needed_xp:    int,
     bar_pct:      float,        # 0-100
     avatar_bytes: bytes | None,
-    font_name:    str = "Halo",
+    font_name:    str = "Avenger",
     theme_name:   str = "matrix",
     member_days:  int = 0,
 ) -> io.BytesIO:
@@ -217,9 +217,9 @@ def build_rank_card(
     # ── Load fonts ────────────────────────────────────────────────────────────
     # Custom font: username + all stat labels
     f_user  = _load_font(font_name, 52)   # username
-    f_label = _load_font(font_name, 44)   # stat labels (RANK, BALANCE, etc.) — was 42
+    f_label = _load_font(font_name, 28)   # stat labels (RANK, BALANCE, etc.) — was 44
     # Mono for pure numbers / progress bar %
-    f_val   = _load_mono(34)              # stat values
+    f_val   = _load_mono(36)              # stat values — was 34
     f_level = _load_mono(70)              # big level number top-right
     f_star  = _load_mono(56)              # ★
     f_pct   = _load_mono(14)             # % inside bar
@@ -245,7 +245,6 @@ def build_rank_card(
     # ── 2 × 2 STAT GRID ──────────────────────────────────────────────────────
     # Row 1 y=92 (label), row 2 y=182 (label)  — value 50px below each label
     LABEL_Y1, LABEL_Y2 = 95, 185
-    VAL_OFFSET = 48   # px below label to place value
 
     cells = [
         # (col_x, label_y,  label_text,              value_text,                  val_color)
@@ -255,9 +254,11 @@ def build_rank_card(
         (COL2_X,  LABEL_Y2, "MEMBER",  f"{member_days:,} days",         sec),
     ]
 
-    for col_x, lbl_y, label, value, val_col in cells:
+    for col_x, lbl_y, label, value, _ in cells:
         draw.text((col_x, lbl_y), label, font=f_label, fill=sec)
-        draw.text((col_x, lbl_y + VAL_OFFSET), value, font=f_val, fill=val_col)
+        # Calculate width of label to place value right after it
+        lbl_w = draw.textlength(label, font=f_label)
+        draw.text((col_x + lbl_w + 12, lbl_y - 4), value, font=f_val, fill=pri)
 
     # ── XP PROGRESS BAR ───────────────────────────────────────────────────────
     bar_h  = 12
