@@ -8,6 +8,7 @@ Falls back to PIL default font if download fails.
 import io
 import logging
 import urllib.request
+import math
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
@@ -202,6 +203,7 @@ def build_rank_card(
     font_name:    str = "Avenger",
     theme_name:   str = "matrix",
     member_days:  int = 0,
+    avg_xp:       int = 20,
 ) -> io.BytesIO:
     theme = THEMES.get(theme_name, THEMES["matrix"])
     card  = Image.new("RGB", (W, H), theme["bg_bot"])
@@ -278,22 +280,37 @@ def build_rank_card(
 
     draw.rounded_rectangle([bar_x0, bar_y, bar_x1, bar_y + bar_h],
                             radius=bar_r, fill=theme["bar_bg"], outline=acc, width=1)
-    fill_w = int((bar_pct / 100) * (bar_x1 - bar_x0))
+    
+    bar_width = bar_x1 - bar_x0
+    fill_w = int((bar_pct / 100) * bar_width)
     if fill_w > bar_r * 2:
         draw.rounded_rectangle([bar_x0, bar_y, bar_x0 + fill_w, bar_y + bar_h],
                                 radius=bar_r, fill=theme["bar_fill"])
 
-    pct_str = f"{bar_pct:.1f}%"
-    p_w = draw.textlength(pct_str, font=f_pct)
-    px = bar_x0 + (bar_x1 - bar_x0) // 2 - int(p_w) // 2
-    py = bar_y + (bar_h // 2) - 11
+    # Calculate messages left
+    xp_left = max(0, needed_xp - progress_xp)
+    msgs_left = math.ceil(xp_left / avg_xp) if avg_xp > 0 else 0
+    pct_str = f"{bar_pct:.1f}% • ~{msgs_left:,} msgs left"
     
-    # Shadow for pure readability
-    draw.text((px+1, py+1), pct_str, font=f_pct, fill=(0,0,0,180))
-    # High contrast color logic
-    luma = 0.299*theme["bar_fill"][0] + 0.587*theme["bar_fill"][1] + 0.114*theme["bar_fill"][2]
-    draw.text((px, py), pct_str, font=f_pct,
-              fill=(10, 10, 10) if luma > 150 else (255, 255, 255))
+    p_w = draw.textlength(pct_str, font=f_pct)
+    padding = 12
+    empty_w = bar_width - fill_w
+    
+    # Position logic: try empty space first
+    if p_w + padding * 2 <= empty_w:
+        px = bar_x0 + fill_w + padding
+        text_fill = (255, 255, 255) # Pure white in the dark part
+    else:
+        # Put it in the filled part
+        px = bar_x0 + padding
+        # Contrast logic for filled part
+        luma = 0.299*theme["bar_fill"][0] + 0.587*theme["bar_fill"][1] + 0.114*theme["bar_fill"][2]
+        text_fill = (10, 10, 10) if luma > 150 else (255, 255, 255)
+
+    py = bar_y + (bar_h // 2) - 11
+    # Shadow for extra readability
+    draw.text((px+1, py+1), pct_str, font=f_pct, fill=(0,0,0,160))
+    draw.text((px, py), pct_str, font=f_pct, fill=text_fill)
 
     # ── Watermark ─────────────────────────────────────────────────────────────
     draw.text((AVATAR_X, H - 16), theme.get("label", ""), font=f_wmark,

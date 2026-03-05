@@ -389,13 +389,18 @@ class LevelingCog(commands.Cog):
         except Exception:
             pass
 
+        # Average XP for msgs_left estimate
+        xp_min = float(settings.get("xp_min", 15))
+        xp_max = float(settings.get("xp_max", 25))
+        avg_xp = (xp_min + xp_max) / 2
+
         loop = asyncio.get_event_loop()
         img_buf = await loop.run_in_executor(
             None, rc.build_rank_card,
             display_name, current_level, server_rank, balance,
             data["xp"], progress_xp, needed_xp, percentage,
             avatar_bytes, prefs["font"], prefs["theme"],
-            member_days
+            member_days, avg_xp
         )
 
         await interaction.followup.send(
