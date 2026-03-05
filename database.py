@@ -365,6 +365,11 @@ async def init_db():
                 )
                 """
             )
+            # Migration: Ensure display_type column exists for users who already had the table
+            try:
+                await conn.execute("ALTER TABLE rank_card_prefs ADD COLUMN display_type TEXT DEFAULT 'username'")
+            except Exception:
+                pass # Already exists
 
             await conn.commit()
         logger.info("✅ Database tables initialized (all modules unified).")

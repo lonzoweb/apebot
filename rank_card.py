@@ -26,8 +26,8 @@ FONT_URLS: dict[str, str] = {
     "StarWars": "https://github.com/google/fonts/raw/main/ofl/audiowide/Audiowide-Regular.ttf",
     "Pokemon":  "https://github.com/google/fonts/raw/main/ofl/titanone/TitanOne-Regular.ttf",
     # Mono for numbers / bar %
-    "_Mono":    "https://github.com/google/fonts/raw/main/apache/robotomono/RobotoMono-Bold.ttf",
-    "_MonoReg": "https://github.com/google/fonts/raw/main/apache/robotomono/RobotoMono-Regular.ttf",
+    "_Mono":    "https://github.com/google/fonts/raw/main/apache/robotomono/static/RobotoMono-Bold.ttf",
+    "_MonoReg": "https://github.com/google/fonts/raw/main/apache/robotomono/static/RobotoMono-Regular.ttf",
 }
 
 FONT_DISPLAY_NAMES = ["Avenger", "Disney", "Chalice", "Truckin", "StarWars", "Pokemon"]
