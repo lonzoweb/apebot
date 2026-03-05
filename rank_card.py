@@ -249,12 +249,12 @@ def build_rank_card(
     _draw_avatar(card, avatar_bytes, theme["ring"], AVATAR_SIZE)
 
     # ── fonts ─────────────────────────────────────────────────────────────────
-    f_name   = _load_font(font_name, 36)   # username
-    f_stat   = _load_mono(22)              # stat labels
-    f_stat_v = _load_mono(22, bold=False)  # stat values (slightly lighter)
-    f_level  = _load_mono(52)             # big level number
-    f_star   = _load_mono(40)             # ★ glyph
-    f_label  = _load_mono(13)             # theme label watermark
+    f_name   = _load_font(font_name, 52)   # username — was 36
+    f_stat   = _load_mono(28)              # stat labels — was 22
+    f_stat_v = _load_mono(28, bold=False)  # stat values
+    f_level  = _load_mono(70)             # big level number — was 52
+    f_star   = _load_mono(56)             # ★ glyph — was 40
+    f_label  = _load_mono(14)             # theme watermark
 
     acc = theme["accent"]
     pri = theme["text_pri"]
@@ -267,64 +267,63 @@ def build_rank_card(
     lvl_w     = draw.textlength(level_str, font=f_level)
     total_w   = int(star_w + 8 + lvl_w)
     sx = W - total_w - 18
-    sy = 12
-    draw.text((sx, sy),            star_str,  font=f_star,  fill=acc)
-    draw.text((sx + star_w + 8, sy + 4), level_str, font=f_level, fill=acc)
+    sy = 8
+    draw.text((sx, sy),                  star_str,  font=f_star,  fill=acc)
+    draw.text((sx + star_w + 8, sy + 6), level_str, font=f_level, fill=acc)
 
     # ── USERNAME ──────────────────────────────────────────────────────────────
-    uy = 22
-    # Glow: draw slightly blurred version behind (simulate)
-    draw.text((STATS_X, uy), username.upper(), font=f_name, fill=(acc[0]//3, acc[1]//3, acc[2]//3))
-    draw.text((STATS_X - 1, uy - 1), username.upper(), font=f_name, fill=pri)
+    uy = 18
+    draw.text((STATS_X + 1, uy + 1), username.upper(), font=f_name,
+              fill=(acc[0]//4, acc[1]//4, acc[2]//4))   # shadow
+    draw.text((STATS_X, uy), username.upper(), font=f_name, fill=pri)
 
     # ── STAT ROWS ─────────────────────────────────────────────────────────────
-    row1_y = uy + 56
-    row2_y = row1_y + 36
-    row3_y = row2_y + 36
+    row1_y = uy + 70    # RANK
+    row2_y = row1_y + 44
+    row3_y = row2_y + 44
 
     # Row 1: RANK #N
     draw.text((STATS_X, row1_y), "RANK", font=f_stat, fill=sec)
-    draw.text((STATS_X + 80, row1_y), f"#{server_rank:,}", font=f_stat_v, fill=acc)
+    draw.text((STATS_X + 100, row1_y), f"#{server_rank:,}", font=f_stat_v, fill=acc)
 
     # Row 2: BALANCE  N 💎
-    bal_str = f"{balance:,} 💎"
     draw.text((STATS_X, row2_y), "BALANCE", font=f_stat, fill=sec)
-    draw.text((STATS_X + 120, row2_y), bal_str, font=f_stat_v, fill=pri)
+    draw.text((STATS_X + 148, row2_y), f"{balance:,} 💎", font=f_stat_v, fill=pri)
 
     # Row 3: EXP  progress/needed  (total TOTAL)
-    exp_str = f"{int(progress_xp):,} / {int(needed_xp):,}   ({total_xp:,} TOTAL)"
+    exp_str = f"{int(progress_xp):,} / {int(needed_xp):,}  ({total_xp:,} TOTAL)"
     draw.text((STATS_X, row3_y), "EXP", font=f_stat, fill=sec)
-    draw.text((STATS_X + 60, row3_y), exp_str, font=f_stat_v, fill=pri)
+    draw.text((STATS_X + 76, row3_y), exp_str, font=f_stat_v, fill=pri)
 
     # ── XP PROGRESS BAR ───────────────────────────────────────────────────────
-    bar_y = H - 50
+    bar_h  = 12                           # thinner — was 18
+    bar_y  = H - 32
     bar_x0, bar_x1 = STATS_X, W - 20
-    bar_h = 18
-    bar_r = bar_h // 2   # corner radius
+    bar_r  = bar_h // 2
 
-    # trough
     draw.rounded_rectangle([bar_x0, bar_y, bar_x1, bar_y + bar_h],
                             radius=bar_r, fill=theme["bar_bg"], outline=acc, width=1)
-    # fill
+
     fill_w = int((bar_pct / 100) * (bar_x1 - bar_x0))
     if fill_w > bar_r * 2:
         draw.rounded_rectangle([bar_x0, bar_y, bar_x0 + fill_w, bar_y + bar_h],
                                 radius=bar_r, fill=theme["bar_fill"])
 
-    # percentage label inside bar
+    # percentage label to the right of the bar
     pct_str = f"{bar_pct:.1f}%"
-    f_pct = _load_mono(13)
-    pw = draw.textlength(pct_str, font=f_pct)
-    px = bar_x0 + (bar_x1 - bar_x0) // 2 - int(pw) // 2
-    luma_fill = 0.299*theme["bar_fill"][0] + 0.587*theme["bar_fill"][1] + 0.114*theme["bar_fill"][2]
-    pct_color = (10, 10, 10) if luma_fill > 140 else (220, 220, 220)
-    draw.text((px, bar_y + 2), pct_str, font=f_pct, fill=pct_color)
+    f_pct   = _load_mono(14)
+    pct_x   = bar_x0 + (bar_x1 - bar_x0) // 2 - int(draw.textlength(pct_str, font=f_pct)) // 2
+    luma    = 0.299*theme["bar_fill"][0] + 0.587*theme["bar_fill"][1] + 0.114*theme["bar_fill"][2]
+    draw.text((pct_x, bar_y - 1), pct_str, font=f_pct,
+              fill=(10, 10, 10) if luma > 140 else (230, 230, 230))
 
     # ── theme watermark (bottom-left, faint) ─────────────────────────────────
-    draw.text((AVATAR_X, H - 18), theme.get("label", ""), font=f_label,
+    draw.text((AVATAR_X, H - 16), theme.get("label", ""), font=f_label,
               fill=(acc[0]//4, acc[1]//4, acc[2]//4))
+
 
     buf = io.BytesIO()
     card.save(buf, "PNG", optimize=True)
     buf.seek(0)
     return buf
+
