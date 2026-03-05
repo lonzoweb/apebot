@@ -137,7 +137,7 @@ AVATAR_SIZE  = 200
 AVATAR_X     = 25
 AVATAR_Y     = (H - AVATAR_SIZE) // 2   # vertically centered
 STATS_X      = AVATAR_X + AVATAR_SIZE + 28   # left edge of text area
-COL2_X       = STATS_X + 300                 # second column of 2x2 grid — brought in to 300
+COL2_X       = STATS_X + 330                 # second column of 2x2 grid — slightly widened from 300
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -216,7 +216,7 @@ def build_rank_card(
 
     # ── Load fonts ────────────────────────────────────────────────────────────
     # Custom font: username + all stat labels + all stat values
-    f_user  = _load_font(font_name, 52)   # username
+    f_user  = _load_font(font_name, 46)   # username — down 6px from 52
     f_label = _load_font(font_name, 21)   # stat labels — down 7px from 28
     f_val   = _load_font(font_name, 33)   # stat values — down from 40
     # Mono for persistent UI elements
@@ -255,7 +255,7 @@ def build_rank_card(
         # (col_x, label_y,  label_text,              value_text)
         (STATS_X, LABEL_Y1, "RANK",    f"#{server_rank:,}"),
         (COL2_X,  LABEL_Y1, "BALANCE", f"{balance:,} 💎"),
-        (STATS_X, LABEL_Y2, "EXP",     f"{int(progress_xp):,} / {int(needed_xp):,}"),
+        (STATS_X, LABEL_Y2, "EXP",     f"{int(progress_xp)}/{int(needed_xp)}"),
         (COL2_X,  LABEL_Y2, "MEMBER",  f"{member_days:,}d"),
     ]
 
@@ -267,10 +267,10 @@ def build_rank_card(
         draw.text((col_x + lbl_w + 15, lbl_y - 12), value, font=f_val, fill=pri)
 
     # ── XP PROGRESS BAR ───────────────────────────────────────────────────────
-    bar_h  = 24   # was 12
-    bar_y  = H - 42
+    bar_h  = 35   # thickened by ~44% from 24
+    bar_y  = H - 52
     bar_x0, bar_x1 = STATS_X, W - 20
-    bar_r  = bar_h // 2
+    bar_r  = 12
 
     draw.rounded_rectangle([bar_x0, bar_y, bar_x1, bar_y + bar_h],
                             radius=bar_r, fill=theme["bar_bg"], outline=acc, width=1)
@@ -281,7 +281,7 @@ def build_rank_card(
 
     pct_str = f"{bar_pct:.1f}%"
     px = bar_x0 + (bar_x1 - bar_x0) // 2 - int(draw.textlength(pct_str, font=f_pct)) // 2
-    # Adjust py slightly to center text in the thicker bar
+    # Adjust py to center text in the 35px bar
     py = bar_y + (bar_h // 2) - 8
     
     luma = 0.299*theme["bar_fill"][0] + 0.587*theme["bar_fill"][1] + 0.114*theme["bar_fill"][2]
