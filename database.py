@@ -354,10 +354,55 @@ async def init_db():
             )
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_profile_updated ON user_profile_cache (last_updated)")
 
+            # 🎨 Rank Card Preferences (per-user font + theme)
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS rank_card_prefs (
+                    user_id TEXT PRIMARY KEY,
+                    font    TEXT DEFAULT 'Halo',
+                    theme   TEXT DEFAULT 'matrix'
+                )
+                """
+            )
+
             await conn.commit()
         logger.info("✅ Database tables initialized (all modules unified).")
     except Exception as e:
         logger.error(f"Error initializing database: {e}", exc_info=True)
+
+
+async def get_user_rank(user_id: int) -> int:
+    """Return 1-indexed server rank by XP (higher XP = lower rank number)."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT COUNT(*) FROM users_xp WHERE xp > (SELECT xp FROM users_xp WHERE user_id = ?)",
+            (str(user_id),),
+        ) as cur:
+            row = await cur.fetchone()
+            return (row[0] + 1) if row else 1
+
+
+async def get_rank_card_prefs(user_id: int) -> dict:
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT font, theme FROM rank_card_prefs WHERE user_id = ?",
+            (str(user_id),),
+        ) as cur:
+            row = await cur.fetchone()
+            if row:
+                return {"font": row[0], "theme": row[1]}
+            return {"font": "Halo", "theme": "matrix"}
+
+
+async def set_rank_card_prefs(user_id: int, font: str = None, theme: str = None):
+    prefs = await get_rank_card_prefs(user_id)
+    new_font  = font  if font  else prefs["font"]
+    new_theme = theme if theme else prefs["theme"]
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO rank_card_prefs (user_id, font, theme) VALUES (?, ?, ?)",
+            (str(user_id), new_font, new_theme),
+        )
 
 
 # ============================================================

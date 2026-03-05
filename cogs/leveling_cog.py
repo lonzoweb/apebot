@@ -2,6 +2,7 @@ import asyncio
 import discord
 from discord.ext import commands
 from discord import app_commands
+from typing import Literal
 import time
 import random
 import math
@@ -9,21 +10,24 @@ import logging
 import json
 import io
 from database import (
-    update_user_xp, get_user_xp_data, get_top_levels, 
+    update_user_xp, get_user_xp_data, get_top_levels,
     get_level_settings, get_level_multipliers, get_reward_roles,
     sync_user_profile, calculate_level_for_xp,
     set_level_setting, sync_server_roles, sync_server_channels,
-    get_cached_roles, init_db, get_cached_channels
+    get_cached_roles, init_db, get_cached_channels,
+    get_user_rank, get_rank_card_prefs, set_rank_card_prefs,
 )
+import rank_card as rc
 
 logger = logging.getLogger(__name__)
 
 class LevelingCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.xp_cooldowns = {} # user_id -> last_xp_time
-        self.profile_sync_times = {} # user_id -> last_sync_time
-        
+        self.xp_cooldowns = {}  # user_id -> last_xp_time
+        self.profile_sync_times = {}  # user_id -> last_sync_time
+        self._rank_cooldowns = {}  # user_id -> last /rank card time
+
         # Performance Cache
         self.cache = {
             "settings": {},
@@ -31,7 +35,7 @@ class LevelingCog(commands.Cog):
             "rewards": [],
             "last_refresh": 0
         }
-        
+
         self.bot.loop.create_task(self.initialize_settings())
 
     async def initialize_settings(self):
@@ -65,6 +69,10 @@ class LevelingCog(commands.Cog):
             if k not in settings:
                 await set_level_setting(k, v)
         logger.info("Initialized Leveling settings.")
+
+        # Pre-fetch rank card fonts in background (non-blocking)
+        import threading
+        threading.Thread(target=rc.prefetch_fonts, daemon=True).start()
         
         # Initial cache populate
         await self.refresh_cache_now()
@@ -325,113 +333,115 @@ class LevelingCog(commands.Cog):
         except Exception:
             pass # Silently fail if DMs closed
 
-    @app_commands.command(name="rank", description="Check your current level and XP")
-    async def rank_slash(self, interaction: discord.Interaction, member: discord.Member = None):
-        member = member or interaction.user
+    # ──────────────────────────────────────────────────────────────────────────
+    # /rank  — command group
+    # ──────────────────────────────────────────────────────────────────────────
+    rank_group = app_commands.Group(name="rank", description="Rank card commands")
+
+    async def _build_and_send_card(self, interaction: discord.Interaction, member: discord.Member):
+        """Shared helper: gathers data, renders Pillow image, sends it."""
         settings = await get_level_settings()
-
-        # --- Setting: rank_enabled ---
-        if settings.get("rank_enabled", "1") == "0" and member == interaction.user:
-            return await interaction.response.send_message("❌ Rank cards are disabled on this server.", ephemeral=True)
-
         is_ephemeral = settings.get("rank_force_hidden") == "1"
-        hide_cooldown = settings.get("rank_hide_cooldown") == "1"
-        hide_mults = settings.get("rank_hide_multipliers") == "1"
-        relative_xp = settings.get("rank_relative_xp", "1") != "0"
+
+        await interaction.response.defer(ephemeral=is_ephemeral)
 
         data = await get_user_xp_data(member.id)
-        
-        # Sync profile on rank check
         await sync_user_profile(member.id, member.display_name, str(member.display_avatar.url))
-        
-        # Formula variables
+
         c3 = float(settings.get("c3", 1))
         c2 = float(settings.get("c2", 50))
         c1 = float(settings.get("c1", 100))
-        r = int(settings.get("rounding", 100))
-        
-        # Ensure level is correct (Recalculate in case of 0 from import)
+        r  = int(settings.get("rounding", 100))
+
         current_level = calculate_level_for_xp(data["xp"], c3, c2, c1, r)
-        
-        # XP for current level start and next level start
-        def get_xp_for_l(L):
-            val = (c3 * (L**3) + c2 * (L**2) + c1 * L)
+
+        def xp_for(L):
+            val = c3 * (L**3) + c2 * (L**2) + c1 * L
             return round(val / r) * r if r > 0 else val
 
-        xp_current_start = get_xp_for_l(current_level)
-        xp_next_start = get_xp_for_l(current_level + 1)
-        
-        progress_xp = data["xp"] - xp_current_start
-        needed_xp = xp_next_start - xp_current_start
-        remaining_xp = xp_next_start - data["xp"]
-        
-        percentage = min(100, max(0, (progress_xp / needed_xp) * 100)) if needed_xp > 0 else 100
-        
-        # Multipliers
-        user_multiplier = 1.0
-        active_mults = []
-        multipliers = await get_level_multipliers()
-        if not hide_mults:
-            for target_id, mult in multipliers.items():
-                matched_role = next((r for r in member.roles if r.id == int(target_id)), None)
-                if matched_role:
-                    user_multiplier *= mult
-                    active_mults.append(f"{mult}x ({matched_role.name})")
-                elif interaction.channel.id == int(target_id):
-                    ch = interaction.guild.get_channel(int(target_id))
-                    ch_name = f"#{ch.name}" if ch else target_id
-                    user_multiplier *= mult
-                    active_mults.append(f"{mult}x ({ch_name})")
-        else:
-            # Still need user_multiplier for accuracy, just don't surface the labels
-            for target_id, mult in multipliers.items():
-                if any(r.id == int(target_id) for r in member.roles):
-                    user_multiplier *= mult
-                elif interaction.channel.id == int(target_id):
-                    user_multiplier *= mult
+        xp_start     = xp_for(current_level)
+        xp_next      = xp_for(current_level + 1)
+        progress_xp  = data["xp"] - xp_start
+        needed_xp    = xp_next - xp_start
+        percentage   = min(100.0, max(0.0, (progress_xp / needed_xp) * 100)) if needed_xp > 0 else 100.0
 
-        # Cooldown
-        last_xp = data.get("last_xp_time", 0)
-        time_since = time.time() - last_xp
-        cd_val = float(settings.get("cooldown", 60))
-        cooldown_status = "None!" if time_since >= cd_val else f"{int(cd_val - time_since)}s"
+        server_rank = await get_user_rank(member.id)
 
-        # Messages to go
-        xp_min_setting = float(settings.get("xp_min", 15))
-        xp_max_setting = float(settings.get("xp_max", 25))
-        avg_xp = (xp_min_setting + xp_max_setting) / 2 * user_multiplier
-        msg_min = int(remaining_xp / (xp_max_setting * user_multiplier)) if (xp_max_setting * user_multiplier) > 0 else 0
-        msg_max = int(remaining_xp / (xp_min_setting * user_multiplier)) if (xp_min_setting * user_multiplier) > 0 else 0
-        
-        bar_len = 33
-        filled = round((percentage / 100) * bar_len)
-        bar = "▓" * filled + "░" * (bar_len - filled)
-        bar_str = f"{bar} ({percentage:.1f}%)"
+        from database import get_balance
+        balance = await get_balance(member.id)
 
-        embed = discord.Embed(color=member.color if member.color.value else discord.Color.from_rgb(99, 102, 241))
-        embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
+        prefs = await get_rank_card_prefs(interaction.user.id)
 
-        # XP / Next Level fields (inline)
-        if relative_xp:
-            embed.add_field(name="✨ XP", value=f"{data['xp']:,} (lv. {current_level})", inline=True)
-            embed.add_field(name="⏩ Next level", value=f"{int(progress_xp):,}/{int(needed_xp):,} ({int(remaining_xp):,} more)", inline=True)
-        else:
-            embed.add_field(name="✨ XP", value=f"{data['xp']:,} (lv. {current_level})", inline=True)
-            embed.add_field(name="⏩ Next level", value=f"{int(xp_next_start):,} ({int(remaining_xp):,} more)", inline=True)
+        avatar_bytes = None
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession() as sess:
+                async with sess.get(str(member.display_avatar.with_size(256).url)) as resp:
+                    if resp.status == 200:
+                        avatar_bytes = await resp.read()
+        except Exception:
+            pass
 
-        # Cooldown field
-        if not hide_cooldown:
-            cd_display = f"{int(cd_val - time_since)}s" if time_since < cd_val else "None!"
-            embed.add_field(name="🕓 Cooldown", value=cd_display, inline=True)
+        loop = asyncio.get_event_loop()
+        img_buf = await loop.run_in_executor(
+            None, rc.build_rank_card,
+            member.name, current_level, server_rank, balance,
+            data["xp"], progress_xp, needed_xp, percentage,
+            avatar_bytes, prefs["font"], prefs["theme"],
+        )
 
-        # Multiplier field
-        if active_mults and not hide_mults:
-            embed.add_field(name="🌟 Multiplier", value="\n".join(active_mults))
+        await interaction.followup.send(
+            file=discord.File(img_buf, filename="rank.png"),
+            ephemeral=is_ephemeral,
+        )
 
-        # Footer: progress bar + messages to go (small muted text, matching Polaris)
-        footer_text = f"{bar_str}\n{msg_min}–{msg_max} messages to go!"
-        embed.set_footer(text=footer_text)
-        await interaction.response.send_message(embed=embed, ephemeral=is_ephemeral)
+    @rank_group.command(name="card", description="View your rank card")
+    @app_commands.describe(member="User to check (defaults to yourself)")
+    async def rank_card_cmd(self, interaction: discord.Interaction, member: discord.Member = None):
+        invoker_id = interaction.user.id
+        target = member or interaction.user
+
+        # 10-second cooldown when viewing own card
+        if target.id == invoker_id:
+            now  = time.time()
+            last = self._rank_cooldowns.get(invoker_id, 0)
+            if now - last < 10:
+                return await interaction.response.send_message(
+                    f"⏳ Slow down. Try again in **{int(10 - (now - last))}s**.", ephemeral=True
+                )
+            self._rank_cooldowns[invoker_id] = now
+
+        settings = await get_level_settings()
+        if settings.get("rank_enabled", "1") == "0" and target == interaction.user:
+            return await interaction.response.send_message("❌ Rank cards are disabled on this server.", ephemeral=True)
+
+        await self._build_and_send_card(interaction, target)
+
+    @rank_group.command(name="font", description="Change your rank card font")
+    @app_commands.describe(name="Font style to use")
+    async def rank_font_cmd(
+        self,
+        interaction: discord.Interaction,
+        name: Literal["Avenger", "Disney", "Chalice", "Vampire", "Vogue", "Halo", "OldLondon"],
+    ):
+        await set_rank_card_prefs(interaction.user.id, font=name)
+        await interaction.response.send_message(
+            f"🖋 Font set to **{name}**. Run `/rank card` to preview!", ephemeral=True
+        )
+
+    @rank_group.command(name="theme", description="Change your rank card colour theme")
+    @app_commands.describe(name="Colour theme to use")
+    async def rank_theme_cmd(
+        self,
+        interaction: discord.Interaction,
+        name: Literal["matrix", "cyberpunk", "vampire", "ghost", "obsidian", "aurora", "crimson", "void"],
+    ):
+        await set_rank_card_prefs(interaction.user.id, theme=name)
+        await interaction.response.send_message(
+            f"🎨 Theme set to **{name}**. Run `/rank card` to preview!", ephemeral=True
+        )
+
+
 
     @app_commands.command(name="rolesync", description="Sync your level reward roles")
     async def rolesync(self, interaction: discord.Interaction):
