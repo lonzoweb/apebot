@@ -334,16 +334,16 @@ class LevelingCog(commands.Cog):
             pass # Silently fail if DMs closed
 
     # ──────────────────────────────────────────────────────────────────────────
-    # /rank  — command group
+    # /rank  — unified command
     # ──────────────────────────────────────────────────────────────────────────
-    rank_group = app_commands.Group(name="rank", description="Rank card commands")
-
-    async def _build_and_send_card(self, interaction: discord.Interaction, member: discord.Member):
+    async def _build_and_send_card(self, interaction: discord.Interaction, member: discord.Member, invoker_id: int):
         """Shared helper: gathers data, renders Pillow image, sends it."""
         settings = await get_level_settings()
         is_ephemeral = settings.get("rank_force_hidden") == "1"
 
-        await interaction.response.defer(ephemeral=is_ephemeral)
+        # Check if interaction already responded
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=is_ephemeral)
 
         data = await get_user_xp_data(member.id)
         await sync_user_profile(member.id, member.display_name, str(member.display_avatar.url))
@@ -370,7 +370,14 @@ class LevelingCog(commands.Cog):
         from database import get_balance
         balance = await get_balance(member.id)
 
-        prefs = await get_rank_card_prefs(interaction.user.id)
+        # Get prefs for the invoker (themes are personal)
+        prefs = await get_rank_card_prefs(invoker_id)
+
+        # Calculate member days
+        member_days = 0
+        if member.joined_at:
+            delta = __import__("datetime").datetime.now(member.joined_at.tzinfo) - member.joined_at
+            member_days = max(0, delta.days)
 
         avatar_bytes = None
         try:
@@ -388,6 +395,7 @@ class LevelingCog(commands.Cog):
             member.name, current_level, server_rank, balance,
             data["xp"], progress_xp, needed_xp, percentage,
             avatar_bytes, prefs["font"], prefs["theme"],
+            member_days
         )
 
         await interaction.followup.send(
@@ -395,14 +403,24 @@ class LevelingCog(commands.Cog):
             ephemeral=is_ephemeral,
         )
 
-    @rank_group.command(name="card", description="View your rank card")
-    @app_commands.describe(member="User to check (defaults to yourself)")
-    async def rank_card_cmd(self, interaction: discord.Interaction, member: discord.Member = None):
+    @app_commands.command(name="rank", description="View your rank card or customize appearance")
+    @app_commands.describe(
+        member="User to check (defaults to yourself)",
+        font="Update your rank card font style",
+        theme="Update your rank card colour theme",
+    )
+    async def rank_slash(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member = None,
+        font: Literal["Avenger", "Disney", "Chalice", "Truckin", "StarWars", "Pokemon"] = None,
+        theme: Literal["matrix", "cyberpunk", "vampire", "ghost", "obsidian", "aurora", "crimson", "void"] = None,
+    ):
         invoker_id = interaction.user.id
         target = member or interaction.user
 
-        # 10-second cooldown when viewing own card
-        if target.id == invoker_id:
+        # 10-second cooldown when viewing own card (and not just updating font/theme)
+        if target.id == invoker_id and not (font or theme):
             now  = time.time()
             last = self._rank_cooldowns.get(invoker_id, 0)
             if now - last < 10:
@@ -415,31 +433,17 @@ class LevelingCog(commands.Cog):
         if settings.get("rank_enabled", "1") == "0" and target == interaction.user:
             return await interaction.response.send_message("❌ Rank cards are disabled on this server.", ephemeral=True)
 
-        await self._build_and_send_card(interaction, target)
+        # Handle font/theme updates
+        if font or theme:
+            await set_rank_card_prefs(invoker_id, font=font, theme=theme)
+            # Notify but then proceed to show the card
+            update_msg = "✅ Preferences updated! Showing your new card:"
+            if not interaction.response.is_done():
+                await interaction.response.send_message(update_msg, ephemeral=True)
+            else:
+                await interaction.followup.send(update_msg, ephemeral=True)
 
-    @rank_group.command(name="font", description="Change your rank card font")
-    @app_commands.describe(name="Font style to use")
-    async def rank_font_cmd(
-        self,
-        interaction: discord.Interaction,
-        name: Literal["Avenger", "Disney", "Chalice", "Vampire", "Vogue", "Halo", "OldLondon"],
-    ):
-        await set_rank_card_prefs(interaction.user.id, font=name)
-        await interaction.response.send_message(
-            f"🖋 Font set to **{name}**. Run `/rank card` to preview!", ephemeral=True
-        )
-
-    @rank_group.command(name="theme", description="Change your rank card colour theme")
-    @app_commands.describe(name="Colour theme to use")
-    async def rank_theme_cmd(
-        self,
-        interaction: discord.Interaction,
-        name: Literal["matrix", "cyberpunk", "vampire", "ghost", "obsidian", "aurora", "crimson", "void"],
-    ):
-        await set_rank_card_prefs(interaction.user.id, theme=name)
-        await interaction.response.send_message(
-            f"🎨 Theme set to **{name}**. Run `/rank card` to preview!", ephemeral=True
-        )
+        await self._build_and_send_card(interaction, target, invoker_id)
 
 
 
