@@ -175,7 +175,7 @@ async def _send_candidates(bot, emperor_channel, today_quote):
             description=lines,
             color=discord.Color.blurple(),
         )
-        pick_embed.set_footer(text=".pv <1 / 2 / 3 / random>")
+        pick_embed.set_footer(text=".pv to vote by reaction · .pv revote to regenerate")
         await emperor_channel.send(embed=pick_embed)
         logger.info("✅ Quote candidates sent to #emperor.")
     except Exception as e:

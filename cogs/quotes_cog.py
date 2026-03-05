@@ -252,16 +252,12 @@ class QuotesCog(commands.Cog):
     @commands.command(name="pv", aliases=["pickquote"])
     @commands.has_permissions(administrator=True)
     async def pickquote_command(self, ctx, choice: str = None):
-        """[Admin] Pick tomorrow's quote. Usage: .pv <1|2|3|random|revote>"""
-        if choice is None:
-            return await ctx.reply(
-                "Usage: `.pv <1 | 2 | 3 | random | revote>`", mention_author=False
-            )
+        """[Admin] Pick tomorrow's quote via reaction. Usage: .pv | .pv revote"""
 
-        choice = choice.strip().lower()
+        choice_lower = (choice or "").strip().lower()
 
-        # --- REVOTE: regenerate 3 fresh candidates and re-post to #emperor ---
-        if choice == "revote":
+        # --- REVOKE: regenerate 3 fresh candidates and re-post to #emperor ---
+        if choice_lower == "revote":
             try:
                 all_quotes = await load_quotes_from_db()
                 today = await tasks.get_daily_quote_async()
@@ -275,28 +271,14 @@ class QuotesCog(commands.Cog):
                 self.bot.pending_quotes = candidates
                 self.bot.tomorrow_quote = None
 
-                lines = "\n\n".join(f"**{i+1}.** {q}" for i, q in enumerate(candidates))
-                pick_embed = discord.Embed(
-                    title="🔄 Tomorrow's Quote — New Vote",
-                    description=lines,
-                    color=discord.Color.blurple(),
-                )
-                pick_embed.set_footer(text=".pv <1 / 2 / 3 / random> to choose")
+                await self._post_candidate_vote(ctx, candidates, title="🔄 Tomorrow's Quote — New Vote")
 
-                guild = ctx.guild
-                emperor_channel = discord.utils.get(guild.text_channels, name="emperor") if guild else None
-                target = emperor_channel or ctx.channel
-                await target.send(embed=pick_embed)
-
-                if emperor_channel and target != ctx.channel:
-                    await ctx.reply(f"✅ New candidates posted in {emperor_channel.mention}.", mention_author=False)
             except Exception as e:
                 logger.error(f"Error in pv revote: {e}")
                 await ctx.reply("❌ Error generating new candidates.", mention_author=False)
             return
 
-        # --- PICK: choose from pending candidates ---
-        # Load from DB first (reboot-resilient), fall back to bot attribute
+        # --- VOTE: load pending candidates and post reaction vote ---
         candidates = await tasks._get_pending_quotes()
         if not candidates:
             candidates = getattr(self.bot, "pending_quotes", [])
@@ -307,17 +289,50 @@ class QuotesCog(commands.Cog):
                 mention_author=False
             )
 
-        if choice == "random":
-            picked = random.choice(candidates)
-        elif choice in ("1", "2", "3") and int(choice) <= len(candidates):
-            picked = candidates[int(choice) - 1]
-        else:
-            return await ctx.reply(
-                "❌ Invalid choice. Use `1`, `2`, `3`, `random`, or `revote`.", mention_author=False
+        await self._post_candidate_vote(ctx, candidates, title="📋 Tomorrow's Quote — React to Vote")
+
+    async def _post_candidate_vote(self, ctx, candidates: list, title: str):
+        """Post a reaction-voteable embed to #emperor (or current channel) and wait for admin pick."""
+        NUMBER_EMOJIS = ["1️⃣", "2️⃣", "3️⃣"]
+        emojis = NUMBER_EMOJIS[:len(candidates)]
+
+        lines = "\n\n".join(f"{emojis[i]} {q}" for i, q in enumerate(candidates))
+        pick_embed = discord.Embed(
+            title=title,
+            description=lines,
+            color=discord.Color.blurple(),
+        )
+        pick_embed.set_footer(text="React below to choose tomorrow's quote")
+
+        guild = ctx.guild
+        emperor_channel = discord.utils.get(guild.text_channels, name="emperor") if guild else None
+        target_channel = emperor_channel or ctx.channel
+
+        vote_msg = await target_channel.send(embed=pick_embed)
+        for emoji in emojis:
+            await vote_msg.add_reaction(emoji)
+
+        if emperor_channel and target_channel != ctx.channel:
+            await ctx.reply(f"✅ Vote posted in {emperor_channel.mention}. React to pick.", mention_author=False)
+
+        # Wait for a reaction from the command author
+        def check(reaction, user):
+            return (
+                user.id == ctx.author.id
+                and reaction.message.id == vote_msg.id
+                and str(reaction.emoji) in emojis
             )
 
+        try:
+            reaction, _ = await self.bot.wait_for("reaction_add", timeout=300.0, check=check)
+            idx = emojis.index(str(reaction.emoji))
+            picked = candidates[idx]
+        except asyncio.TimeoutError:
+            await target_channel.send("⌛ No pick made — vote timed out. Use `.pv` to try again.")
+            return
+
         await tasks._set_tomorrow_quote(picked)
-        await tasks._set_pending_quotes([])  # Clear queue
+        await tasks._set_pending_quotes([])
         self.bot.tomorrow_quote = picked
         self.bot.pending_quotes = []
 
@@ -327,7 +342,9 @@ class QuotesCog(commands.Cog):
             color=discord.Color.green(),
         )
         embed.set_footer(text=f"Chosen by {ctx.author.display_name} · Posts at 10am & 6pm tomorrow")
-        await ctx.send(embed=embed)
+        await target_channel.send(embed=embed)
+
+
 
 
 async def setup(bot):
