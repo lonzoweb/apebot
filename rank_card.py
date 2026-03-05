@@ -73,59 +73,59 @@ def prefetch_fonts():
 # ── Colour themes ─────────────────────────────────────────────────────────────
 THEMES: dict[str, dict] = {
     "matrix": {
-        "bg_top":   (5,  12,  5), "bg_bot":   (0,   0,  0),
-        "accent":   (0, 255, 70), "bar_fill": (0, 220, 60),
-        "bar_bg":   (15, 40, 15), "text_pri": (200, 255, 200),
-        "text_sec": (100, 200, 100), "ring":   (0, 255, 70),
+        "bg_top":   (0,  20,  0), "bg_bot":   (0,   0,  0),
+        "accent":   (0, 255, 100), "bar_fill": (0, 255, 70),
+        "bar_bg":   (0,  50, 20), "text_pri": (200, 255, 200),
+        "text_sec": (100, 255, 150), "ring":   (0, 255, 100),
         "label":    "☠ MATRIX",
     },
     "cyberpunk": {
-        "bg_top":   (10,  5, 25), "bg_bot":   (0,   0,  0),
-        "accent":   (255, 0, 200), "bar_fill": (190, 0, 255),
-        "bar_bg":   (40,  5, 60), "text_pri": (255, 200, 255),
-        "text_sec": (200, 100, 255), "ring":   (255, 0, 200),
+        "bg_top":   (20, 0, 40), "bg_bot":   (0,   0,  0),
+        "accent":   (0, 255, 255), "bar_fill": (255, 0, 255),
+        "bar_bg":   (60, 0, 80), "text_pri": (255, 255, 255),
+        "text_sec": (200, 100, 255), "ring":   (0, 255, 255),
         "label":    "⚡ CYBERPUNK",
     },
     "vampire": {
-        "bg_top":   (20,  0,  0), "bg_bot":   (5,   0,  0),
-        "accent":   (200, 0, 30), "bar_fill": (180, 0, 20),
-        "bar_bg":   (50, 10, 10), "text_pri": (255, 200, 200),
-        "text_sec": (200, 100, 100), "ring":   (200, 0, 30),
+        "bg_top":   (40,  0,  0), "bg_bot":   (0,   0,  0),
+        "accent":   (255, 0, 50), "bar_fill": (220, 0, 30),
+        "bar_bg":   (80,  0,  0), "text_pri": (255, 255, 255),
+        "text_sec": (255, 100, 100), "ring":   (255, 0, 50),
         "label":    "🩸 VAMPIRE",
     },
     "ghost": {
-        "bg_top":   (15, 15, 20), "bg_bot":   (5,   5, 10),
-        "accent":   (180, 180, 255), "bar_fill": (140, 140, 255),
-        "bar_bg":   (30,  30, 60), "text_pri": (220, 220, 255),
-        "text_sec": (150, 150, 200), "ring":   (160, 160, 255),
+        "bg_top":   (30, 30, 50), "bg_bot":   (0,   0,  0),
+        "accent":   (0, 200, 255), "bar_fill": (150, 150, 255),
+        "bar_bg":   (40, 40, 80), "text_pri": (255, 255, 255),
+        "text_sec": (200, 200, 255), "ring":   (0, 200, 255),
         "label":    "👻 GHOST",
     },
     "obsidian": {
-        "bg_top":   (10, 10, 10), "bg_bot":   (0,   0,  0),
-        "accent":   (255, 215, 0), "bar_fill": (220, 180, 0),
-        "bar_bg":   (40,  35,  5), "text_pri": (255, 230, 150),
-        "text_sec": (200, 170, 80), "ring":   (255, 215, 0),
+        "bg_top":   (30, 25,  0), "bg_bot":   (0,   0,  0),
+        "accent":   (255, 180, 0), "bar_fill": (255, 215, 0),
+        "bar_bg":   (60, 45,  0), "text_pri": (255, 255, 255),
+        "text_sec": (255, 200, 50), "ring":   (255, 180, 0),
         "label":    "⚫ OBSIDIAN",
     },
     "aurora": {
-        "bg_top":   (0,  15, 25), "bg_bot":   (0,   5, 10),
-        "accent":   (0, 235, 200), "bar_fill": (0, 200, 170),
-        "bar_bg":   (0,  40, 40), "text_pri": (180, 255, 240),
-        "text_sec": (80, 200, 180), "ring":   (0, 220, 190),
+        "bg_top":   (0, 40, 60), "bg_bot":   (0,   0,  0),
+        "accent":   (0, 255, 150), "bar_fill": (0, 255, 200),
+        "bar_bg":   (0, 60, 80), "text_pri": (255, 255, 255),
+        "text_sec": (150, 255, 200), "ring":   (0, 255, 150),
         "label":    "🌌 AURORA",
     },
     "crimson": {
-        "bg_top":   (20,  0, 10), "bg_bot":   (5,   0,  5),
-        "accent":   (255, 50, 100), "bar_fill": (220, 30, 80),
-        "bar_bg":   (60, 10, 30), "text_pri": (255, 180, 200),
-        "text_sec": (200, 100, 140), "ring":   (255, 50, 100),
+        "bg_top":   (50, 0, 20), "bg_bot":   (0,   0,  0),
+        "accent":   (255, 0, 100), "bar_fill": (255, 50, 150),
+        "bar_bg":   (100, 0, 50), "text_pri": (255, 255, 255),
+        "text_sec": (255, 150, 200), "ring":   (255, 0, 100),
         "label":    "💀 CRIMSON",
     },
     "void": {
-        "bg_top":   (5,   0, 15), "bg_bot":   (0,   0,  5),
-        "accent":   (130, 0, 255), "bar_fill": (110, 0, 220),
-        "bar_bg":   (25,  0, 50), "text_pri": (210, 180, 255),
-        "text_sec": (150, 100, 220), "ring":   (130, 0, 255),
+        "bg_top":   (10, 0, 30), "bg_bot":   (0,   0,  0),
+        "accent":   (180, 0, 255), "bar_fill": (150, 0, 255),
+        "bar_bg":   (50, 0, 100), "text_pri": (255, 255, 255),
+        "text_sec": (200, 150, 255), "ring":   (180, 0, 255),
         "label":    "🕳 VOID",
     },
 }
@@ -151,6 +151,7 @@ def _circle_crop(img: Image.Image, size: int) -> Image.Image:
 
 
 def _draw_bg(draw: ImageDraw.ImageDraw, theme: dict):
+    # Base Gradient
     t, b = theme["bg_top"], theme["bg_bot"]
     for y in range(H):
         r  = t[0] + (b[0] - t[0]) * y // H
@@ -159,14 +160,33 @@ def _draw_bg(draw: ImageDraw.ImageDraw, theme: dict):
         draw.line([(0, y), (W, y)], fill=(r, g, bl))
 
     acc = theme["accent"]
-    for y in range(0, H, 6):   # scanlines
-        draw.line([(0, y), (W, y)], fill=(acc[0]//20, acc[1]//20, acc[2]//20))
+    
+    # ── SUBTLE NOISE / GRIT ──
+    import random
+    for _ in range(2500):
+        nx, ny = random.randint(0, W-1), random.randint(0, H-1)
+        val = random.randint(5, 15)
+        draw.point((nx, ny), fill=(acc[0]//val, acc[1]//val, acc[2]//val, 100))
 
-    # diagonal accent corner top-right
-    draw.polygon([(W - 240, 0), (W, 0), (W, 240)],
-                 fill=(acc[0]//8, acc[1]//8, acc[2]//8))
+    # ── SCANLINES ──
+    for y in range(0, H, 6):
+        draw.line([(0, y), (W, y)], fill=(acc[0]//25, acc[1]//25, acc[2]//25))
 
-    # neon border frame
+    # ── CYBER CIRCUIT LINES ──
+    # Random tech lines for "esoteric/cyber" look
+    for i in range(3):
+        lx = random.randint(200, W-100)
+        draw.line([(lx, 0), (lx + 40, 40)], fill=(acc[0]//10, acc[1]//10, acc[2]//10), width=1)
+        draw.line([(lx + 40, 40), (W, 40)], fill=(acc[0]//10, acc[1]//10, acc[2]//10), width=1)
+
+    # ── CORNER GLOW / FLARE (Top Right) ──
+    # Multi-layered polygon for "glow" effect
+    for i in range(10, 1, -1):
+        alpha_div = i * 2
+        draw.polygon([(W - (80*i), 0), (W, 0), (W, 80*i)],
+                     fill=(acc[0]//alpha_div, acc[1]//alpha_div, acc[2]//alpha_div))
+
+    # ── NEON BORDER ──
     draw.rectangle([2, 2, W - 3, H - 3], outline=acc, width=2)
 
 
@@ -201,7 +221,7 @@ def build_rank_card(
     bar_pct:      float,        # 0-100
     avatar_bytes: bytes | None,
     font_name:    str = "Avenger",
-    theme_name:   str = "matrix",
+    theme_name:   str = "vampire",
     member_days:  int = 0,
     avg_xp:       int = 20,
 ) -> io.BytesIO:
@@ -218,18 +238,19 @@ def build_rank_card(
 
     # ── Load fonts ────────────────────────────────────────────────────────────
     # Custom font: username + all stat labels + all stat values
-    f_user  = _load_font(font_name, 46)   # username — down 6px from 52
+    f_user  = _load_font(font_name, 46)   # username
     f_label = _load_font(font_name, 21)   # stat labels
     f_val   = _load_font(font_name, 33)   # stat values
-    f_level = _load_font(font_name, 46)   # level — now same as username
+    f_level = _load_font(font_name, 46)   # level
     
     # Mono for persistent UI elements (star is being replaced)
-    f_pct   = _load_font("Avenger", 18)   # Always use Avenger for bar text
-    f_wmark = _load_mono(13)              # theme watermark
+    f_pct   = _load_font("Avenger", 23)   # increased 5px from 18
+    f_mono  = _load_mono(21)             # for lower-case suffix/emoji fallback
+    f_wmark = _load_mono(13)             # theme watermark
 
     # ── LEVEL CIRCLE ── top-right
     lvl_str = str(level)
-    circ_size = 80
+    circ_size = 95   # Enlarge slightly (was 80)
     cx, cy = W - circ_size - 25, 20
     # draw circle
     draw.ellipse([cx, cy, cx+circ_size, cy+circ_size], outline=acc, width=3)
@@ -238,9 +259,9 @@ def build_rank_card(
     tx = cx + (circ_size - l_w) // 2
     ty = cy + (circ_size - 46) // 2 - 4
     draw.text((tx, ty), lvl_str, font=f_level, fill=pri)
-    # Small "LVL" tag above or inside? Let's put it tiny inside
+    # Small "LVL" tag
     f_tiny = _load_mono(10)
-    draw.text((cx + (circ_size - 20)//2, cy + 10), "LVL", font=f_tiny, fill=sec)
+    draw.text((cx + (circ_size - 20)//2, cy + 12), "LVL", font=f_tiny, fill=sec)
 
     # ── USERNAME ──────────────────────────────────────────────────────────────
     uy = 20
@@ -267,10 +288,25 @@ def build_rank_card(
 
     for col_x, lbl_y, label, value in cells:
         draw.text((col_x, lbl_y), label, font=f_label, fill=sec)
-        # Calculate width of label to place value right after it
         lbl_w = draw.textlength(label, font=f_label)
-        # Vertical offset -12 to align visual baselines of different sizes
-        draw.text((col_x + lbl_w + 15, lbl_y - 12), value, font=f_val, fill=pri)
+        
+        # Split value and suffix/emoji to avoid all-caps or missing glyphs in Avenger
+        val_x = col_x + lbl_w + 15
+        val_y = lbl_y - 12
+
+        if "d" in value: # Member Days
+            num_part = value.replace("d", "")
+            draw.text((val_x, val_y), num_part, font=f_val, fill=pri)
+            num_w = draw.textlength(num_part, font=f_val)
+            draw.text((val_x + num_w + 4, val_y + 10), "d", font=f_mono, fill=pri)
+        elif "💎" in value: # Balance
+            num_part = value.replace(" 💎", "")
+            draw.text((val_x, val_y), num_part, font=f_val, fill=pri)
+            num_w = draw.textlength(num_part, font=f_val)
+            # Use a standard fallback for the emoji
+            draw.text((val_x + num_w + 8, val_y + 8), "💎", font=f_mono, fill=pri)
+        else:
+            draw.text((val_x, val_y), value, font=f_val, fill=pri)
 
     # ── XP PROGRESS BAR ───────────────────────────────────────────────────────
     bar_h  = 52   # thickened by 50% from 35
@@ -308,7 +344,7 @@ def build_rank_card(
         text_fill = (10, 10, 10) if luma > 150 else (255, 255, 255)
 
     # Vertical centering for a 52px bar (18px font)
-    py = bar_y + (bar_h - 18) // 2 - 4
+    py = bar_y + (bar_h - 23) // 2 - 4
     # Shadow for extra readability
     draw.text((px+1, py+1), pct_str, font=f_pct, fill=(0,0,0,160))
     draw.text((px, py), pct_str, font=f_pct, fill=text_fill)
