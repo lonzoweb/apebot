@@ -137,7 +137,7 @@ AVATAR_SIZE  = 200
 AVATAR_X     = 25
 AVATAR_Y     = (H - AVATAR_SIZE) // 2   # vertically centered
 STATS_X      = AVATAR_X + AVATAR_SIZE + 28   # left edge of text area
-COL2_X       = STATS_X + 380                 # second column of 2x2 grid — was 330
+COL2_X       = STATS_X + 300                 # second column of 2x2 grid — brought in to 300
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -215,11 +215,11 @@ def build_rank_card(
     sec = theme["text_sec"]
 
     # ── Load fonts ────────────────────────────────────────────────────────────
-    # Custom font: username + all stat labels
+    # Custom font: username + all stat labels + all stat values
     f_user  = _load_font(font_name, 52)   # username
-    f_label = _load_font(font_name, 28)   # stat labels (RANK, BALANCE, etc.) — was 44
-    # Mono for pure numbers / progress bar %
-    f_val   = _load_mono(36)              # stat values — was 34
+    f_label = _load_font(font_name, 28)   # stat labels
+    f_val   = _load_font(font_name, 40)   # stat values — now custom font & 40px
+    # Mono for persistent UI elements
     f_level = _load_mono(70)              # big level number top-right
     f_star  = _load_mono(56)              # ★
     f_pct   = _load_mono(14)             # % inside bar
@@ -247,18 +247,19 @@ def build_rank_card(
     LABEL_Y1, LABEL_Y2 = 95, 185
 
     cells = [
-        # (col_x, label_y,  label_text,              value_text,                  val_color)
-        (STATS_X, LABEL_Y1, "RANK",    f"#{server_rank:,}",             acc),
-        (COL2_X,  LABEL_Y1, "BALANCE", f"{balance:,} \U0001f48e",       pri),
-        (STATS_X, LABEL_Y2, "EXP",     f"{int(progress_xp):,} / {int(needed_xp):,}", pri),
-        (COL2_X,  LABEL_Y2, "MEMBER",  f"{member_days:,} days",         sec),
+        # (col_x, label_y,  label_text,              value_text)
+        (STATS_X, LABEL_Y1, "RANK",    f"#{server_rank:,}"),
+        (COL2_X,  LABEL_Y1, "BALANCE", f"{balance:,} \U0001f48e"),
+        (STATS_X, LABEL_Y2, "EXP",     f"{int(progress_xp):,} / {int(needed_xp):,}"),
+        (COL2_X,  LABEL_Y2, "MEMBER",  f"{member_days:,} days"),
     ]
 
-    for col_x, lbl_y, label, value, _ in cells:
+    for col_x, lbl_y, label, value in cells:
         draw.text((col_x, lbl_y), label, font=f_label, fill=sec)
         # Calculate width of label to place value right after it
         lbl_w = draw.textlength(label, font=f_label)
-        draw.text((col_x + lbl_w + 12, lbl_y - 4), value, font=f_val, fill=pri)
+        # Vertical offset -12 to align visual baselines of different sizes
+        draw.text((col_x + lbl_w + 15, lbl_y - 12), value, font=f_val, fill=pri)
 
     # ── XP PROGRESS BAR ───────────────────────────────────────────────────────
     bar_h  = 12
