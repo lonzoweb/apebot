@@ -224,8 +224,8 @@ def build_rank_card(
     f_level = _load_font(font_name, 46)   # level — now same as username
     
     # Mono for persistent UI elements (star is being replaced)
-    f_pct   = _load_mono(18, bold=True)  # % inside bar — made larger/bolder
-    f_wmark = _load_mono(13)             # theme watermark
+    f_pct   = _load_font("Avenger", 18)   # Always use Avenger for bar text
+    f_wmark = _load_mono(13)              # theme watermark
 
     # ── LEVEL CIRCLE ── top-right
     lvl_str = str(level)
@@ -273,10 +273,10 @@ def build_rank_card(
         draw.text((col_x + lbl_w + 15, lbl_y - 12), value, font=f_val, fill=pri)
 
     # ── XP PROGRESS BAR ───────────────────────────────────────────────────────
-    bar_h  = 35   # thickened by ~44% from 24
-    bar_y  = H - 52
+    bar_h  = 52   # thickened by 50% from 35
+    bar_y  = H - 70
     bar_x0, bar_x1 = STATS_X, W - 20
-    bar_r  = 12
+    bar_r  = 16
 
     draw.rounded_rectangle([bar_x0, bar_y, bar_x1, bar_y + bar_h],
                             radius=bar_r, fill=theme["bar_bg"], outline=acc, width=1)
@@ -290,24 +290,25 @@ def build_rank_card(
     # Calculate messages left
     xp_left = max(0, needed_xp - progress_xp)
     msgs_left = math.ceil(xp_left / avg_xp) if avg_xp > 0 else 0
-    pct_str = f"{bar_pct:.1f}% • ~{msgs_left:,} msgs left"
+    pct_str = f"{bar_pct:.1f}%  ~{msgs_left:,} MSGS LEFT"
     
     p_w = draw.textlength(pct_str, font=f_pct)
-    padding = 12
     empty_w = bar_width - fill_w
     
-    # Position logic: try empty space first
-    if p_w + padding * 2 <= empty_w:
-        px = bar_x0 + fill_w + padding
+    # Position logic: center in empty space if possible, else center in filled
+    if p_w + 30 <= empty_w:
+        # Center in unfilled part (right)
+        px = bar_x0 + fill_w + (empty_w - p_w) // 2
         text_fill = (255, 255, 255) # Pure white in the dark part
     else:
-        # Put it in the filled part
-        px = bar_x0 + padding
+        # Center in filled part (left)
+        px = bar_x0 + (fill_w - p_w) // 2
         # Contrast logic for filled part
         luma = 0.299*theme["bar_fill"][0] + 0.587*theme["bar_fill"][1] + 0.114*theme["bar_fill"][2]
         text_fill = (10, 10, 10) if luma > 150 else (255, 255, 255)
 
-    py = bar_y + (bar_h // 2) - 11
+    # Vertical centering for a 52px bar (18px font)
+    py = bar_y + (bar_h - 18) // 2 - 4
     # Shadow for extra readability
     draw.text((px+1, py+1), pct_str, font=f_pct, fill=(0,0,0,160))
     draw.text((px, py), pct_str, font=f_pct, fill=text_fill)
