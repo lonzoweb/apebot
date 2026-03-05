@@ -239,8 +239,8 @@ def build_rank_card(
     # ── Load fonts ────────────────────────────────────────────────────────────
     # Custom font: username + all stat labels + all stat values
     f_user  = _load_font(font_name, 46)   # username
-    f_label = _load_font(font_name, 21)   # stat labels
-    f_val   = _load_font(font_name, 33)   # stat values
+    f_label = _load_font(font_name, 13)   # stat labels (down 8px from 21)
+    f_val   = _load_font(font_name, 25)   # stat values (down 8px from 33)
     f_level = _load_font(font_name, 46)   # level
     
     # Mono for persistent UI elements (star is being replaced)
@@ -281,7 +281,7 @@ def build_rank_card(
     cells = [
         # (col_x, label_y,  label_text,              value_text)
         (STATS_X, LABEL_Y1, "RANK",    f"#{server_rank:,}"),
-        (COL2_X,  LABEL_Y1, "BALANCE", f"{balance:,} 💎"),
+        (COL2_X,  LABEL_Y1, "BALANCE", f"{balance:,}"),
         (STATS_X, LABEL_Y2, "EXP",     f"{int(progress_xp)}/{int(needed_xp)}"),
         (COL2_X,  LABEL_Y2, "MEMBER",  f"{member_days:,}d"),
     ]
@@ -290,23 +290,10 @@ def build_rank_card(
         draw.text((col_x, lbl_y), label, font=f_label, fill=sec)
         lbl_w = draw.textlength(label, font=f_label)
         
-        # Split value and suffix/emoji to avoid all-caps or missing glyphs in Avenger
-        val_x = col_x + lbl_w + 15
-        val_y = lbl_y - 12
-
-        if "d" in value: # Member Days
-            num_part = value.replace("d", "")
-            draw.text((val_x, val_y), num_part, font=f_val, fill=pri)
-            num_w = draw.textlength(num_part, font=f_val)
-            draw.text((val_x + num_w + 4, val_y + 10), "d", font=f_mono, fill=pri)
-        elif "💎" in value: # Balance
-            num_part = value.replace(" 💎", "")
-            draw.text((val_x, val_y), num_part, font=f_val, fill=pri)
-            num_w = draw.textlength(num_part, font=f_val)
-            # Use a standard fallback for the emoji
-            draw.text((val_x + num_w + 8, val_y + 8), "💎", font=f_mono, fill=pri)
-        else:
-            draw.text((val_x, val_y), value, font=f_val, fill=pri)
+        # Stat value placement (smaller fonts need less offset)
+        val_x = col_x + lbl_w + 12
+        val_y = lbl_y - 8
+        draw.text((val_x, val_y), value, font=f_val, fill=pri)
 
     # ── XP PROGRESS BAR ───────────────────────────────────────────────────────
     bar_h  = 52   # thickened by 50% from 35
