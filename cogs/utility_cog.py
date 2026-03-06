@@ -874,6 +874,19 @@ class UtilityCog(commands.Cog):
 # AVATAR — slash command + context menu
 # ─────────────────────────────────────────────────────────────
 
+@commands.command(name="avatar", aliases=["av"])
+@commands.cooldown(1, 5, commands.BucketType.user)
+async def avatar_prefix_command(self, ctx, member: discord.Member = None):
+    """Show a user's avatar. Usage: .avatar [@user]"""
+    target = member or ctx.author
+    avatar = target.display_avatar.with_size(1024)
+    embed = discord.Embed(
+        description=f"**{target.name}**",
+        color=target.accent_color or discord.Color.dark_grey(),
+    )
+    embed.set_image(url=avatar.url)
+    await ctx.send(embed=embed)
+
 from discord import app_commands as _apc
 
 @_apc.context_menu(name="View Avatar")

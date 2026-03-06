@@ -87,31 +87,32 @@ async def _get_entry(msg_id: int):
     async with get_db() as conn:
         async with conn.execute(
             "SELECT orig_message_id, orig_channel_id, author_id, hof_message_id, "
-            "star_count, content, image_url, jump_url, voice_url FROM hof_entries WHERE orig_message_id = ?",
+            "star_count, content, image_url, jump_url, voice_url, trigger_emoji FROM hof_entries WHERE orig_message_id = ?",
             (str(msg_id),)
         ) as cur:
             return await cur.fetchone()
 
 
 async def _upsert_entry(orig_msg_id, orig_ch_id, author_id, hof_msg_id,
-                        star_count, content, image_url, jump_url, voice_url=None):
+                        star_count, content, image_url, jump_url, voice_url=None, trigger_emoji=None):
     async with get_db() as conn:
         await conn.execute(
             """
             INSERT INTO hof_entries
                 (orig_message_id, orig_channel_id, author_id, hof_message_id,
-                 star_count, content, image_url, jump_url, voice_url, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 star_count, content, image_url, jump_url, voice_url, trigger_emoji, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(orig_message_id) DO UPDATE SET
                 hof_message_id = excluded.hof_message_id,
                 star_count     = excluded.star_count,
                 content        = excluded.content,
                 image_url      = excluded.image_url,
-                voice_url      = excluded.voice_url
+                voice_url      = excluded.voice_url,
+                trigger_emoji  = COALESCE(hof_entries.trigger_emoji, excluded.trigger_emoji)
             """,
             (str(orig_msg_id), str(orig_ch_id), str(author_id),
              str(hof_msg_id) if hof_msg_id else None,
-             star_count, content, image_url, jump_url, voice_url, time.time())
+             star_count, content, image_url, jump_url, voice_url, trigger_emoji, time.time())
         )
 
 
@@ -249,6 +250,7 @@ async def _post_or_update_hof(
         hof_msg.id, total,
         message.content, _extract_image(message), jump_url,
         voice_url=_extract_voice(message),
+        trigger_emoji=trigger_emoji
     )
 
 
@@ -270,6 +272,27 @@ class _jump_view(discord.ui.View):
 class HofCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.locks = {} # msg_id -> Lock
+        self.cleanup_task.start()
+
+    def cog_unload(self):
+        self.cleanup_task.cancel()
+
+    @discord.ext.tasks.loop(hours=24)
+    async def cleanup_task(self):
+        """Purge non-HOF entries older than 30 days."""
+        thirty_days_ago = time.time() - (30 * 24 * 60 * 60)
+        async with get_db() as conn:
+            await conn.execute(
+                "DELETE FROM hof_entries WHERE hof_message_id IS NULL AND created_at < ?",
+                (thirty_days_ago,)
+            )
+            await conn.commit()
+        logger.info("🧹 Cleaned up old Hall of Fame rejects.")
+
+    @cleanup_task.before_loop
+    async def before_cleanup(self):
+        await self.bot.wait_until_ready()
 
     # ── REACTION HANDLING ─────────────────────────────────────
 
@@ -285,61 +308,76 @@ class HofCog(commands.Cog):
         if not payload.guild_id:
             return
 
-        s = await _get_settings(payload.guild_id)
-        if not s["channel_id"]:
-            return
+        # Serialization: ensure one reaction at a time per message to prevent race induction
+        if payload.message_id not in self.locks:
+            self.locks[payload.message_id] = asyncio.Lock()
+        
+        async with self.locks[payload.message_id]:
+            s = await _get_settings(payload.guild_id)
+            if not s["channel_id"]:
+                return
 
-        # Check blacklist (voter)
-        if str(payload.user_id) in s.get("blacklisted_users", []):
-            return
-        if str(payload.emoji) not in s["emojis"]:
-            return
-        if str(payload.channel_id) == s["channel_id"]:
-            return  # Ignore reactions on HOF channel itself
-        if str(payload.channel_id) in s["ignored_channels"]:
-            return
-        if str(payload.message_id) in s["trashed_messages"]:
-            return
+            # Check blacklist (voter)
+            if str(payload.user_id) in s.get("blacklisted_users", []):
+                return
+            if str(payload.emoji) not in s["emojis"]:
+                return
+            if str(payload.channel_id) == s["channel_id"]:
+                return  # Ignore reactions on HOF channel itself
+            if str(payload.channel_id) in s["ignored_channels"]:
+                return
+            if str(payload.message_id) in s["trashed_messages"]:
+                return
 
-        guild   = self.bot.get_guild(payload.guild_id)
-        channel = guild.get_channel(payload.channel_id)
-        if not channel:
-            return
-        try:
-            message = await channel.fetch_message(payload.message_id)
-        except Exception:
-            return
+            guild   = self.bot.get_guild(payload.guild_id)
+            channel = guild.get_channel(payload.channel_id)
+            if not channel:
+                return
+            try:
+                message = await channel.fetch_message(payload.message_id)
+            except Exception:
+                return
 
-        # Check blacklist (author)
-        if str(message.author.id) in s.get("blacklisted_users", []):
-            return
+            # Check blacklist (author)
+            if str(message.author.id) in s.get("blacklisted_users", []):
+                return
 
-        emoji_counts = _count_by_emoji_from_reactions(message, s["emojis"])
-        total = sum(emoji_counts.values())
-        is_locked = str(payload.message_id) in s["locked_messages"]
+            emoji_counts = _count_by_emoji_from_reactions(message, s["emojis"])
+            total = sum(emoji_counts.values())
+            is_locked = str(payload.message_id) in s["locked_messages"]
 
-        if total >= s["threshold"]:
-            # Pick a trigger emoji (the one with the most counts, or the one just added)
-            # For simplicity, we'll pick the one from the payload if possible, 
-            # but since this handles both add/remove, we'll pick the max.
-            trigger = str(payload.emoji)
-            await _post_or_update_hof(self.bot, guild, message, emoji_counts, s, trigger_emoji=trigger)
-
-        else:
             entry = await _get_entry(payload.message_id)
-            if entry and entry[3] and not is_locked:
-                hof_ch = guild.get_channel(int(s["channel_id"]))
-                if hof_ch:
-                    try:
-                        await (await hof_ch.fetch_message(int(entry[3]))).delete()
-                    except discord.NotFound:
-                        pass
-                await _upsert_entry(
-                    message.id, channel.id, message.author.id,
-                    None, total,
-                    message.content, _extract_image(message), message.jump_url,
-                    voice_url=_extract_voice(message),
-                )
+            persistent_trigger = entry[9] if entry else None
+
+            if total >= s["threshold"]:
+                # Use persistent trigger if available, else current reaction
+                trigger = persistent_trigger or str(payload.emoji)
+                await _post_or_update_hof(self.bot, guild, message, emoji_counts, s, trigger_emoji=trigger)
+                # Cleanup lock after completion (optional, but keep it for threshold transitions)
+            else:
+                if entry and entry[3] and not is_locked:
+                    hof_ch = guild.get_channel(int(s["channel_id"]))
+                    if hof_ch:
+                        try:
+                            await (await hof_ch.fetch_message(int(entry[3]))).delete()
+                        except discord.NotFound:
+                            pass
+                    await _upsert_entry(
+                        message.id, channel.id, message.author.id,
+                        None, total,
+                        message.content, _extract_image(message), message.jump_url,
+                        voice_url=_extract_voice(message),
+                        trigger_emoji=persistent_trigger
+                    )
+                elif total > 0:
+                    # Always populate entries with at least 1 reaction to support "lost hall"
+                    await _upsert_entry(
+                        message.id, channel.id, message.author.id,
+                        None, total,
+                        message.content, _extract_image(message), message.jump_url,
+                        voice_url=_extract_voice(message),
+                        trigger_emoji=persistent_trigger or str(payload.emoji)
+                    )
 
     # ── AUTO-STAR ─────────────────────────────────────────────
 
@@ -361,10 +399,38 @@ class HofCog(commands.Cog):
     @commands.command(name="hall", aliases=["hof"])
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def hall_command(self, ctx, *, arg: str = None):
-        """Browse Hall of Fame. Usage: .hall random | .hall @user"""
+        """Browse Hall of Fame. Usage: .hall random | .hall @user | .hall lost"""
         async with ctx.channel.typing():
             async with get_db() as conn:
-                if arg and ctx.message.mentions:
+                if arg == "lost":
+                    # Pull a random message with 2+ stars that isn't in the HOF
+                    async with conn.execute(
+                        "SELECT author_id, star_count, content, image_url, jump_url, voice_url "
+                        "FROM hof_entries "
+                        "WHERE hof_message_id IS NULL AND star_count >= 2 "
+                        "ORDER BY RANDOM() LIMIT 1"
+                    ) as cur:
+                        row = await cur.fetchone()
+                    
+                    if not row:
+                        return await ctx.reply("❌ No 'lost' entries found yet.", mention_author=False)
+                    
+                    author_id, star_count, content, image_url, jump_url, voice_url = row
+                    s = await _get_settings(ctx.guild.id)
+                    emoji = s["emojis"][0] if s["emojis"] else "⭐"
+                    author = ctx.guild.get_member(int(author_id)) or await self.bot.fetch_user(int(author_id))
+
+                    embed = discord.Embed(
+                        description=content[:4090] if content else "*[no text]*",
+                        color=0x808080,
+                    )
+                    embed.set_author(name=getattr(author, "display_name", str(author)), icon_url=author.display_avatar.url)
+                    if image_url:
+                        embed.set_image(url=image_url)
+                    embed.set_footer(text=f"{emoji} {star_count} — no cigar")
+                    return await ctx.send(embed=embed, view=_jump_view(jump_url) if jump_url else None)
+
+                elif arg and ctx.message.mentions:
                     uid = str(ctx.message.mentions[0].id)
                     async with conn.execute(
                         "SELECT author_id, hof_message_id, star_count, content, image_url, jump_url, voice_url "
@@ -891,6 +957,7 @@ async def _force_post_to_hof(bot, guild, message, emoji_counts, s, trigger_emoji
         hof_msg.id, total,
         message.content, _extract_image(message), jump_url,
         voice_url=_extract_voice(message),
+        trigger_emoji=trigger_emoji
     )
 
 

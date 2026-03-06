@@ -249,6 +249,9 @@ async def init_db():
                 if hof_cols and "voice_url" not in hof_cols:
                     logger.info("Adding voice_url to hof_entries...")
                     await conn.execute("ALTER TABLE hof_entries ADD COLUMN voice_url TEXT")
+                if hof_cols and "trigger_emoji" not in hof_cols:
+                    logger.info("Adding trigger_emoji to hof_entries...")
+                    await conn.execute("ALTER TABLE hof_entries ADD COLUMN trigger_emoji TEXT")
 
             await conn.execute(
                 """
@@ -262,6 +265,7 @@ async def init_db():
                     image_url TEXT,
                     jump_url TEXT,
                     voice_url TEXT,
+                    trigger_emoji TEXT,
                     created_at REAL NOT NULL
                 )
                 """
