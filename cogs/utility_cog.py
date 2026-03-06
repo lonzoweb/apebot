@@ -890,6 +890,7 @@ async def avatar_prefix_command(self, ctx, member: discord.Member = None):
 from discord import app_commands as _apc
 
 @_apc.context_menu(name="View Avatar")
+@_apc.guild_only()
 async def view_avatar_context_menu(interaction: discord.Interaction, member: discord.Member):
     """Right-click a user → View Avatar."""
     await _send_avatar(interaction, member)

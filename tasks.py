@@ -32,6 +32,7 @@ QUOTE_TEXT_KEY    = "daily_quote_text"   # The actual quote text
 PENDING_Q_KEY     = "pending_quotes"     # JSON list of candidates
 TOMORROW_Q_KEY    = "tomorrow_quote"     # Admin-picked quote
 CANDIDATES_SENT_KEY = "candidates_sent_date"  # ISO date string of last candidate send
+PV_MSG_ID_KEY     = "pv_message_id"      # ID of the current candidate voting message
 
 
 async def _get_today_str() -> str:
@@ -175,9 +176,16 @@ async def _send_candidates(bot, emperor_channel, today_quote):
             description=lines,
             color=discord.Color.blurple(),
         )
-        pick_embed.set_footer(text=".pv to vote by reaction · .pv revote to regenerate")
-        await emperor_channel.send(embed=pick_embed)
-        logger.info("✅ Quote candidates sent to #emperor.")
+        pick_embed.set_footer(text="React with 1, 2, or 3 to pick tomorrow's quote · .pv revote to regenerate")
+        msg = await emperor_channel.send(embed=pick_embed)
+        
+        # Add reactions for easy voting
+        NUMBER_EMOJIS = ["1️⃣", "2️⃣", "3️⃣"]
+        for emoji in NUMBER_EMOJIS[:len(candidates)]:
+            await msg.add_reaction(emoji)
+            
+        await database.set_setting(PV_MSG_ID_KEY, str(msg.id))
+        logger.info("✅ Quote candidates sent to #emperor with reactions.")
     except Exception as e:
         logger.error(f"Error sending quote candidates: {e}", exc_info=True)
 

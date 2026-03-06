@@ -244,7 +244,7 @@ def build_rank_card(
     f_level = _load_font(font_name, 46)   # level
     
     # Mono for persistent UI elements (star is being replaced)
-    f_pct   = _load_font("Avenger", 23)   # increased 5px from 18
+    f_pct   = _load_font("Avenger", 26)   # increased to 26px for better visibility
     f_mono  = _load_mono(21)             # for lower-case suffix/emoji fallback
     f_wmark = _load_mono(13)             # theme watermark
 
@@ -330,8 +330,11 @@ def build_rank_card(
         luma = 0.299*theme["bar_fill"][0] + 0.587*theme["bar_fill"][1] + 0.114*theme["bar_fill"][2]
         text_fill = (10, 10, 10) if luma > 150 else (255, 255, 255)
 
-    # Vertical centering for a 52px bar (18px font)
-    py = bar_y + (bar_h - 23) // 2 - 4
+    # Vertical centering for a 52px bar (26px font)
+    # Using textbbox for more precise vertical centering
+    _bb = draw.textbbox((0, 0), pct_str, font=f_pct)
+    th = _bb[3] - _bb[1]
+    py = bar_y + (bar_h - th) // 2 - 2  # slight offset for visual balance
     # Shadow for extra readability
     draw.text((px+1, py+1), pct_str, font=f_pct, fill=(0,0,0,160))
     draw.text((px, py), pct_str, font=f_pct, fill=text_fill)

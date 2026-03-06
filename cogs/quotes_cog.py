@@ -271,7 +271,27 @@ class QuotesCog(commands.Cog):
                 self.bot.pending_quotes = candidates
                 self.bot.tomorrow_quote = None
 
-                await self._post_candidate_vote(ctx, candidates, title="🔄 Tomorrow's Quote — New Vote")
+                # Re-post to #emperor with reactions
+                NUMBER_EMOJIS = ["1️⃣", "2️⃣", "3️⃣"]
+                pick_embed = discord.Embed(
+                    title="🔄 Tomorrow's Quote — New Vote",
+                    description="\n\n".join(f"{NUMBER_EMOJIS[i]} {q}" for i, q in enumerate(candidates)),
+                    color=discord.Color.blurple(),
+                )
+                emperor_channel = discord.utils.get(ctx.guild.text_channels, name="emperor")
+                target_channel = emperor_channel or ctx.channel
+                
+                msg = await target_channel.send(embed=pick_embed)
+                for emoji in NUMBER_EMOJIS[:len(candidates)]:
+                    await msg.add_reaction(emoji)
+                
+                # Save msg ID for the listener
+                from tasks import PV_MSG_ID_KEY
+                from database import set_setting
+                await set_setting(PV_MSG_ID_KEY, str(msg.id))
+
+                if emperor_channel and target_channel != ctx.channel:
+                    await ctx.reply(f"✅ New vote posted in {emperor_channel.mention}.", mention_author=False)
 
             except Exception as e:
                 logger.error(f"Error in pv revote: {e}")
@@ -343,6 +363,61 @@ class QuotesCog(commands.Cog):
         )
         embed.set_footer(text=f"Chosen by {ctx.author.display_name} · Posts at 10am & 6pm tomorrow")
         await target_channel.send(embed=embed)
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
+        """Listen for 1, 2, 3 reactions on the current PV message."""
+        if payload.user_id == self.bot.user.id:
+            return
+        
+        from database import get_setting
+        from tasks import PV_MSG_ID_KEY
+        pv_msg_id = await get_setting(PV_MSG_ID_KEY)
+        if not pv_msg_id or str(payload.message_id) != pv_msg_id:
+            return
+
+        # Check if user is an admin
+        guild = self.bot.get_guild(payload.guild_id)
+        if not guild:
+            return
+        member = guild.get_member(payload.user_id)
+        if not member or not member.guild_permissions.administrator:
+            return
+
+        # Check if emoji is 1, 2, or 3
+        NUMBER_EMOJIS = ["1️⃣", "2️⃣", "3️⃣"]
+        emoji_str = str(payload.emoji)
+        if emoji_str not in NUMBER_EMOJIS:
+            return
+
+        # Lock it in
+        candidates = await tasks._get_pending_quotes()
+        if not candidates:
+            return
+
+        idx = NUMBER_EMOJIS.index(emoji_str)
+        if idx >= len(candidates):
+            return
+        
+        picked = candidates[idx]
+        await tasks._set_tomorrow_quote(picked)
+        await tasks._set_pending_quotes([])
+        self.bot.tomorrow_quote = picked
+        self.bot.pending_quotes = []
+        # Clear PV message ID so we don't double-trigger
+        from database import set_setting
+        await set_setting(PV_MSG_ID_KEY, "")
+
+        # Notify
+        channel = self.bot.get_channel(payload.channel_id)
+        if channel:
+            embed = discord.Embed(
+                title="✅ Tomorrow's Quote — Locked In",
+                description=f"📜 {picked}",
+                color=discord.Color.green(),
+            )
+            embed.set_footer(text=f"Chosen by {member.display_name} via reaction")
+            await channel.send(embed=embed)
 
 
 

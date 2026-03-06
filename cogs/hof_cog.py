@@ -343,13 +343,13 @@ class HofCog(commands.Cog):
                 return
 
             emoji_counts = _count_by_emoji_from_reactions(message, s["emojis"])
-            total = sum(emoji_counts.values())
+            max_count = max(emoji_counts.values()) if emoji_counts else 0
             is_locked = str(payload.message_id) in s["locked_messages"]
 
             entry = await _get_entry(payload.message_id)
             persistent_trigger = entry[9] if entry else None
 
-            if total >= s["threshold"]:
+            if max_count >= s["threshold"]:
                 # Use persistent trigger if available, else current reaction
                 trigger = persistent_trigger or str(payload.emoji)
                 await _post_or_update_hof(self.bot, guild, message, emoji_counts, s, trigger_emoji=trigger)
@@ -364,16 +364,16 @@ class HofCog(commands.Cog):
                             pass
                     await _upsert_entry(
                         message.id, channel.id, message.author.id,
-                        None, total,
+                        None, max_count,
                         message.content, _extract_image(message), message.jump_url,
                         voice_url=_extract_voice(message),
                         trigger_emoji=persistent_trigger
                     )
-                elif total > 0:
+                elif max_count > 0:
                     # Always populate entries with at least 1 reaction to support "lost hall"
                     await _upsert_entry(
                         message.id, channel.id, message.author.id,
-                        None, total,
+                        None, max_count,
                         message.content, _extract_image(message), message.jump_url,
                         voice_url=_extract_voice(message),
                         trigger_emoji=persistent_trigger or str(payload.emoji)
