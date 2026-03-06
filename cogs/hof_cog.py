@@ -11,8 +11,9 @@ import logging
 import random
 import re
 import discord
+import asyncio
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 from database import get_db
 
 logger = logging.getLogger(__name__)
@@ -278,7 +279,7 @@ class HofCog(commands.Cog):
     def cog_unload(self):
         self.cleanup_task.cancel()
 
-    @discord.ext.tasks.loop(hours=24)
+    @tasks.loop(hours=24)
     async def cleanup_task(self):
         """Purge non-HOF entries older than 30 days."""
         thirty_days_ago = time.time() - (30 * 24 * 60 * 60)
@@ -309,10 +310,9 @@ class HofCog(commands.Cog):
             return
 
         # Serialization: ensure one reaction at a time per message to prevent race induction
-        if payload.message_id not in self.locks:
-            self.locks[payload.message_id] = asyncio.Lock()
+        lock = self.locks.setdefault(payload.message_id, asyncio.Lock())
         
-        async with self.locks[payload.message_id]:
+        async with lock:
             s = await _get_settings(payload.guild_id)
             if not s["channel_id"]:
                 return
