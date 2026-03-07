@@ -60,12 +60,12 @@ class UtilityCog(commands.Cog):
         )
         embed.add_field(
             name="#forum (works in both channels)",
-            value="`.beg` `.daily` `.bal` `.send` `.key` `.gem` `.moon` `.tc` `.w` `.time` `.8ball` `.location` `.roll` `.roulette`",
+            value="`.beg` `.daily` `.bal` `.send` `.key` `.gem` `.moon` `.tc` `.w` `.time` `.8ball` `.location` `.roll` `.roulette` `.ud`",
             inline=False
         )
         embed.add_field(
             name="#forum-livi only",
-            value="`.shop` `.inv` `.bt` `.dice` `.pull` `.jugg` `.rev` `.ud` `.lp` `.crypto` `.gifs` `.flip`",
+            value="`.shop` `.inv` `.bt` `.dice` `.pull` `.jugg` `.rev` `.lp` `.crypto` `.gifs` `.flip`",
             inline=False
         )
         await ctx.send(embed=embed)
@@ -202,8 +202,8 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def urban_command(self, ctx, *, term: str):
         """Look up a term on Urban Dictionary"""
-        # Channel Restriction: Only forum-livi
-        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        # Channel Restriction: forum and forum-livi
+        if ctx.channel.name.lower() not in ["forum", "forum-livi"] and not ctx.author.guild_permissions.administrator:
             return
         if len(term) > 100:
             return await ctx.send("❌ Term too long (max 100 characters)")
