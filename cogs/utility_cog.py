@@ -60,12 +60,12 @@ class UtilityCog(commands.Cog):
         )
         embed.add_field(
             name="#forum (works in both channels)",
-            value="`.beg` `.daily` `.bal` `.send` `.key` `.gem` `.moon` `.tc` `.w` `.time` `.8ball` `.location` `.roll` `.roulette` `.ud`",
+            value="`.beg` `.daily` `.bal` `.send` `.key` `.gem` `.moon` `.tc` `.w` `.time` `.8ball` `.location` `.roll` `.roulette` `.ud` `.rev`",
             inline=False
         )
         embed.add_field(
             name="#forum-livi only",
-            value="`.shop` `.inv` `.bt` `.dice` `.pull` `.jugg` `.rev` `.lp` `.crypto` `.gifs` `.flip`",
+            value="`.shop` `.inv` `.bt` `.dice` `.pull` `.jugg` `.lp` `.crypto` `.gifs` `.flip`",
             inline=False
         )
         await ctx.send(embed=embed)
@@ -125,8 +125,8 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 30, commands.BucketType.user)
     async def reverse_command(self, ctx):
         """Reverse search the most relevant image in chat using Google Lens (costs 2 tokens)"""
-        # Channel Restriction: Only forum-livi
-        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
+        # Channel Restriction: forum and forum-livi
+        if ctx.channel.name.lower() not in ["forum", "forum-livi"] and not ctx.author.guild_permissions.administrator:
             return
         async with ctx.channel.typing():
             image_url = None
