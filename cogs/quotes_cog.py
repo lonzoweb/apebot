@@ -140,10 +140,9 @@ class QuotesCog(commands.Cog):
             await ctx.reply("⌛ The sands have run out. Aborted.", mention_author=False)
 
     @commands.command(name="delquote")
+    @commands.has_permissions(administrator=True)
     async def delete_quote(self, ctx, *, keyword: str):
         """Delete a quote by keyword (Admin only)"""
-        if not ctx.author.guild_permissions.administrator:
-            return await ctx.send("🚫 Peasant Detected")
 
         results = await search_quotes_by_keyword(keyword)
         if not results:
@@ -198,11 +197,9 @@ class QuotesCog(commands.Cog):
             await ctx.send("❌ Error deleting quote")
 
     @commands.command(name="listquotes")
+    @commands.has_permissions(administrator=True)
     async def list_quotes(self, ctx):
         """DM all quotes (Admin only)"""
-        if not ctx.author.guild_permissions.administrator:
-            await ctx.send("🚫 Peasant Detected")
-            return
         quotes = await load_quotes_from_db()
         if not quotes:
             await ctx.send("⚠️ No quotes available.")

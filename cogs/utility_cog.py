@@ -870,53 +870,41 @@ class UtilityCog(commands.Cog):
 
 
 
-# ─────────────────────────────────────────────────────────────
-# AVATAR — slash command + context menu
-# ─────────────────────────────────────────────────────────────
+    @commands.command(name="avatar", aliases=["av"])
+    @commands.cooldown(1, 5, commands.BucketType.user)
+    async def avatar_prefix_command(self, ctx, member: discord.Member = None):
+        """Show a user's avatar. Usage: .avatar [@user]"""
+        target = member or ctx.author
+        avatar = target.display_avatar.with_size(1024)
+        embed = discord.Embed(
+            description=f"**{target.name}**",
+            color=target.accent_color or discord.Color.dark_grey(),
+        )
+        embed.set_image(url=avatar.url)
+        await ctx.send(embed=embed)
 
-@commands.command(name="avatar", aliases=["av"])
-@commands.cooldown(1, 5, commands.BucketType.user)
-async def avatar_prefix_command(self, ctx, member: discord.Member = None):
-    """Show a user's avatar. Usage: .avatar [@user]"""
-    target = member or ctx.author
-    avatar = target.display_avatar.with_size(1024)
-    embed = discord.Embed(
-        description=f"**{target.name}**",
-        color=target.accent_color or discord.Color.dark_grey(),
-    )
-    embed.set_image(url=avatar.url)
-    await ctx.send(embed=embed)
+    async def _send_avatar(self, interaction: discord.Interaction, target: discord.Member | discord.User):
+        avatar = target.display_avatar.with_size(1024)
+        embed = discord.Embed(
+            description=f"**{target.name}**",
+            color=target.accent_color or discord.Color.dark_grey(),
+        )
+        embed.set_image(url=avatar.url)
+        await interaction.response.send_message(embed=embed)
 
-from discord import app_commands as _apc
+    @app_commands.context_menu(name="View Avatar")
+    @app_commands.guild_only()
+    async def view_avatar_context_menu(self, interaction: discord.Interaction, member: discord.Member):
+        """Right-click a user → View Avatar."""
+        await self._send_avatar(interaction, member)
 
-@_apc.context_menu(name="View Avatar")
-@_apc.guild_only()
-async def view_avatar_context_menu(interaction: discord.Interaction, member: discord.Member):
-    """Right-click a user → View Avatar."""
-    await _send_avatar(interaction, member)
-
-
-async def _send_avatar(interaction: discord.Interaction, target: discord.Member | discord.User):
-    avatar = target.display_avatar.with_size(1024)
-    embed = discord.Embed(
-        description=f"**{target.name}**",
-        color=target.accent_color or discord.Color.dark_grey(),
-    )
-    embed.set_image(url=avatar.url)
-    await interaction.response.send_message(embed=embed)
+    @app_commands.command(name="avatar", description="Show a user's avatar")
+    @app_commands.describe(user="The user whose avatar to show (defaults to yourself)")
+    async def slash_avatar(self, interaction: discord.Interaction, user: discord.Member = None):
+        target = user or interaction.user
+        await self._send_avatar(interaction, target)
 
 
 async def setup(bot):
-    cog = UtilityCog(bot)
-    await bot.add_cog(cog)
-
-    # Register the "View Avatar" user context menu globally
-    bot.tree.add_command(view_avatar_context_menu)
-
-    # Register /avatar as a global slash command
-    @bot.tree.command(name="avatar", description="Show a user's avatar")
-    @_apc.describe(user="The user whose avatar to show (defaults to yourself)")
-    async def slash_avatar(interaction: discord.Interaction, user: discord.Member = None):
-        target = user or interaction.user
-        await _send_avatar(interaction, target)
+    await bot.add_cog(UtilityCog(bot))
 

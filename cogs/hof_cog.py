@@ -405,7 +405,7 @@ class HofCog(commands.Cog):
                 if arg == "lost":
                     # Pull a random message with 2+ stars that isn't in the HOF
                     async with conn.execute(
-                        "SELECT author_id, star_count, content, image_url, jump_url, voice_url "
+                        "SELECT author_id, star_count, content, image_url, jump_url, voice_url, trigger_emoji, orig_channel_id "
                         "FROM hof_entries "
                         "WHERE hof_message_id IS NULL AND star_count >= 2 "
                         "ORDER BY RANDOM() LIMIT 1"
@@ -415,9 +415,16 @@ class HofCog(commands.Cog):
                     if not row:
                         return await ctx.reply("❌ No 'lost' entries found yet.", mention_author=False)
                     
-                    author_id, star_count, content, image_url, jump_url, voice_url = row
-                    s = await _get_settings(ctx.guild.id)
-                    emoji = s["emojis"][0] if s["emojis"] else "⭐"
+                    author_id, star_count, content, image_url, jump_url, voice_url, trigger_emoji, orig_ch_id = row
+                    
+                    if not trigger_emoji:
+                        s = await _get_settings(ctx.guild.id)
+                        trigger_emoji = s["emojis"][0] if s["emojis"] else "⭐"
+                        
+                    channel = ctx.guild.get_channel(int(orig_ch_id))
+                    ch_name = f"#{channel.name}" if channel else "channel"
+                    content_header = f"{trigger_emoji} **{star_count}** in [{ch_name}]({jump_url}) — *no cigar*"
+
                     author = ctx.guild.get_member(int(author_id)) or await self.bot.fetch_user(int(author_id))
 
                     embed = discord.Embed(
@@ -427,13 +434,12 @@ class HofCog(commands.Cog):
                     embed.set_author(name=getattr(author, "display_name", str(author)), icon_url=author.display_avatar.url)
                     if image_url:
                         embed.set_image(url=image_url)
-                    embed.set_footer(text=f"{emoji} {star_count} — no cigar")
-                    return await ctx.send(embed=embed, view=_jump_view(jump_url) if jump_url else None)
+                    return await ctx.send(content=content_header, embed=embed, view=_jump_view(jump_url) if jump_url else None)
 
                 elif arg and ctx.message.mentions:
                     uid = str(ctx.message.mentions[0].id)
                     async with conn.execute(
-                        "SELECT author_id, hof_message_id, star_count, content, image_url, jump_url, voice_url "
+                        "SELECT author_id, star_count, content, image_url, jump_url, voice_url, trigger_emoji, orig_channel_id "
                         "FROM hof_entries WHERE author_id = ? AND hof_message_id IS NOT NULL "
                         "ORDER BY RANDOM() LIMIT 1", (uid,)
                     ) as cur:
@@ -446,7 +452,7 @@ class HofCog(commands.Cog):
                         )
                 else:
                     async with conn.execute(
-                        "SELECT author_id, hof_message_id, star_count, content, image_url, jump_url, voice_url "
+                        "SELECT author_id, star_count, content, image_url, jump_url, voice_url, trigger_emoji, orig_channel_id "
                         "FROM hof_entries WHERE hof_message_id IS NOT NULL "
                         "ORDER BY RANDOM() LIMIT 1"
                     ) as cur:
@@ -457,7 +463,16 @@ class HofCog(commands.Cog):
                             mention_author=False
                         )
 
-            author_id, hof_msg_id, star_count, content, image_url, jump_url, voice_url = row
+            author_id, star_count, content, image_url, jump_url, voice_url, trigger_emoji, orig_ch_id = row
+            
+            if not trigger_emoji:
+                s = await _get_settings(ctx.guild.id)
+                trigger_emoji = s["emojis"][0] if s["emojis"] else "⭐"
+            
+            channel = ctx.guild.get_channel(int(orig_ch_id))
+            ch_name = f"#{channel.name}" if channel else "channel"
+            content_header = f"{trigger_emoji} **{star_count}** in [{ch_name}]({jump_url})"
+
             author = ctx.guild.get_member(int(author_id)) or await self.bot.fetch_user(int(author_id))
 
             voice_line = f"\n\n🎙️ [Voice Note]({voice_url})" if voice_url else ""
@@ -472,8 +487,7 @@ class HofCog(commands.Cog):
             )
             if image_url:
                 embed.set_image(url=image_url)
-            embed.set_footer(text=f"⭐ {star_count} total reactions")
-            await ctx.send(embed=embed, view=_jump_view(jump_url) if jump_url else None)
+            await ctx.send(content=content_header, embed=embed, view=_jump_view(jump_url) if jump_url else None)
 
     @hall_command.error
     async def hall_error(self, ctx, error):
@@ -974,46 +988,42 @@ def _parse_message_id(link: str) -> str | None:
 # SETUP
 # ─────────────────────────────────────────────────────────────
 
-@app_commands.context_menu(name="Add to Hall of Fame")
-@app_commands.default_permissions(administrator=True)
-async def force_to_hof_context_menu(interaction: discord.Interaction, message: discord.Message):
-    """Right-click context menu: force any message into the Hall of Fame."""
-    await _force_to_hof(interaction, message)
+    @app_commands.context_menu(name="Add to Hall of Fame")
+    @app_commands.default_permissions(administrator=True)
+    async def force_to_hof_context_menu(self, interaction: discord.Interaction, message: discord.Message):
+        """Right-click context menu: force any message into the Hall of Fame."""
+        await _force_to_hof(interaction, message)
 
+    @app_commands.context_menu(name="Trash from Hall of Fame")
+    @app_commands.default_permissions(administrator=True)
+    async def trash_from_hof_context_menu(self, interaction: discord.Interaction, message: discord.Message):
+        """Right-click context menu: remove a message from the Hall of Fame and blacklist it."""
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("🚫 Admins only.", ephemeral=True)
 
-@app_commands.context_menu(name="Trash from Hall of Fame")
-@app_commands.default_permissions(administrator=True)
-async def trash_from_hof_context_menu(interaction: discord.Interaction, message: discord.Message):
-    """Right-click context menu: remove a message from the Hall of Fame and blacklist it."""
-    if not interaction.user.guild_permissions.administrator:
-        return await interaction.response.send_message("🚫 Admins only.", ephemeral=True)
+        s = await _get_settings(interaction.guild_id)
+        msg_id = str(message.id)
 
-    s = await _get_settings(interaction.guild_id)
-    msg_id = str(message.id)
+        trashed = s["trashed_messages"]
+        if msg_id not in trashed:
+            trashed.append(msg_id)
+        await _set_settings(interaction.guild_id, trashed_messages=trashed)
 
-    trashed = s["trashed_messages"]
-    if msg_id not in trashed:
-        trashed.append(msg_id)
-    await _set_settings(interaction.guild_id, trashed_messages=trashed)
+        entry = await _get_entry(message.id)
+        if entry and entry[3] and s["channel_id"]:
+            hof_ch = interaction.guild.get_channel(int(s["channel_id"]))
+            if hof_ch:
+                try:
+                    await (await hof_ch.fetch_message(int(entry[3]))).delete()
+                except discord.NotFound:
+                    pass
+            await _upsert_entry(message.id, entry[1], entry[2], None, entry[4], entry[5], entry[6], entry[7], voice_url=entry[8] if len(entry) > 8 else None)
 
-    entry = await _get_entry(message.id)
-    if entry and entry[3] and s["channel_id"]:
-        hof_ch = interaction.guild.get_channel(int(s["channel_id"]))
-        if hof_ch:
-            try:
-                await (await hof_ch.fetch_message(int(entry[3]))).delete()
-            except discord.NotFound:
-                pass
-        await _upsert_entry(message.id, entry[1], entry[2], None, entry[4], entry[5], entry[6], entry[7], voice_url=entry[8] if len(entry) > 8 else None)
-
-    await interaction.response.send_message(
-        f"🗑️ **{message.author.display_name}'s** message removed from the Hall of Fame and blacklisted.",
-        ephemeral=True,
-    )
+        await interaction.response.send_message(
+            f"🗑️ **{message.author.display_name}'s** message removed from the Hall of Fame and blacklisted.",
+            ephemeral=True,
+        )
 
 
 async def setup(bot: commands.Bot):
-    cog = HofCog(bot)
-    await bot.add_cog(cog)
-    bot.tree.add_command(force_to_hof_context_menu)
-    bot.tree.add_command(trash_from_hof_context_menu)
+    await bot.add_cog(HofCog(bot))
