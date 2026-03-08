@@ -401,10 +401,10 @@ async def globally_block_commands(ctx):
     # Allow channels in these channel names
     # Handle threads inside these channels by checking parent channel
     parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-    ALLOWED_CHANNEL_NAMES = ["forum", "forum-livi", "livi", "bot-logs", "system-logs"]
+    ALLOWED_CHANNEL_NAMES = ["forum", "forum-livi", "livi", "emperor", "bot-logs", "system-logs"]
     
     # Public Command Exemptions (Allowed in all channels)
-    PUBLIC_COMMANDS = ["gem", "moon", "tc", "w", "time", "8ball", "location"]
+    PUBLIC_COMMANDS = ["gem", "moon", "tc", "w", "time", "8ball", "location", "ud", "rev", "roll", "flip"]
     if ctx.command and ctx.command.name in PUBLIC_COMMANDS:
         return True
 
