@@ -896,30 +896,32 @@ class UtilityCog(commands.Cog):
             color=target.accent_color or discord.Color.dark_grey(),
         )
         embed.set_image(url=avatar.url)
-        await ctx.send(embed=embed)
-
-    async def _send_avatar(self, interaction: discord.Interaction, target: discord.Member | discord.User):
-        avatar = target.display_avatar.with_size(1024)
-        embed = discord.Embed(
-            description=f"**{target.name}**",
-            color=target.accent_color or discord.Color.dark_grey(),
-        )
-        embed.set_image(url=avatar.url)
-        await interaction.response.send_message(embed=embed)
-
-    @app_commands.context_menu(name="View Avatar")
-    @app_commands.guild_only()
-    async def view_avatar_context_menu(self, interaction: discord.Interaction, member: discord.Member):
-        """Right-click a user → View Avatar."""
-        await self._send_avatar(interaction, member)
 
     @app_commands.command(name="avatar", description="Show a user's avatar")
     @app_commands.describe(user="The user whose avatar to show (defaults to yourself)")
     async def slash_avatar(self, interaction: discord.Interaction, user: discord.Member = None):
         target = user or interaction.user
-        await self._send_avatar(interaction, target)
+        await _send_avatar(interaction, target)
+
+
+async def _send_avatar(interaction: discord.Interaction, target: discord.Member | discord.User):
+    avatar = target.display_avatar.with_size(1024)
+    embed = discord.Embed(
+        description=f"**{target.name}**",
+        color=target.accent_color or discord.Color.dark_grey(),
+    )
+    embed.set_image(url=avatar.url)
+    await interaction.response.send_message(embed=embed)
+
+
+@app_commands.context_menu(name="View Avatar")
+@app_commands.guild_only()
+async def view_avatar_context_menu(interaction: discord.Interaction, member: discord.Member):
+    """Right-click a user → View Avatar."""
+    await _send_avatar(interaction, member)
 
 
 async def setup(bot):
     await bot.add_cog(UtilityCog(bot))
+    bot.tree.add_command(view_avatar_context_menu)
 
