@@ -839,22 +839,6 @@ class HofCog(commands.Cog):
         
         await interaction.response.send_message(embed=embed)
 
-    @hall_group.command(name="blacklist", description="[ADMIN] Prevent a user from appearing in the Hall of Fame")
-    @app_commands.describe(user="The user to blacklist (or unblacklist if already barred)")
-    @app_commands.default_permissions(administrator=True)
-    async def slash_blacklist(self, interaction: discord.Interaction, user: discord.Member):
-        s = await _get_settings(interaction.guild_id)
-        uid = str(user.id)
-        
-        if uid in s["blacklisted_users"]:
-            s["blacklisted_users"].remove(uid)
-            msg = f"✅ **{user.display_name}** has been removed from the HOF blacklist."
-        else:
-            s["blacklisted_users"].append(uid)
-            msg = f"🚫 **{user.display_name}** has been added to the HOF blacklist."
-        
-        await _set_settings(interaction.guild_id, blacklisted_users=s["blacklisted_users"])
-        await interaction.response.send_message(msg, ephemeral=True)
 
     @hall_group.command(name="sync", description="[ADMIN] Manually scan and induct a message by its link")
     @app_commands.describe(link="The link to the Discord message")
