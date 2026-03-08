@@ -4,6 +4,7 @@ Commands: gem, rev, ud, flip, roll, 8ball, moon, lp, w, crypto, gifs, key, stats
 """
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 import logging
 import random
