@@ -381,56 +381,41 @@ async def on_raw_reaction_add(payload):
 @bot.check
 async def globally_block_commands(ctx):
     """Block all commands except in allowed channels or if muzzled/uwud."""
-    try:
-        # Admins and Capos can use commands anywhere and are immune to curses/spam checks
-        roles = getattr(ctx.author, "roles", [])
-        is_capo = any(getattr(role, "name", "") == "Capo" for role in roles)
-        is_admin = getattr(ctx.author.guild_permissions, "administrator", False) if hasattr(ctx.author, "guild_permissions") else False
-        
-        # Block if muzzled or uwud
-        effects = await get_all_active_effects(ctx.author.id)
-        for effect_name, expiration in effects:
-            if time.time() < expiration and effect_name in ["muzzle", "uwu"]:
-                return False
-
-        if is_admin or is_capo:
-            return True
-
-        # Check debug mode
-        if getattr(bot, "DEBUG_MODE", False):
+    # Admins and Capos can use commands anywhere and are immune to curses/spam checks
+    is_capo = any(role.name == "Capo" for role in ctx.author.roles)
+    is_admin = ctx.author.guild_permissions.administrator
+    
+    # Block if muzzled or uwud (Capos are no longer exempt from muzzle/uwu)
+    effects = await get_all_active_effects(ctx.author.id)
+    for effect_name, expiration in effects:
+        if time.time() < expiration and effect_name in ["muzzle", "uwu"]:
             return False
 
-        # Public Command Exemptions (Allowed in all channels)
-        PUBLIC_COMMANDS = ["gem", "moon", "tc", "w", "time", "8ball", "location", "ud", "rev", "roll", "flip", "key"]
-        if ctx.command and ctx.command.name in PUBLIC_COMMANDS:
-            return True
-
-        # Allow channels in these channel names
-        # Handle threads inside these channels by checking parent channel
-        parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        parent_name = getattr(parent_ch, "name", "").lower()
-        ALLOWED_CHANNEL_NAMES = ["forum", "forum-livi", "livi", "emperor", "bot-logs", "system-logs"]
-        
-        if parent_name not in ALLOWED_CHANNEL_NAMES:
-            return False
-
-        # YAP SYSTEM (20s Window)
-        is_gold = await has_item(ctx.author.id, "gold_card")
-        triggered, duration = bot.yap_manager.check_spam(ctx.author.id, is_gold)
-        if triggered:
-            await add_active_effect(ctx.author.id, "muzzle", duration)
-            await assign_muzzle_role(ctx.author)
-            msg = "for yapping" if not is_gold else "for excessive yapping"
-            mins = int(duration / 60)
-            await ctx.reply(f"{ctx.author.mention} muzzled for {mins}m {msg}.", mention_author=False)
-            return False
-
+    if is_admin or is_capo:
         return True
-    except Exception as e:
-        logger.error(f"Error in global command check: {e}")
-        # If the check itself fails, we probably shouldn't block the command
-        # BUT we should log it. Returning True to be safe for users.
-        return True
+
+    # Check debug mode
+    if getattr(bot, "DEBUG_MODE", False):
+        return False
+
+    # Allow channels in these channel names
+    ALLOWED_CHANNEL_NAMES = ["forum", "forum-livi", "bot-logs"]
+    if ctx.channel.name not in ALLOWED_CHANNEL_NAMES:
+        return False
+
+
+    # YAP SYSTEM (20s Window)
+    is_gold = await has_item(ctx.author.id, "gold_card")
+    triggered, duration = bot.yap_manager.check_spam(ctx.author.id, is_gold)
+    if triggered:
+        await add_active_effect(ctx.author.id, "muzzle", duration)
+        await assign_muzzle_role(ctx.author)
+        msg = "for yapping" if not is_gold else "for excessive yapping"
+        mins = int(duration / 60)
+        await ctx.reply(f"{ctx.author.mention} muzzled for {mins}m {msg}.", mention_author=False)
+        return False
+
+    return True
 
 
 @bot.tree.interaction_check
