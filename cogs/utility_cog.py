@@ -127,7 +127,8 @@ class UtilityCog(commands.Cog):
         """Reverse search the most relevant image in chat using Google Lens (costs 2 tokens)"""
         # Channel Restriction: forum and forum-livi
         parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        if parent_ch.name.lower() not in ["forum", "forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
+        parent_name = getattr(parent_ch, "name", "").lower()
+        if parent_name not in ["forum", "forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
             return
         async with ctx.channel.typing():
             image_url = None
@@ -205,7 +206,8 @@ class UtilityCog(commands.Cog):
         """Look up a term on Urban Dictionary"""
         # Channel Restriction: forum and forum-livi
         parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        if parent_ch.name.lower() not in ["forum", "forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
+        parent_name = getattr(parent_ch, "name", "").lower()
+        if parent_name not in ["forum", "forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
             return
         if len(term) > 100:
             return await ctx.send("❌ Term too long (max 100 characters)")
@@ -235,7 +237,8 @@ class UtilityCog(commands.Cog):
         """Flip a coin"""
         # Channel Restriction: Only forum-livi
         parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        if parent_ch.name.lower() not in ["forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
+        parent_name = getattr(parent_ch, "name", "").lower()
+        if parent_name not in ["forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
             return
         await asyncio.sleep(1)
         result = random.choice(["Heads", "Tails"])
@@ -247,7 +250,8 @@ class UtilityCog(commands.Cog):
         """Roll a random number between 1-33"""
         # Channel Restriction: forum and forum-livi
         parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        if parent_ch.name.lower() not in ["forum", "forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
+        parent_name = getattr(parent_ch, "name", "").lower()
+        if parent_name not in ["forum", "forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
             return
         await asyncio.sleep(0.5)
         result = random.randint(1, 33)
@@ -375,7 +379,8 @@ class UtilityCog(commands.Cog):
         """Calculate Life Path Number from birthdate with Chinese Zodiac"""
         # Channel Restriction: Only forum-livi
         parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        if parent_ch.name.lower() not in ["forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
+        parent_name = getattr(parent_ch, "name", "").lower()
+        if parent_name not in ["forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
             return
         if not date:
             return await ctx.send(
@@ -608,7 +613,8 @@ class UtilityCog(commands.Cog):
         """Displays real-time prices for the top 5 cryptocurrencies."""
         # Channel Restriction: Only forum-livi
         parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        if parent_ch.name.lower() not in ["forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
+        parent_name = getattr(parent_ch, "name", "").lower()
+        if parent_name not in ["forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
             return
 
         if self.bot.aiohttp_session is None or self.bot.aiohttp_session.closed:
@@ -672,7 +678,8 @@ class UtilityCog(commands.Cog):
         """Show top 10 most sent GIFs"""
         # Channel Restriction: Only forum-livi
         parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        if parent_ch.name.lower() not in ["forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
+        parent_name = getattr(parent_ch, "name", "").lower()
+        if parent_name not in ["forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
             return
         top_gifs = await get_top_gifs(limit=10)
 
