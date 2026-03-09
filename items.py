@@ -69,7 +69,7 @@ ITEM_REGISTRY = {
         "cost": 1100,
         "type": "event",
         "shop_desc": "Triggers a Token Storm. Next 10 speakers get bonus tokens.",
-        "feedback": "⛈️ **TOKEN STORM!** The next 10 unique users to speak are blessed with 50 tokens!",
+        "feedback": "⛈️ **TOKEN STORM!** someone dropped a fat bag of loosh, grab it by saying Apeiron owns my soul in chat",
     },
     "luck_curse": {
         "cost": 7,
