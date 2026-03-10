@@ -98,7 +98,7 @@ class BlackjackGame:
 
     def get_hand_status(self, hand):
         score = hand.get_score()
-        if hand.is_blackjack(): return "Blackjack!"
+        if hand.is_blackjack(): return "BJ!"
         if hand.busted: return f"Bust ({score})"
         if hand.stood: return f"Stay ({score})"
         return f"Total: {score}"
@@ -111,7 +111,7 @@ class BlackjackGame:
             dealer_str = str(self.dealer_hand)
             dealer_score = self.dealer_hand.get_score()
             dealer_status = f"Total: {dealer_score}"
-            if self.dealer_hand.is_blackjack(): dealer_status = "Blackjack!"
+            if self.dealer_hand.is_blackjack(): dealer_status = "BJ!"
             elif self.dealer_hand.busted: dealer_status = f"Bust ({dealer_score})"
         else:
             dealer_str = f"[{self.dealer_hand.cards[0][0]}{self.dealer_hand.cards[0][1]}] [ ? ]"
@@ -139,7 +139,7 @@ class BlackjackGame:
         current_hand = self.player_hands[self.current_hand_index]
         
         if self.message:
-            await self.message.edit(content=self.build_text() + "\n\n⏳ *The Dealer slides a card to you...*")
+            await self.message.edit(content=self.build_text() + "\n\n⏳ *Dealer slides you a card*")
             
         await asyncio.sleep(1.2)
         current_hand.add_card(self.draw())
@@ -154,7 +154,7 @@ class BlackjackGame:
         self.player_hands[self.current_hand_index].stood = True
         
         if self.message:
-            await self.message.edit(content=self.build_text() + "\n\n⏳ *The Dealer nods and moves on...*")
+            await self.message.edit(content=self.build_text() + "\n\n⏳ *Dealer moves on*")
             
         await asyncio.sleep(1.0)
         await self.move_to_next_hand()
@@ -196,7 +196,7 @@ class BlackjackGame:
         if not all_busted:
             while self.dealer_hand.get_score() < 17:
                 if self.message:
-                    await self.message.edit(content=self.build_text(show_all_dealer=True) + "\n\n⏳ *The Dealer is drawing cards...*")
+                    await self.message.edit(content=self.build_text(show_all_dealer=True) + "\n\n⏳ *Dealer is drawing cards...*")
                 
                 await asyncio.sleep(1.5)
                 self.dealer_hand.add_card(self.draw())
