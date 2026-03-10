@@ -133,7 +133,9 @@ class BlackjackGame:
         hand = self.player_hands[self.current_hand_index]
         hand.add_card(self.draw())
         
-        if hand.busted:
+        score = hand.get_score()
+        if score >= 21:
+            if score == 21: hand.stood = True
             if not self.move_to_next_hand():
                 await self.resolve_dealer()
             else:
@@ -171,6 +173,13 @@ class BlackjackGame:
         new_hand.add_card(self.draw())
         self.player_hands.insert(self.current_hand_index + 1, new_hand)
         
+        # If current hand hit 21, move to next
+        if hand.get_score() == 21:
+            hand.stood = True
+            if not self.move_to_next_hand():
+                await self.resolve_dealer()
+                return
+                
         await self.send_status()
 
     def move_to_next_hand(self):
@@ -206,11 +215,11 @@ class BlackjackGame:
                 total_loss += hand.bet
             elif self.dealer_hand.busted:
                 outcomes.append(f"Dealer busted! {hand_name} wins.")
-                payout = int(hand.bet * 2)
+                payout = int(hand.bet * 2.5) if hand.is_blackjack() else int(hand.bet * 2)
                 total_payout += payout
             elif score > dealer_score:
                 outcomes.append(f"{hand_name} ({score}) beats Dealer ({dealer_score}).")
-                payout = int(hand.bet * 2)
+                payout = int(hand.bet * 2.5) if hand.is_blackjack() else int(hand.bet * 2)
                 total_payout += payout
             elif score < dealer_score:
                 outcomes.append(f"Dealer ({dealer_score}) beats {hand_name} ({score}).")
@@ -1191,8 +1200,8 @@ class GamesCog(commands.Cog):
         
         await game.send_status()
         
-        # Check for instant blackjack
-        if game.player_hands[0].is_blackjack():
+        # Check for instant blackjack (21 on initial deal)
+        if game.player_hands[0].get_score() == 21 or game.dealer_hand.get_score() == 21:
             await game.resolve_dealer()
 
     @commands.command(name="hit")
