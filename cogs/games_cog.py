@@ -61,6 +61,21 @@ class BlackjackHand:
     def is_blackjack(self):
         return len(self.cards) == 2 and self.get_score() == 21
 
+    def get_filenames(self):
+        rank_map = {
+            "A": "Ace", "2": "Two", "3": "Three", "4": "Four", "5": "Five",
+            "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine", "10": "Ten",
+            "J": "Jack", "Q": "Queen", "K": "King"
+        }
+        suit_map = {
+            "♠️": "Spades", "❤️": "Hearts", "♦️": "Diamonds", "♣️": "Clubs"
+        }
+        filenames = []
+        for rank, suit in self.cards:
+            filename = f"{rank_map[rank]}Of{suit_map[suit]}.jpg"
+            filenames.append(filename)
+        return filenames
+
     def __str__(self):
         return " ".join([f"[{r}{s}]" for r, s in self.cards])
 
@@ -88,6 +103,8 @@ class BlackjackGame:
         for _ in range(2):
             self.player_hands[0].add_card(self.draw())
             self.dealer_hand.add_card(self.draw())
+        
+        self.last_card_filename = None
 
     def draw(self):
         if not self.deck:
@@ -140,7 +157,13 @@ class BlackjackGame:
         await self.ctx.send("⏳ *Dealer slides you a card*")
             
         await asyncio.sleep(1.2)
-        current_hand.add_card(self.draw())
+        card = self.draw()
+        current_hand.add_card(card)
+        
+        # Track last card for image display
+        rank_map = {"A": "Ace", "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine", "10": "Ten", "J": "Jack", "Q": "Queen", "K": "King"}
+        suit_map = {"♠️": "Spades", "❤️": "Hearts", "♦️": "Diamonds", "♣️": "Clubs"}
+        self.last_card_filename = f"{rank_map[card[0]]}Of{suit_map[card[1]]}.jpg"
         
         if current_hand.busted:
             await self.move_to_next_hand()
@@ -171,7 +194,13 @@ class BlackjackGame:
         new_hand.bet = self.base_bet
         
         current_hand.add_card(self.draw())
-        new_hand.add_card(self.draw())
+        card2 = self.draw()
+        new_hand.add_card(card2)
+
+        # Update last card to the one added to the new split hand
+        rank_map = {"A": "Ace", "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine", "10": "Ten", "J": "Jack", "Q": "Queen", "K": "King"}
+        suit_map = {"♠️": "Spades", "❤️": "Hearts", "♦️": "Diamonds", "♣️": "Clubs"}
+        self.last_card_filename = f"{rank_map[card2[0]]}Of{suit_map[card2[1]]}.jpg"
         
         self.player_hands.insert(self.current_hand_index + 1, new_hand)
         
@@ -195,7 +224,12 @@ class BlackjackGame:
                 await self.ctx.send(self.build_text(show_all_dealer=True) + "\n\n⏳ *Dealer is drawing cards...*")
                 
                 await asyncio.sleep(1.5)
-                self.dealer_hand.add_card(self.draw())
+                card = self.draw()
+                self.dealer_hand.add_card(card)
+                
+                rank_map = {"A": "Ace", "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine", "10": "Ten", "J": "Jack", "Q": "Queen", "K": "King"}
+                suit_map = {"♠️": "Spades", "❤️": "Hearts", "♦️": "Diamonds", "♣️": "Clubs"}
+                self.last_card_filename = f"{rank_map[card[0]]}Of{suit_map[card[1]]}.jpg"
         
         await self.finalize_game()
 
@@ -264,7 +298,16 @@ class BlackjackGame:
 
     async def send_status(self):
         content = self.build_text()
-        await self.ctx.send(content)
+        file = None
+        if self.last_card_filename:
+            image_path = f"/Users/jessealonso/Repos/apebot/images/playingcards/{self.last_card_filename}"
+            try:
+                file = discord.File(image_path, filename=self.last_card_filename)
+            except Exception as e:
+                logger.error(f"Error loading card image {image_path}: {e}")
+        
+        await self.ctx.send(content, file=file)
+        self.last_card_filename = None
 
 
 
@@ -1087,6 +1130,12 @@ class GamesCog(commands.Cog):
         game = BlackjackGame(ctx, self, bet)
         self.active_bj_games[user_id] = game
         
+        # Show the player's second card image for the initial deal
+        card = game.player_hands[0].cards[1]
+        rank_map = {"A": "Ace", "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine", "10": "Ten", "J": "Jack", "Q": "Queen", "K": "King"}
+        suit_map = {"♠️": "Spades", "❤️": "Hearts", "♦️": "Diamonds", "♣️": "Clubs"}
+        game.last_card_filename = f"{rank_map[card[0]]}Of{suit_map[card[1]]}.jpg"
+
         await game.send_status()
         
         # Check for instant blackjack
