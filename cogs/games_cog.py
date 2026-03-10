@@ -5,6 +5,7 @@ Commands: dice, pull, torture
 
 import discord
 from discord.ext import commands
+import discord.ui
 import logging
 import random
 import asyncio
@@ -24,6 +25,321 @@ logger = logging.getLogger(__name__)
 # Dice emoji mapping
 DICE_EMOJIS = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️⃣", 6: "6️⃣"}
 
+# Blackjack Constants
+SUITS = ["♠️", "❤️", "♦️", "♣️"]
+RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
+
+class BlackjackHand:
+    def __init__(self, cards=None):
+        self.cards = cards or []
+        self.stood = False
+        self.busted = False
+        self.bet = 0
+
+    def add_card(self, card):
+        self.cards.append(card)
+        if self.get_score() > 21:
+            self.busted = True
+
+    def get_score(self):
+        score = 0
+        aces = 0
+        for rank, suit in self.cards:
+            if rank in ["J", "Q", "K"]:
+                score += 10
+            elif rank == "A":
+                aces += 1
+                score += 11
+            else:
+                score += int(rank)
+        
+        while score > 21 and aces:
+            score -= 10
+            aces -= 1
+        return score
+
+    def is_blackjack(self):
+        return len(self.cards) == 2 and self.get_score() == 21
+
+    def __str__(self):
+        return " ".join([f"[{r}{s}]" for r, s in self.cards])
+
+
+class BlackjackView(discord.ui.View):
+    def __init__(self, ctx, cog, bet):
+        super().__init__(timeout=60.0)
+        self.ctx = ctx
+        self.cog = cog
+        self.base_bet = bet
+        
+        # Initialize deck
+        self.deck = [(r, s) for r in RANKS for s in SUITS]
+        random.shuffle(self.deck)
+        
+        # Initialize hands
+        self.dealer_hand = BlackjackHand()
+        self.player_hands = [BlackjackHand()]
+        self.player_hands[0].bet = bet
+        self.current_hand_index = 0
+        
+        # Game state
+        self.message = None
+        self.resolved = False
+        
+        # Initial deal
+        for _ in range(2):
+            self.player_hands[0].add_card(self.draw())
+            self.dealer_hand.add_card(self.draw())
+
+    def draw(self):
+        if not self.deck:
+            self.deck = [(r, s) for r in RANKS for s in SUITS]
+            random.shuffle(self.deck)
+        return self.deck.pop()
+
+    def get_hand_status(self, hand):
+        score = hand.get_score()
+        if hand.is_blackjack(): return "Blackjack!"
+        if hand.busted: return f"Bust ({score})"
+        if hand.stood: return f"Stay ({score})"
+        return f"Total: {score}"
+
+    def build_embed(self, show_all_dealer=False):
+        embed = discord.Embed(title="🃏 Blackjack", color=discord.Color.dark_grey())
+        
+        # Dealer
+        if show_all_dealer:
+            dealer_str = str(self.dealer_hand)
+            dealer_score = self.dealer_hand.get_score()
+            dealer_status = f"Total: {dealer_score}"
+            if self.dealer_hand.is_blackjack(): dealer_status = "Blackjack!"
+            elif self.dealer_hand.busted: dealer_status = f"Bust ({dealer_score})"
+        else:
+            dealer_str = f"[{self.dealer_hand.cards[0][0]}{self.dealer_hand.cards[0][1]}] [ ? ]"
+            dealer_score = BlackjackHand(cards=[self.dealer_hand.cards[0]]).get_score()
+            dealer_status = f"Total: {dealer_score}+"
+
+        embed.add_field(name=f"Dealer's Hand", value=f"{dealer_str}\n*{dealer_status}*", inline=False)
+        
+        # Player Hands
+        for i, hand in enumerate(self.player_hands):
+            marker = " **<< CURRENT**" if i == self.current_hand_index and not self.resolved else ""
+            status = self.get_hand_status(hand)
+            name = f"Your Hand {i+1}" if len(self.player_hands) > 1 else "Your Hand"
+            embed.add_field(name=name + marker, value=f"{str(hand)}\n*{status}*\nBet: {economy.format_balance(hand.bet)}", inline=False)
+        
+        if self.resolved:
+            embed.set_footer(text="Game Over")
+        else:
+            embed.set_footer(text="Use buttons or .hit / .stay / .split")
+            
+        return embed
+
+    def update_buttons(self):
+        self.clear_items()
+        if self.resolved:
+            return
+
+        current_hand = self.player_hands[self.current_hand_index]
+        
+        hit_btn = discord.ui.Button(label="Hit", style=discord.ButtonStyle.green, custom_id="bj_hit")
+        hit_btn.callback = self.hit_callback
+        self.add_item(hit_btn)
+        
+        stand_btn = discord.ui.Button(label="Stay", style=discord.ButtonStyle.red, custom_id="bj_stand")
+        stand_btn.callback = self.stand_callback
+        self.add_item(stand_btn)
+        
+        # Split condition: same rank and only 2 cards and enough balance
+        if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(self.player_hands) < 4:
+            split_btn = discord.ui.Button(label="Split", style=discord.ButtonStyle.blurple, custom_id="bj_split")
+            split_btn.callback = self.split_callback
+            self.add_item(split_btn)
+
+    async def hit_callback(self, interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This isn't your seat.", ephemeral=True)
+        await self.process_hit(interaction)
+
+    async def stand_callback(self, interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This isn't your seat.", ephemeral=True)
+        await self.process_stand(interaction)
+
+    async def split_callback(self, interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This isn't your seat.", ephemeral=True)
+        await self.process_split(interaction)
+
+    async def process_hit(self, interaction=None):
+        current_hand = self.player_hands[self.current_hand_index]
+        
+        # Add a bit of suspense
+        if interaction:
+            await interaction.response.edit_message(content="⏳ *The Dealer slides a card to you...*", view=None)
+        elif self.message:
+            await self.message.edit(content="⏳ *The Dealer slides a card to you...*", view=None)
+            
+        await asyncio.sleep(1.2)
+        current_hand.add_card(self.draw())
+        
+        if current_hand.busted:
+            await self.move_to_next_hand(interaction)
+        else:
+            await self.update_message(interaction)
+
+    async def process_stand(self, interaction=None):
+        self.player_hands[self.current_hand_index].stood = True
+        
+        if interaction:
+            await interaction.response.edit_message(content="⏳ *The Dealer nods and moves on...*", view=None)
+        elif self.message:
+            await self.message.edit(content="⏳ *The Dealer nods and moves on...*", view=None)
+            
+        await asyncio.sleep(1.0)
+        await self.move_to_next_hand(interaction)
+
+    async def process_split(self, interaction=None):
+        user_id = self.ctx.author.id
+        balance = await get_balance(user_id)
+        
+        if balance < self.base_bet:
+            if interaction:
+                return await interaction.response.send_message("You're too short for a split.", ephemeral=True)
+            else:
+                return await self.ctx.send("You're too short for a split.")
+
+        await update_balance(user_id, -self.base_bet)
+        
+        current_hand = self.player_hands[self.current_hand_index]
+        new_hand = BlackjackHand(cards=[current_hand.cards.pop()])
+        new_hand.bet = self.base_bet
+        
+        current_hand.add_card(self.draw())
+        new_hand.add_card(self.draw())
+        
+        self.player_hands.insert(self.current_hand_index + 1, new_hand)
+        
+        # If current hand is now blackjack/21, it might stand automatically or needs hit
+        await self.update_message(interaction)
+
+    async def move_to_next_hand(self, interaction=None):
+        self.current_hand_index += 1
+        if self.current_hand_index >= len(self.player_hands):
+            await self.resolve_dealer(interaction)
+        else:
+            await self.update_message(interaction)
+
+    async def resolve_dealer(self, interaction=None):
+        self.resolved = True
+        
+        # If all hands busted, dealer doesn't need to roll
+        all_busted = all(h.busted for h in self.player_hands)
+        
+        if not all_busted:
+            while self.dealer_hand.get_score() < 17:
+                # Update visual to show dealer thinking/drawing
+                if interaction:
+                    await interaction.followup.edit_message(self.message.id, content="⏳ *The Dealer is drawing cards...*", embed=self.build_embed(show_all_dealer=True), view=None)
+                elif self.message:
+                    await self.message.edit(content="⏳ *The Dealer is drawing cards...*", embed=self.build_embed(show_all_dealer=True), view=None)
+                
+                await asyncio.sleep(1.5)
+                self.dealer_hand.add_card(self.draw())
+        
+        await self.finalize_game(interaction)
+
+    async def finalize_game(self, interaction=None):
+        dealer_score = self.dealer_hand.get_score()
+        dealer_bj = self.dealer_hand.is_blackjack()
+        
+        total_payout = 0
+        outcomes = []
+        
+        for i, hand in enumerate(self.player_hands):
+            score = hand.get_score()
+            player_bj = hand.is_blackjack()
+            hand_bet = hand.bet
+            
+            outcome = ""
+            if hand.busted:
+                outcome = "LOSS"
+            elif dealer_bj:
+                if player_bj:
+                    total_payout += hand_bet
+                    outcome = "PUSH"
+                else:
+                    outcome = "LOSS"
+            elif player_bj:
+                payout = int(hand_bet * 2.5) # Original bet back + 1.5x
+                total_payout += payout
+                outcome = "WIN (BJ)"
+            elif self.dealer_hand.busted:
+                payout = hand_bet * 2
+                total_payout += payout
+                outcome = "WIN"
+            elif score > dealer_score:
+                payout = hand_bet * 2
+                total_payout += payout
+                outcome = "WIN"
+            elif score < dealer_score:
+                outcome = "LOSS"
+            else:
+                total_payout += hand_bet
+                outcome = "PUSH"
+            
+            outcomes.append(f"Hand {i+1}: **{outcome}**")
+
+        if total_payout > 0:
+            await update_balance(self.ctx.author.id, total_payout)
+            await self.cog.process_reaping(self.ctx)
+
+        embed = self.build_embed(show_all_dealer=True)
+        
+        result_text = "\n".join(outcomes)
+        if total_payout > 0:
+            formatted_winnings = economy.format_balance(total_payout)
+            result_text += f"\n\n**Final Payout: {formatted_winnings}**"
+        else:
+            result_text += f"\n\n**The house takes it all.**"
+            
+        embed.description = result_text
+        
+        # Custom verbiage
+        footer_msg = "The Dealer tips his cap. Well played." if total_payout > 0 else "The Dealer slides your tokens away. 'Next time, perhaps.'"
+        embed.set_footer(text=footer_msg)
+
+        if interaction:
+            await interaction.response.edit_message(embed=embed, view=None)
+        elif self.message:
+            await self.message.edit(embed=embed, view=None)
+        
+        # Cleanup
+        if self.ctx.author.id in self.cog.active_bj_games:
+            del self.cog.active_bj_games[self.ctx.author.id]
+        self.stop()
+
+    async def update_message(self, interaction=None):
+        self.update_buttons()
+        embed = self.build_embed()
+        
+        if interaction:
+            await interaction.response.edit_message(embed=embed, view=self)
+        elif self.message:
+            await self.message.edit(embed=embed, view=self)
+
+    async def on_timeout(self):
+        # Auto-stand and resolve if timeout
+        if not self.resolved:
+            for hand in self.player_hands:
+                if not hand.stood and not hand.busted:
+                    hand.stood = True
+            await self.resolve_dealer()
+        
+        if self.ctx.author.id in self.cog.active_bj_games:
+            del self.cog.active_bj_games[self.ctx.author.id]
+
+
 
 
 
@@ -39,6 +355,7 @@ class GamesCog(commands.Cog):
 
 
         self.active_fades = {}  # challenger_id -> {target_id, time}
+        self.active_bj_games = {} # user_id -> BlackjackView
 
     async def process_reaping(self, ctx):
         """Handle Reaping lifecycle: End if expired, else tax user."""
@@ -802,6 +1119,83 @@ class GamesCog(commands.Cog):
         await msg.edit(content=final_msg)
 
 
+
+    @commands.command(name="bj", aliases=["blackjack"])
+    async def bj_command(self, ctx, amount: str = None):
+        """Play Blackjack against the dealer. Usage: .bj <amount>"""
+        if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
+            return await ctx.reply("🌑 **System Notice**: The Pit is closed while the economy is disabled.", mention_author=False)
+
+        # Channel Restriction: forum or forum-livi
+        valid_channels = ["forum", "forum-livi"]
+        if ctx.channel.name.lower() not in valid_channels and not ctx.author.guild_permissions.administrator:
+            return
+
+        user_id = ctx.author.id
+        
+        # Concurrency check
+        if user_id in self.active_bj_games:
+            return await ctx.reply("❌ Finish your current hand before you start another.", mention_author=False)
+
+        balance = await get_balance(user_id)
+
+        if amount == "all":
+            bet = balance
+        else:
+            try:
+                bet = int(amount)
+            except (ValueError, TypeError):
+                return await ctx.reply("Usage: `.bj <amount> or .bj all`\n*\"Put your bread on the felt...\"*", mention_author=False)
+
+        if bet <= 0:
+            return await ctx.reply("❌ Enter a real bet.", mention_author=False)
+        if balance < bet:
+            return await ctx.reply(f"❌ You're flat. Need {economy.format_balance(bet)} to play.", mention_author=False)
+
+        # Deduct bet
+        await update_balance(user_id, -bet)
+        await self.process_reaping(ctx)
+
+        # Create game
+        view = BlackjackView(ctx, self, bet)
+        self.active_bj_games[user_id] = view
+        
+        embed = view.build_embed()
+        view.update_buttons()
+        
+        # Check for instant blackjack
+        if view.player_hands[0].is_blackjack():
+            # Still send the message but resolve it immediately
+            view.message = await ctx.send(embed=embed, view=view)
+            await view.resolve_dealer()
+        else:
+            view.message = await ctx.send(embed=embed, view=view)
+
+    @commands.command(name="hit")
+    async def hit_command(self, ctx):
+        """Hit in an active Blackjack game."""
+        user_id = ctx.author.id
+        if user_id in self.active_bj_games:
+            view = self.active_bj_games[user_id]
+            await view.process_hit()
+
+    @commands.command(name="stay", aliases=["stand"])
+    async def stay_command(self, ctx):
+        """Stay in an active Blackjack game."""
+        user_id = ctx.author.id
+        if user_id in self.active_bj_games:
+            view = self.active_bj_games[user_id]
+            await view.process_stand()
+
+    @commands.command(name="split")
+    async def split_command(self, ctx):
+        """Split in an active Blackjack game."""
+        user_id = ctx.author.id
+        if user_id in self.active_bj_games:
+            view = self.active_bj_games[user_id]
+            current_hand = view.player_hands[view.current_hand_index]
+            if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(view.player_hands) < 4:
+                await view.process_split()
 
     @commands.command(name="jugg", aliases=["lick"])
     @commands.cooldown(1, 600, commands.BucketType.user)
