@@ -139,7 +139,7 @@ class BlackjackGame:
         hand.add_card(self.draw())
         
         await self.send_status()
-        await asyncio.sleep(2) # 2 second delay per request
+        await asyncio.sleep(1.5) # 1.5 second delay per request
         
         score = hand.get_score()
         if score >= 21:
@@ -156,7 +156,7 @@ class BlackjackGame:
         hand.stood = True
         
         await self.send_status()
-        await asyncio.sleep(2) # 2 second delay per request
+        await asyncio.sleep(1.5) # 1.5 second delay per request
         
         if not self.move_to_next_hand():
             await self.resolve_dealer()
@@ -185,7 +185,7 @@ class BlackjackGame:
         self.player_hands.insert(self.current_hand_index + 1, new_hand)
         
         await self.send_status()
-        await asyncio.sleep(2) # 2 second delay per request
+        await asyncio.sleep(1.5) # 1.5 second delay per request
         
         # If current hand hit 21, move to next
         if hand.get_score() == 21:
@@ -202,18 +202,22 @@ class BlackjackGame:
 
     async def resolve_dealer(self):
         if self.timeout_task: self.timeout_task.cancel()
-        self.resolved = True
+        
+        # Dealer's cards are "revealed" but game not fully "resolved" for scoring UI colors yet
+        self.revealed = True
         
         # update state before dealer draws, so we see dealer's 2nd card
         await self.send_status()
-        await asyncio.sleep(2) # Visual pause
+        await asyncio.sleep(1.5) # Visual pause
         
         # Dealer hits until 17
         while self.dealer_hand.get_score() < 17:
             self.dealer_hand.add_card(self.draw())
             await self.send_status()
-            await asyncio.sleep(2) # Visual pause
+            await asyncio.sleep(1.5) # Visual pause
             
+        self.resolved = True
+        await self.send_status() # Final color update
         await self.finalize_game()
 
     async def finalize_game(self):
@@ -320,7 +324,8 @@ class BlackjackGame:
         cards_dir = os.path.join(base_dir, "images", "playingcards")
         
         # 1. Get Hand Strips
-        dealer_cards = self.dealer_hand.cards if self.resolved else [self.dealer_hand.cards[0]]
+        is_revealed = getattr(self, "revealed", False)
+        dealer_cards = self.dealer_hand.cards if is_revealed else [self.dealer_hand.cards[0]]
         dealer_strip = self.render_hand_strip(dealer_cards, cards_dir)
         
         player_strips = []
@@ -335,7 +340,7 @@ class BlackjackGame:
         board_width = max(max_hand_width, 400) + 40
         
         # Calculate scores/status
-        if self.resolved:
+        if is_revealed:
             d_score = self.dealer_hand.get_score()
             if self.dealer_hand.is_blackjack(): d_status = "BJ!"
             elif self.dealer_hand.busted: d_status = f"Bust ({d_score})"
