@@ -133,39 +133,47 @@ class BlackjackGame:
         return ".HIT or .STAY"
 
     async def process_hit(self):
-        if self.resolved: return
+        if getattr(self, "processing", False) or getattr(self, "resolved", False): return
+        self.processing = True
         self.reset_timeout()
+        
+        await asyncio.sleep(1.5) # Anticipation delay before card appears
+        
         hand = self.player_hands[self.current_hand_index]
         hand.add_card(self.draw())
-        
-        await self.send_status()
-        await asyncio.sleep(1.5) # 1.5 second delay per request
         
         score = hand.get_score()
         if score >= 21:
             if score == 21: hand.stood = True
+            await self.send_status()
             if not self.move_to_next_hand():
+                await asyncio.sleep(1.5)
                 await self.resolve_dealer()
-            else:
-                await self.send_status()
-
-    async def process_stand(self):
-        if self.resolved: return
-        self.reset_timeout()
-        hand = self.player_hands[self.current_hand_index]
-        hand.stood = True
-        
-        await self.send_status()
-        await asyncio.sleep(1.5) # 1.5 second delay per request
-        
-        if not self.move_to_next_hand():
-            await self.resolve_dealer()
         else:
             await self.send_status()
+            
+        self.processing = False
+
+    async def process_stand(self):
+        if getattr(self, "processing", False) or getattr(self, "resolved", False): return
+        self.processing = True
+        self.reset_timeout()
+        
+        await asyncio.sleep(1.5) # Anticipation delay
+        
+        hand = self.player_hands[self.current_hand_index]
+        hand.stood = True
+        await self.send_status()
+        
+        if not self.move_to_next_hand():
+            await asyncio.sleep(1.5)
+            await self.resolve_dealer()
+            
+        self.processing = False
 
     async def process_split(self):
-        if self.resolved: return
-        self.reset_timeout()
+        if getattr(self, "processing", False) or getattr(self, "resolved", False): return
+        
         hand = self.player_hands[self.current_hand_index]
         
         if len(hand.cards) != 2 or hand.cards[0][0] != hand.cards[1][0] or len(self.player_hands) >= 4:
@@ -176,7 +184,11 @@ class BlackjackGame:
         if balance < self.base_bet:
             return await self.ctx.send("Insufficient funds to split.")
             
+        self.processing = True
+        self.reset_timeout()
         await update_balance(self.ctx.author.id, -self.base_bet)
+        
+        await asyncio.sleep(1.5) # Anticipation delay
         
         new_hand = BlackjackHand(cards=[hand.cards.pop()])
         new_hand.bet = self.base_bet
@@ -185,14 +197,15 @@ class BlackjackGame:
         self.player_hands.insert(self.current_hand_index + 1, new_hand)
         
         await self.send_status()
-        await asyncio.sleep(1.5) # 1.5 second delay per request
         
         # If current hand hit 21, move to next
         if hand.get_score() == 21:
             hand.stood = True
             if not self.move_to_next_hand():
+                await asyncio.sleep(1.5)
                 await self.resolve_dealer()
-                return
+                
+        self.processing = False
 
     def move_to_next_hand(self):
         self.current_hand_index += 1
@@ -206,15 +219,18 @@ class BlackjackGame:
         # Dealer's cards are "revealed" but game not fully "resolved" for scoring UI colors yet
         self.revealed = True
         
-        # update state before dealer draws, so we see dealer's 2nd card
-        await self.send_status()
-        await asyncio.sleep(1.5) # Visual pause
+        all_busted = all(h.busted for h in self.player_hands)
         
-        # Dealer hits until 17
-        while self.dealer_hand.get_score() < 17:
-            self.dealer_hand.add_card(self.draw())
+        if not all_busted:
+            # update state before dealer draws, so we see dealer's 2nd card
             await self.send_status()
             await asyncio.sleep(1.5) # Visual pause
+            
+            # Dealer hits until 17
+            while self.dealer_hand.get_score() < 17:
+                self.dealer_hand.add_card(self.draw())
+                await self.send_status()
+                await asyncio.sleep(1.5) # Visual pause
             
         self.resolved = True
         await self.send_status() # Final color update
@@ -324,7 +340,7 @@ class BlackjackGame:
         cards_dir = os.path.join(base_dir, "images", "playingcards")
         
         # 1. Get Hand Strips
-        is_revealed = getattr(self, "revealed", False)
+        is_revealed = getattr(self, "revealed", False) or getattr(self, "resolved", False)
         dealer_cards = self.dealer_hand.cards if is_revealed else [self.dealer_hand.cards[0]]
         dealer_strip = self.render_hand_strip(dealer_cards, cards_dir)
         
