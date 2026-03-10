@@ -233,6 +233,10 @@ class BlackjackGame:
         final_msg = f"*Cooked*\n\n{result_text}\n\n*{footer_msg}*"
         
         await self.ctx.send(final_msg)
+        
+        # Cleanup
+        if self.ctx.author.id in self.cog.active_bj_games:
+            del self.cog.active_bj_games[self.ctx.author.id]
 
     async def send_status(self):
         """Update the existing message with a new combined game board image."""
