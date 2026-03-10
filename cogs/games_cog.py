@@ -10,6 +10,9 @@ import logging
 import random
 import asyncio
 import time
+import io
+import os
+from PIL import Image
 from database import (
     get_balance, update_balance, add_active_effect, is_economy_on,
     get_user_inventory, remove_item_from_inventory, add_reaping_tithe,
@@ -58,10 +61,8 @@ class BlackjackHand:
             aces -= 1
         return score
 
-    def is_blackjack(self):
-        return len(self.cards) == 2 and self.get_score() == 21
-
-    def get_filenames(self):
+    def get_card_filename(self, card):
+        rank, suit = card
         rank_map = {
             "A": "Ace", "2": "Two", "3": "Three", "4": "Four", "5": "Five",
             "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine", "10": "Ten",
@@ -70,10 +71,15 @@ class BlackjackHand:
         suit_map = {
             "♠️": "Spades", "❤️": "Hearts", "♦️": "Diamonds", "♣️": "Clubs"
         }
+        return f"{rank_map[rank]}Of{suit_map[suit]}.jpg"
+
+    def is_blackjack(self):
+        return len(self.cards) == 2 and self.get_score() == 21
+
+    def get_filenames(self):
         filenames = []
-        for rank, suit in self.cards:
-            filename = f"{rank_map[rank]}Of{suit_map[suit]}.jpg"
-            filenames.append(filename)
+        for card in self.cards:
+            filenames.append(self.get_card_filename(card))
         return filenames
 
     def __str__(self):
@@ -124,29 +130,30 @@ class BlackjackGame:
         
         # Dealer
         if show_all_dealer:
-            dealer_str = str(self.dealer_hand)
             dealer_score = self.dealer_hand.get_score()
             dealer_status = f"Total: {dealer_score}"
             if self.dealer_hand.is_blackjack(): dealer_status = "BJ!"
             elif self.dealer_hand.busted: dealer_status = f"Bust ({dealer_score})"
         else:
-            dealer_str = f"[{self.dealer_hand.cards[0][0]}{self.dealer_hand.cards[0][1]}] [ ? ]"
             dealer_score = BlackjackHand(cards=[self.dealer_hand.cards[0]]).get_score()
             dealer_status = f"Total: {dealer_score}+"
 
-        lines.append(f"**Dealer's Hand**: {dealer_str} (*{dealer_status}*)")
+        lines.append(f"DEALER: ({dealer_status})")
         
         # Player Hands
         for i, hand in enumerate(self.player_hands):
-            marker = " **<< CURRENT**" if i == self.current_hand_index and not self.resolved else ""
             status = self.get_hand_status(hand)
-            name = f"Hand {i+1}" if len(self.player_hands) > 1 else "Your Hand"
-            lines.append(f"**{name}**: {str(hand)} (*{status}*) | Bet: {economy.format_balance(hand.bet)}{marker}")
+            name = f"Hand {i+1}" if len(self.player_hands) > 1 else "YOURS"
+            lines.append(f"{name}: ({status})")
         
         if self.resolved:
             lines.append("\n*Cooked*")
         else:
-            lines.append("\n*Type .hit, .stay, or .split*")
+            commands = ".hit .stay"
+            current_hand = self.player_hands[self.current_hand_index]
+            if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(self.player_hands) < 4:
+                commands += " .split"
+            lines.append(f"\n{commands}")
             
         return "\n".join(lines)
 
@@ -154,16 +161,12 @@ class BlackjackGame:
         if self.resolved: return
         current_hand = self.player_hands[self.current_hand_index]
         
-        await self.ctx.send("⏳ *Dealer slides you a card*")
+        await self.ctx.send("*Dealer slides you a card*")
             
         await asyncio.sleep(1.2)
         card = self.draw()
         current_hand.add_card(card)
-        
-        # Track last card for image display
-        rank_map = {"A": "Ace", "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine", "10": "Ten", "J": "Jack", "Q": "Queen", "K": "King"}
-        suit_map = {"♠️": "Spades", "❤️": "Hearts", "♦️": "Diamonds", "♣️": "Clubs"}
-        self.last_card_filename = f"{rank_map[card[0]]}Of{suit_map[card[1]]}.jpg"
+        self.last_card_filename = current_hand.get_card_filename(card)
         
         if current_hand.busted:
             await self.move_to_next_hand()
@@ -174,7 +177,7 @@ class BlackjackGame:
         if self.resolved: return
         self.player_hands[self.current_hand_index].stood = True
         
-        await self.ctx.send("⏳ *Dealer moves on*")
+        await self.ctx.send("*Dealer moves on*")
             
         await asyncio.sleep(1.0)
         await self.move_to_next_hand()
@@ -196,11 +199,7 @@ class BlackjackGame:
         current_hand.add_card(self.draw())
         card2 = self.draw()
         new_hand.add_card(card2)
-
-        # Update last card to the one added to the new split hand
-        rank_map = {"A": "Ace", "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine", "10": "Ten", "J": "Jack", "Q": "Queen", "K": "King"}
-        suit_map = {"♠️": "Spades", "❤️": "Hearts", "♦️": "Diamonds", "♣️": "Clubs"}
-        self.last_card_filename = f"{rank_map[card2[0]]}Of{suit_map[card2[1]]}.jpg"
+        self.last_card_filename = new_hand.get_card_filename(card2)
         
         self.player_hands.insert(self.current_hand_index + 1, new_hand)
         
@@ -221,15 +220,12 @@ class BlackjackGame:
         
         if not all_busted:
             while self.dealer_hand.get_score() < 17:
-                await self.ctx.send(self.build_text(show_all_dealer=True) + "\n\n⏳ *Dealer is drawing cards...*")
+                await self.send_status(content=self.build_text(show_all_dealer=True) + "\n\n*Dealer is drawing cards...*")
                 
                 await asyncio.sleep(1.5)
                 card = self.draw()
                 self.dealer_hand.add_card(card)
-                
-                rank_map = {"A": "Ace", "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine", "10": "Ten", "J": "Jack", "Q": "Queen", "K": "King"}
-                suit_map = {"♠️": "Spades", "❤️": "Hearts", "♦️": "Diamonds", "♣️": "Clubs"}
-                self.last_card_filename = f"{rank_map[card[0]]}Of{suit_map[card[1]]}.jpg"
+                self.last_card_filename = self.dealer_hand.get_card_filename(card)
         
         await self.finalize_game()
 
@@ -290,24 +286,74 @@ class BlackjackGame:
         
         final_content = self.build_text(show_all_dealer=True) + "\n\n" + result_text + "\n\n*" + footer_msg + "*"
         
-        await self.ctx.send(final_content)
+        await self.send_status(content=final_content)
         
         # Cleanup
         if self.ctx.author.id in self.cog.active_bj_games:
             del self.cog.active_bj_games[self.ctx.author.id]
 
-    async def send_status(self):
-        content = self.build_text()
-        file = None
-        if self.last_card_filename:
-            image_path = f"/Users/jessealonso/Repos/apebot/images/playingcards/{self.last_card_filename}"
-            try:
-                file = discord.File(image_path, filename=self.last_card_filename)
-            except Exception as e:
-                logger.error(f"Error loading card image {image_path}: {e}")
+    async def send_status(self, content=None):
+        if not content:
+            content = self.build_text()
+            
+        files = []
+        try:
+            # Use relative path from this script's location
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            cards_dir = os.path.join(base_dir, "images", "playingcards")
+            
+            # Dealer hand image
+            dealer_cards = self.dealer_hand.cards if self.resolved else [self.dealer_hand.cards[0]]
+            dealer_img = self.generate_hand_image(dealer_cards, cards_dir)
+            if dealer_img:
+                files.append(discord.File(dealer_img, filename="dealer.png"))
+            
+            # Current player hand image
+            player_hand = self.player_hands[self.current_hand_index]
+            player_img = self.generate_hand_image(player_hand.cards, cards_dir)
+            if player_img:
+                files.append(discord.File(player_img, filename="player.png"))
+                
+        except Exception as e:
+            logger.error(f"Error generating hand images: {e}")
         
-        await self.ctx.send(content, file=file)
+        await self.ctx.send(content, files=files)
         self.last_card_filename = None
+
+    def generate_hand_image(self, cards, cards_dir):
+        """Combine card images into a horizontal strip."""
+        if not cards: return None
+        
+        images = []
+        total_width = 0
+        max_height = 0
+        
+        for card in cards:
+            filename = BlackjackHand().get_card_filename(card)
+            path = os.path.join(cards_dir, filename)
+            if os.path.exists(path):
+                img = Image.open(path)
+                images.append(img)
+                total_width += img.width
+                max_height = max(max_height, img.height)
+        
+        if not images: return None
+        
+        combined = Image.new("RGBA", (total_width, max_height), (0, 0, 0, 0))
+        x_offset = 0
+        for img in images:
+            combined.paste(img, (x_offset, 0))
+            x_offset += img.width
+            
+        # Optional: Resize if too large
+        if combined.width > 2000:
+            ratio = 2000 / combined.width
+            combined = combined.resize((2000, int(combined.height * ratio)), Image.LANCZOS)
+            
+        buf = io.BytesIO()
+        combined.save(buf, format="PNG")
+        buf.seek(0)
+        return buf
 
 
 
@@ -1132,9 +1178,7 @@ class GamesCog(commands.Cog):
         
         # Show the player's second card image for the initial deal
         card = game.player_hands[0].cards[1]
-        rank_map = {"A": "Ace", "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine", "10": "Ten", "J": "Jack", "Q": "Queen", "K": "King"}
-        suit_map = {"♠️": "Spades", "❤️": "Hearts", "♦️": "Diamonds", "♣️": "Clubs"}
-        game.last_card_filename = f"{rank_map[card[0]]}Of{suit_map[card[1]]}.jpg"
+        game.last_card_filename = game.player_hands[0].get_card_filename(card)
 
         await game.send_status()
         
