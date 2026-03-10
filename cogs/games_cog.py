@@ -203,13 +203,14 @@ class BlackjackGame:
         outcomes = []
         total_payout = 0
         total_loss = 0
+        total_bet = sum(h.bet for h in self.player_hands)
         dealer_score = self.dealer_hand.get_score()
         mention = self.ctx.author.mention
         
         for i, hand in enumerate(self.player_hands):
             score = hand.get_score()
             hand_name = f"Hand {i+1}" if len(self.player_hands) > 1 else mention
-            
+            # ... (rest of logic) ...
             if hand.busted:
                 outcomes.append(f"{hand_name} busted. House wins.")
                 total_loss += hand.bet
@@ -229,17 +230,25 @@ class BlackjackGame:
                 total_payout += hand.bet
 
         result_text = "\n".join(outcomes)
-        if total_payout > 0:
+        if total_payout > total_bet:
+            header = "BIG W"
             await update_balance(self.ctx.author.id, total_payout)
             formatted_winnings = economy.format_balance(total_payout)
             result_text += f"\n\n**Final Payout: {formatted_winnings}**"
             footer_msg = "You win ... Apeiron provides"
-        else:
-            formatted_loss = economy.format_balance(total_loss)
+        elif total_payout < total_bet:
+            header = "COOKED"
+            if total_payout > 0: await update_balance(self.ctx.author.id, total_payout) # Partial return on multi-hand
+            formatted_loss = economy.format_balance(total_bet - total_payout)
             result_text += f"\n\n**Apeiron collects {formatted_loss}.**"
             footer_msg = "Dealer grabs your chips."
+        else:
+            header = "PUSH"
+            if total_payout > 0: await update_balance(self.ctx.author.id, total_payout)
+            result_text += f"\n\n**Tokens returned.**"
+            footer_msg = "Dealer nods. 'Try again.'"
             
-        final_msg = f"*Cooked*\n\n{result_text}\n\n*{footer_msg}*"
+        final_msg = f"*{header}*\n\n{result_text}\n\n*{footer_msg}*"
         
         await self.ctx.send(final_msg)
         
@@ -306,7 +315,8 @@ class BlackjackGame:
             elif hand.stood: status = f"Stay ({score})"
             else: status = f"{score}"
             
-            name = f"HAND {i+1}" if len(self.player_hands) > 1 else "YOURS"
+            user_name = self.ctx.author.display_name.upper()
+            name = f"HAND {i+1}" if len(self.player_hands) > 1 else user_name
             player_labels.append(f"{name}: {status}")
             
         card_height = dealer_strip.height
