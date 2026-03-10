@@ -1142,7 +1142,7 @@ class GamesCog(commands.Cog):
     async def bj_command(self, ctx, amount: str = None):
         """Play Blackjack against the dealer. Usage: .bj <amount>"""
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
-            return await ctx.reply("🌑 **System Notice**: The Pit is closed while the economy is disabled.", mention_author=False)
+            return await ctx.reply("**System Notice**: The Pit is closed while the economy is disabled.", mention_author=False)
 
         # Channel Restriction: forum or forum-livi
         valid_channels = ["forum", "forum-livi"]
