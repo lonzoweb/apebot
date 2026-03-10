@@ -230,25 +230,28 @@ class BlackjackGame:
                 total_payout += hand.bet
 
         result_text = "\n".join(outcomes)
+        # Build combined header line based on outcome
         if total_payout > total_bet:
-            header = "BIG W"
+            words = ["BIG W", "CLUTCH", "TOO EASY"]
+            header = f"**{random.choice(words)}... Apeiron provides**"
+            
             await update_balance(self.ctx.author.id, total_payout)
             formatted_winnings = economy.format_balance(total_payout)
-            result_text += f"\n\n**Final Payout: {formatted_winnings}**"
-            footer_msg = "You win ... Apeiron provides"
+            result_text += f"\n\n**Payout: +{formatted_winnings}**"
+            
         elif total_payout < total_bet:
-            header = "COOKED"
-            if total_payout > 0: await update_balance(self.ctx.author.id, total_payout) # Partial return on multi-hand
+            words = ["COOKED", "RAPED", "LOSER"]
+            header = f"**{random.choice(words)}... Dealer takes your gems.**"
+            
+            if total_payout > 0: await update_balance(self.ctx.author.id, total_payout) # Partial return
             formatted_loss = economy.format_balance(total_bet - total_payout)
             result_text += f"\n\n**Apeiron collects {formatted_loss}.**"
-            footer_msg = "Dealer grabs your chips."
-        else:
-            header = "PUSH"
-            if total_payout > 0: await update_balance(self.ctx.author.id, total_payout)
-            result_text += f"\n\n**Tokens returned.**"
-            footer_msg = "Dealer nods. 'Try again.'"
             
-        final_msg = f"*{header}*\n\n{result_text}\n\n*{footer_msg}*"
+        else:
+            header = "**PUSH... Tokens returned.**"
+            if total_payout > 0: await update_balance(self.ctx.author.id, total_payout)
+            
+        final_msg = f"{header}\n\n{result_text}"
         
         await self.ctx.send(final_msg)
         
@@ -1212,7 +1215,9 @@ class GamesCog(commands.Cog):
         
         # Check for instant blackjack (21 on initial deal)
         if game.player_hands[0].get_score() == 21 or game.dealer_hand.get_score() == 21:
-            await game.resolve_dealer()
+            game.resolved = True
+            await game.send_status() # Update board to show both dealer cards
+            await game.finalize_game()
 
     @commands.command(name="hit")
     async def hit_command(self, ctx):
