@@ -193,14 +193,17 @@ class BlackjackGame:
     async def finalize_game(self):
         outcomes = []
         total_payout = 0
+        total_loss = 0
         dealer_score = self.dealer_hand.get_score()
+        mention = self.ctx.author.mention
         
         for i, hand in enumerate(self.player_hands):
             score = hand.get_score()
-            hand_name = f"Hand {i+1}" if len(self.player_hands) > 1 else "Your hand"
+            hand_name = f"Hand {i+1}" if len(self.player_hands) > 1 else mention
             
             if hand.busted:
                 outcomes.append(f"{hand_name} busted. House wins.")
+                total_loss += hand.bet
             elif self.dealer_hand.busted:
                 outcomes.append(f"Dealer busted! {hand_name} wins.")
                 payout = int(hand.bet * 2)
@@ -211,32 +214,31 @@ class BlackjackGame:
                 total_payout += payout
             elif score < dealer_score:
                 outcomes.append(f"Dealer ({dealer_score}) beats {hand_name} ({score}).")
+                total_loss += hand.bet
             else:
                 outcomes.append(f"{hand_name} pushes.")
                 total_payout += hand.bet
 
+        result_text = "\n".join(outcomes)
         if total_payout > 0:
             await update_balance(self.ctx.author.id, total_payout)
-            result_text = "\n".join(outcomes)
             formatted_winnings = economy.format_balance(total_payout)
             result_text += f"\n\n**Final Payout: {formatted_winnings}**"
-            footer_msg = "The Dealer tips his cap. Well played."
+            footer_msg = "You win ... Apeiron provides"
         else:
-            result_text = "\n".join(outcomes)
-            result_text += f"\n\n**The house takes it all.**"
-            footer_msg = "The Dealer slides your tokens away. 'Next time, perhaps.'"
+            formatted_loss = economy.format_balance(total_loss)
+            result_text += f"\n\n**Apeiron collects {formatted_loss}.**"
+            footer_msg = "Dealer grabs your chips."
             
         final_msg = f"*Cooked*\n\n{result_text}\n\n*{footer_msg}*"
         
         await self.ctx.send(final_msg)
-        
-        # Cleanup
-        if self.ctx.author.id in self.cog.active_bj_games:
-            del self.cog.active_bj_games[self.ctx.author.id]
 
     async def send_status(self):
         """Update the existing message with a new combined game board image."""
-        content = self.build_status_text()
+        status_text = self.build_status_text()
+        content = f"{self.ctx.author.mention}\n{status_text}" if self.message is None else status_text
+        
         board_img = self.generate_game_board()
         if not board_img:
             return await self.ctx.send("Error generating game board.")
