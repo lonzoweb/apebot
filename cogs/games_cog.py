@@ -138,6 +138,9 @@ class BlackjackGame:
         hand = self.player_hands[self.current_hand_index]
         hand.add_card(self.draw())
         
+        await self.send_status()
+        await asyncio.sleep(2) # 2 second delay per request
+        
         score = hand.get_score()
         if score >= 21:
             if score == 21: hand.stood = True
@@ -145,14 +148,15 @@ class BlackjackGame:
                 await self.resolve_dealer()
             else:
                 await self.send_status()
-        else:
-            await self.send_status()
 
     async def process_stand(self):
         if self.resolved: return
         self.reset_timeout()
         hand = self.player_hands[self.current_hand_index]
         hand.stood = True
+        
+        await self.send_status()
+        await asyncio.sleep(2) # 2 second delay per request
         
         if not self.move_to_next_hand():
             await self.resolve_dealer()
@@ -180,14 +184,15 @@ class BlackjackGame:
         new_hand.add_card(self.draw())
         self.player_hands.insert(self.current_hand_index + 1, new_hand)
         
+        await self.send_status()
+        await asyncio.sleep(2) # 2 second delay per request
+        
         # If current hand hit 21, move to next
         if hand.get_score() == 21:
             hand.stood = True
             if not self.move_to_next_hand():
                 await self.resolve_dealer()
                 return
-                
-        await self.send_status()
 
     def move_to_next_hand(self):
         self.current_hand_index += 1
@@ -199,11 +204,15 @@ class BlackjackGame:
         if self.timeout_task: self.timeout_task.cancel()
         self.resolved = True
         
+        # update state before dealer draws, so we see dealer's 2nd card
+        await self.send_status()
+        await asyncio.sleep(2) # Visual pause
+        
         # Dealer hits until 17
         while self.dealer_hand.get_score() < 17:
             self.dealer_hand.add_card(self.draw())
             await self.send_status()
-            await asyncio.sleep(1) # Visual pause
+            await asyncio.sleep(2) # Visual pause
             
         await self.finalize_game()
 
