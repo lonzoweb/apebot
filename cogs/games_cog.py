@@ -236,11 +236,11 @@ class BlackjackGame:
                 payout = int(hand.bet * 2.5) if hand.is_blackjack() else int(hand.bet * 2)
                 total_payout += payout
             elif score > dealer_score:
-                outcomes.append(f"{hand_name} ({score}) beats Dealer ({dealer_score}).")
+                outcomes.append(f"{hand_name} (**{score}**) beats Dealer (**{dealer_score}**).")
                 payout = int(hand.bet * 2.5) if hand.is_blackjack() else int(hand.bet * 2)
                 total_payout += payout
             elif score < dealer_score:
-                outcomes.append(f"Dealer ({dealer_score}) beats {hand_name} ({score}).")
+                outcomes.append(f"Dealer (**{dealer_score}**) beats {hand_name} (**{score}**).")
                 total_loss += hand.bet
             else:
                 outcomes.append(f"{hand_name} pushes.")
@@ -346,11 +346,45 @@ class BlackjackGame:
         dealer_label = f"DEALER: {d_status}"
         
         player_labels = []
+        player_colors = []
+        dealer_color = (255, 255, 255)
+        
+        if self.resolved:
+            d_score = self.dealer_hand.get_score()
+            dealer_wins = True
+            dealer_losses = False
+            
+            for i, hand in enumerate(self.player_hands):
+                score = hand.get_score()
+                
+                if hand.busted:
+                    player_colors.append((255, 80, 80)) # Red
+                elif self.dealer_hand.busted:
+                    player_colors.append((80, 255, 80)) # Green
+                    dealer_wins = False
+                    dealer_losses = True
+                elif score > d_score:
+                    player_colors.append((80, 255, 80)) # Green
+                    dealer_wins = False
+                    dealer_losses = True
+                elif score < d_score:
+                    player_colors.append((255, 80, 80)) # Red
+                else:
+                    player_colors.append((200, 200, 200)) # Push/White
+                    dealer_wins = False
+                    
+            if self.dealer_hand.busted or dealer_losses:
+                dealer_color = (255, 80, 80) # Dealer lost at least one hand
+            elif dealer_wins:
+                dealer_color = (80, 255, 80) # Dealer beat everybody
+        else:
+            player_colors = [(255, 255, 255)] * len(self.player_hands)
+
         for i, hand in enumerate(self.player_hands):
             score = hand.get_score()
             if hand.is_blackjack(): status = "BJ!"
             elif hand.busted: status = f"Bust ({score})"
-            elif hand.stood: status = f"Stay ({score})"
+            elif hand.stood: status = f"{score} (Stay)"
             else: status = f"{score}"
             
             user_name = self.ctx.author.display_name.upper()
@@ -384,14 +418,14 @@ class BlackjackGame:
         curr_y = 10
         
         # Draw Dealer
-        draw.text((20, curr_y), dealer_label, font=f_header, fill=(255, 255, 255))
+        draw.text((20, curr_y), dealer_label, font=f_header, fill=dealer_color)
         curr_y += line_height
         board.paste(dealer_strip, (20, curr_y), dealer_strip)
         curr_y += card_height + gap
         
         # Draw Player Hands
         for i, strip in enumerate(player_strips):
-            draw.text((20, curr_y), player_labels[i], font=f_header, fill=(255, 255, 255))
+            draw.text((20, curr_y), player_labels[i], font=f_header, fill=player_colors[i])
             curr_y += line_height
             board.paste(strip, (20, curr_y), strip)
             curr_y += card_height + gap
