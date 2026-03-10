@@ -82,7 +82,6 @@ class BlackjackGame:
         self.current_hand_index = 0
         
         # Game state
-        self.message = None
         self.resolved = False
         
         # Initial deal
@@ -138,8 +137,7 @@ class BlackjackGame:
         if self.resolved: return
         current_hand = self.player_hands[self.current_hand_index]
         
-        if self.message:
-            await self.message.edit(content=self.build_text() + "\n\n⏳ *Dealer slides you a card*")
+        await self.ctx.send("⏳ *Dealer slides you a card*")
             
         await asyncio.sleep(1.2)
         current_hand.add_card(self.draw())
@@ -147,14 +145,13 @@ class BlackjackGame:
         if current_hand.busted:
             await self.move_to_next_hand()
         else:
-            await self.update_message()
+            await self.send_status()
 
     async def process_stand(self):
         if self.resolved: return
         self.player_hands[self.current_hand_index].stood = True
         
-        if self.message:
-            await self.message.edit(content=self.build_text() + "\n\n⏳ *Dealer moves on*")
+        await self.ctx.send("⏳ *Dealer moves on*")
             
         await asyncio.sleep(1.0)
         await self.move_to_next_hand()
@@ -178,14 +175,14 @@ class BlackjackGame:
         
         self.player_hands.insert(self.current_hand_index + 1, new_hand)
         
-        await self.update_message()
+        await self.send_status()
 
     async def move_to_next_hand(self):
         self.current_hand_index += 1
         if self.current_hand_index >= len(self.player_hands):
             await self.resolve_dealer()
         else:
-            await self.update_message()
+            await self.send_status()
 
     async def resolve_dealer(self):
         self.resolved = True
@@ -195,8 +192,7 @@ class BlackjackGame:
         
         if not all_busted:
             while self.dealer_hand.get_score() < 17:
-                if self.message:
-                    await self.message.edit(content=self.build_text(show_all_dealer=True) + "\n\n⏳ *Dealer is drawing cards...*")
+                await self.ctx.send(self.build_text(show_all_dealer=True) + "\n\n⏳ *Dealer is drawing cards...*")
                 
                 await asyncio.sleep(1.5)
                 self.dealer_hand.add_card(self.draw())
@@ -260,17 +256,15 @@ class BlackjackGame:
         
         final_content = self.build_text(show_all_dealer=True) + "\n\n" + result_text + "\n\n*" + footer_msg + "*"
         
-        if self.message:
-            await self.message.edit(content=final_content)
+        await self.ctx.send(final_content)
         
         # Cleanup
         if self.ctx.author.id in self.cog.active_bj_games:
             del self.cog.active_bj_games[self.ctx.author.id]
 
-    async def update_message(self):
+    async def send_status(self):
         content = self.build_text()
-        if self.message:
-            await self.message.edit(content=content)
+        await self.ctx.send(content)
 
 
 
@@ -1093,8 +1087,7 @@ class GamesCog(commands.Cog):
         game = BlackjackGame(ctx, self, bet)
         self.active_bj_games[user_id] = game
         
-        content = game.build_text()
-        game.message = await ctx.send(content)
+        await game.send_status()
         
         # Check for instant blackjack
         if game.player_hands[0].is_blackjack():
