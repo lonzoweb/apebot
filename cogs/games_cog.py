@@ -129,47 +129,15 @@ class BlackjackView(discord.ui.View):
             embed.add_field(name=name + marker, value=f"{str(hand)}\n*{status}*\nBet: {economy.format_balance(hand.bet)}", inline=False)
         
         if self.resolved:
-            embed.set_footer(text="Game Over")
+            embed.set_footer(text="Cooked")
         else:
-            embed.set_footer(text="Use buttons or .hit / .stay / .split")
+            embed.set_footer(text="Use .hit / .stay / .split")
             
         return embed
 
     def update_buttons(self):
+        # Buttons removed as per user request
         self.clear_items()
-        if self.resolved:
-            return
-
-        current_hand = self.player_hands[self.current_hand_index]
-        
-        hit_btn = discord.ui.Button(label="Hit", style=discord.ButtonStyle.green, custom_id="bj_hit")
-        hit_btn.callback = self.hit_callback
-        self.add_item(hit_btn)
-        
-        stand_btn = discord.ui.Button(label="Stay", style=discord.ButtonStyle.red, custom_id="bj_stand")
-        stand_btn.callback = self.stand_callback
-        self.add_item(stand_btn)
-        
-        # Split condition: same rank and only 2 cards and enough balance
-        if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(self.player_hands) < 4:
-            split_btn = discord.ui.Button(label="Split", style=discord.ButtonStyle.blurple, custom_id="bj_split")
-            split_btn.callback = self.split_callback
-            self.add_item(split_btn)
-
-    async def hit_callback(self, interaction):
-        if interaction.user.id != self.ctx.author.id:
-            return await interaction.response.send_message("This isn't your seat.", ephemeral=True)
-        await self.process_hit(interaction)
-
-    async def stand_callback(self, interaction):
-        if interaction.user.id != self.ctx.author.id:
-            return await interaction.response.send_message("This isn't your seat.", ephemeral=True)
-        await self.process_stand(interaction)
-
-    async def split_callback(self, interaction):
-        if interaction.user.id != self.ctx.author.id:
-            return await interaction.response.send_message("This isn't your seat.", ephemeral=True)
-        await self.process_split(interaction)
 
     async def process_hit(self, interaction=None):
         current_hand = self.player_hands[self.current_hand_index]
