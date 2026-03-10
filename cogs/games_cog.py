@@ -233,22 +233,21 @@ class BlackjackGame:
         # Build combined header line based on outcome
         if total_payout > total_bet:
             words = ["BIG W", "CLUTCH", "TOO EASY"]
-            header = f"**{random.choice(words)}... Apeiron provides**"
+            header = f"**{random.choice(words)}**"
             
             await update_balance(self.ctx.author.id, total_payout)
-            formatted_winnings = economy.format_balance(total_payout)
-            result_text += f"\n\n**Payout: +{formatted_winnings}**"
+            result_text += f"\n\nApeiron provides ... payout + {total_payout} {economy.CURRENCY_SYMBOL}"
             
         elif total_payout < total_bet:
             words = ["COOKED", "RAPED", "LOSER"]
-            header = f"**{random.choice(words)}... Dealer takes your gems.**"
+            loss_amount = total_bet - total_payout
+            header = f"**{random.choice(words)}** ... Dealer takes your {loss_amount} {economy.CURRENCY_SYMBOL}"
             
             if total_payout > 0: await update_balance(self.ctx.author.id, total_payout) # Partial return
-            formatted_loss = economy.format_balance(total_bet - total_payout)
-            result_text += f"\n\n**Apeiron collects {formatted_loss}.**"
+            result_text += f"\n\nApeiron collects."
             
         else:
-            header = "**PUSH... Tokens returned.**"
+            header = "**PUSH** ... Tokens returned."
             if total_payout > 0: await update_balance(self.ctx.author.id, total_payout)
             
         final_msg = f"{header}\n\n{result_text}"
