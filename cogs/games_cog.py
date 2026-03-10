@@ -92,7 +92,7 @@ class BlackjackGame:
         self.cog = cog
         self.base_bet = bet
         
-        # Initialize deck
+        # Initialize deck - NO JOKERS
         self.deck = [(r, s) for r in RANKS for s in SUITS]
         random.shuffle(self.deck)
         
@@ -104,13 +104,12 @@ class BlackjackGame:
         
         # Game state
         self.resolved = False
+        self.message = None # The single message we will update
         
         # Initial deal
         for _ in range(2):
             self.player_hands[0].add_card(self.draw())
             self.dealer_hand.add_card(self.draw())
-        
-        self.last_card_filename = None
 
     def draw(self):
         if not self.deck:
@@ -118,222 +117,228 @@ class BlackjackGame:
             random.shuffle(self.deck)
         return self.deck.pop()
 
-    def get_hand_status(self, hand):
-        score = hand.get_score()
-        if hand.is_blackjack(): return "BJ!"
-        if hand.busted: return f"Bust ({score})"
-        if hand.stood: return f"Stay ({score})"
-        return f"Total: {score}"
-
-    def build_text(self, show_all_dealer=False):
-        # We now return a tuple: (dealer_text, player_texts_list, footer_text)
-        
-        # Dealer
-        if show_all_dealer:
-            dealer_score = self.dealer_hand.get_score()
-            dealer_status = f"{dealer_score}"
-            if self.dealer_hand.is_blackjack(): dealer_status = "BJ!"
-            elif self.dealer_hand.busted: dealer_status = f"Bust ({dealer_score})"
-        else:
-            dealer_score = BlackjackHand(cards=[self.dealer_hand.cards[0]]).get_score()
-            dealer_status = f"{dealer_score}+"
-
-        dealer_text = f"DEALER: {dealer_status}"
-        
-        # Player Hands
-        player_texts = []
-        for i, hand in enumerate(self.player_hands):
-            status = self.get_hand_status(hand)
-            # Remove parentheses from score/status for minimal look
-            if "Total: " in status: status = status.replace("Total: ", "")
-            elif "Stay (" in status: status = status.replace("Stay (", "").replace(")", "")
-            elif "Bust (" in status: status = status.replace("Bust (", "").replace(")", "")
+    def build_status_text(self):
+        """Build the text content for the Discord message (commands only)."""
+        if self.resolved:
+            return "" # Results sent in a separate message
             
-            name = f"Hand {i+1}" if len(self.player_hands) > 1 else "YOURS"
-            player_texts.append(f"{name}: {status}")
-        
-        footer_text = ""
-        if not self.resolved:
-            commands = ".hit .stay"
-            current_hand = self.player_hands[self.current_hand_index]
-            if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(self.player_hands) < 4:
-                commands += " .split"
-            footer_text = commands
-            
-        return dealer_text, player_texts, footer_text
+        commands = ".hit .stay"
+        current_hand = self.player_hands[self.current_hand_index]
+        if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(self.player_hands) < 4:
+            commands += " .split"
+        return commands
 
     async def process_hit(self):
         if self.resolved: return
-        current_hand = self.player_hands[self.current_hand_index]
+        hand = self.player_hands[self.current_hand_index]
+        hand.add_card(self.draw())
         
-        await self.ctx.send("*Dealer slides you a card*")
-            
-        await asyncio.sleep(1.2)
-        card = self.draw()
-        current_hand.add_card(card)
-        self.last_card_filename = current_hand.get_card_filename(card)
-        
-        if current_hand.busted:
-            await self.move_to_next_hand()
+        if hand.busted:
+            if not self.move_to_next_hand():
+                await self.resolve_dealer()
+            else:
+                await self.send_status()
         else:
             await self.send_status()
 
     async def process_stand(self):
         if self.resolved: return
-        self.player_hands[self.current_hand_index].stood = True
+        hand = self.player_hands[self.current_hand_index]
+        hand.stood = True
         
-        await self.ctx.send("*Dealer moves on*")
-            
-        await asyncio.sleep(1.0)
-        await self.move_to_next_hand()
-
-    async def process_split(self):
-        if self.resolved: return
-        user_id = self.ctx.author.id
-        balance = await get_balance(user_id)
-        
-        if balance < self.base_bet:
-            return await self.ctx.reply("❌ You're too short for a split.", mention_author=False)
-
-        await update_balance(user_id, -self.base_bet)
-        
-        current_hand = self.player_hands[self.current_hand_index]
-        new_hand = BlackjackHand(cards=[current_hand.cards.pop()])
-        new_hand.bet = self.base_bet
-        
-        current_hand.add_card(self.draw())
-        card2 = self.draw()
-        new_hand.add_card(card2)
-        self.last_card_filename = new_hand.get_card_filename(card2)
-        
-        self.player_hands.insert(self.current_hand_index + 1, new_hand)
-        
-        await self.send_status()
-
-    async def move_to_next_hand(self):
-        self.current_hand_index += 1
-        if self.current_hand_index >= len(self.player_hands):
+        if not self.move_to_next_hand():
             await self.resolve_dealer()
         else:
             await self.send_status()
 
+    async def process_split(self):
+        if self.resolved: return
+        hand = self.player_hands[self.current_hand_index]
+        
+        if len(hand.cards) != 2 or hand.cards[0][0] != hand.cards[1][0] or len(self.player_hands) >= 4:
+            return
+            
+        # Check balance for second bet
+        balance = await get_balance(self.ctx.author.id)
+        if balance < self.base_bet:
+            return await self.ctx.send("Insufficient funds to split.")
+            
+        await update_balance(self.ctx.author.id, -self.base_bet)
+        
+        new_hand = BlackjackHand(cards=[hand.cards.pop()])
+        new_hand.bet = self.base_bet
+        hand.add_card(self.draw())
+        new_hand.add_card(self.draw())
+        self.player_hands.insert(self.current_hand_index + 1, new_hand)
+        
+        await self.send_status()
+
+    def move_to_next_hand(self):
+        self.current_hand_index += 1
+        if self.current_hand_index >= len(self.player_hands):
+            return False
+        return True
+
     async def resolve_dealer(self):
         self.resolved = True
         
-        # If all hands busted, dealer doesn't need to roll
-        all_busted = all(h.busted for h in self.player_hands)
-        
-        if not all_busted:
-            while self.dealer_hand.get_score() < 17:
-                await self.send_status(content=self.build_text(show_all_dealer=True) + "\n\n*Dealer is drawing cards...*")
-                
-                await asyncio.sleep(1.5)
-                card = self.draw()
-                self.dealer_hand.add_card(card)
-                self.last_card_filename = self.dealer_hand.get_card_filename(card)
-        
+        # Dealer hits until 17
+        while self.dealer_hand.get_score() < 17:
+            self.dealer_hand.add_card(self.draw())
+            await self.send_status()
+            await asyncio.sleep(1) # Visual pause
+            
         await self.finalize_game()
 
     async def finalize_game(self):
-        dealer_score = self.dealer_hand.get_score()
-        dealer_bj = self.dealer_hand.is_blackjack()
-        
-        total_payout = 0
         outcomes = []
+        total_payout = 0
+        dealer_score = self.dealer_hand.get_score()
         
         for i, hand in enumerate(self.player_hands):
             score = hand.get_score()
-            player_bj = hand.is_blackjack()
-            hand_bet = hand.bet
+            hand_name = f"Hand {i+1}" if len(self.player_hands) > 1 else "Your hand"
             
-            outcome = ""
             if hand.busted:
-                outcome = "LOSS"
-            elif dealer_bj:
-                if player_bj:
-                    total_payout += hand_bet
-                    outcome = "PUSH"
-                else:
-                    outcome = "LOSS"
-            elif player_bj:
-                payout = int(hand_bet * 2.5) # Original bet back + 1.5x
-                total_payout += payout
-                outcome = "WIN (BJ)"
+                outcomes.append(f"{hand_name} busted. House wins.")
             elif self.dealer_hand.busted:
-                payout = hand_bet * 2
+                outcomes.append(f"Dealer busted! {hand_name} wins.")
+                payout = int(hand.bet * 2)
                 total_payout += payout
-                outcome = "WIN"
             elif score > dealer_score:
-                payout = hand_bet * 2
+                outcomes.append(f"{hand_name} ({score}) beats Dealer ({dealer_score}).")
+                payout = int(hand.bet * 2)
                 total_payout += payout
-                outcome = "WIN"
             elif score < dealer_score:
-                outcome = "LOSS"
+                outcomes.append(f"Dealer ({dealer_score}) beats {hand_name} ({score}).")
             else:
-                total_payout += hand_bet
-                outcome = "PUSH"
-            
-            outcomes.append(f"Hand {i+1}: **{outcome}**")
+                outcomes.append(f"{hand_name} pushes.")
+                total_payout += hand.bet
 
         if total_payout > 0:
             await update_balance(self.ctx.author.id, total_payout)
-            await self.cog.process_reaping(self.ctx)
-
-        result_text = "\n".join(outcomes)
-        if total_payout > 0:
+            result_text = "\n".join(outcomes)
             formatted_winnings = economy.format_balance(total_payout)
             result_text += f"\n\n**Final Payout: {formatted_winnings}**"
+            footer_msg = "The Dealer tips his cap. Well played."
         else:
+            result_text = "\n".join(outcomes)
             result_text += f"\n\n**The house takes it all.**"
+            footer_msg = "The Dealer slides your tokens away. 'Next time, perhaps.'"
             
-        # Custom verbiage
-        footer_msg = "The Dealer tips his cap. Well played." if total_payout > 0 else "The Dealer slides your tokens away. 'Next time, perhaps.'"
+        final_msg = f"*Cooked*\n\n{result_text}\n\n*{footer_msg}*"
         
-        final_footer = f"\n*Cooked*\n\n{result_text}\n\n*{footer_msg}*"
-        
-        await self.send_status(player_footer=final_footer)
+        await self.ctx.send(final_msg)
         
         # Cleanup
         if self.ctx.author.id in self.cog.active_bj_games:
             del self.cog.active_bj_games[self.ctx.author.id]
 
-    async def send_status(self, player_footer=None):
-        dealer_text, player_texts, footer_text = self.build_text(show_all_dealer=self.resolved)
+    async def send_status(self):
+        """Update the existing message with a new combined game board image."""
+        content = self.build_status_text()
+        board_img = self.generate_game_board()
+        if not board_img:
+            return await self.ctx.send("Error generating game board.")
+            
+        file = discord.File(board_img, filename="blackjack.png")
+        
+        if self.message is None:
+            self.message = await self.ctx.send(content, file=file)
+        else:
+            # Note: discord.py message.edit() allows updating the file
+            await self.message.edit(content=content, attachments=[file])
+
+    def generate_game_board(self):
+        """Combine Dealer and Player hands into a single image with text labels."""
+        from PIL import Image, ImageDraw, ImageFont
+        
+        # Paths
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cards_dir = os.path.join(base_dir, "images", "playingcards")
+        
+        # 1. Get Hand Strips
+        dealer_cards = self.dealer_hand.cards if self.resolved else [self.dealer_hand.cards[0]]
+        dealer_strip = self.render_hand_strip(dealer_cards, cards_dir)
+        
+        player_strips = []
+        for hand in self.player_hands:
+            player_strips.append(self.render_hand_strip(hand.cards, cards_dir))
+            
+        if not dealer_strip or not player_strips[0]:
+            return None
+            
+        # 2. Calculate Board Dimensions
+        max_hand_width = max(dealer_strip.width, max(s.width for s in player_strips))
+        board_width = max(max_hand_width, 400) + 40
+        
+        # Calculate scores/status
+        if self.resolved:
+            d_score = self.dealer_hand.get_score()
+            if self.dealer_hand.is_blackjack(): d_status = "BJ!"
+            elif self.dealer_hand.busted: d_status = f"Bust ({d_score})"
+            else: d_status = f"{d_score}"
+        else:
+            d_status = f"{BlackjackHand(cards=[self.dealer_hand.cards[0]]).get_score()}+"
+            
+        dealer_label = f"DEALER: {d_status}"
+        
+        player_labels = []
+        for i, hand in enumerate(self.player_hands):
+            score = hand.get_score()
+            if hand.is_blackjack(): status = "BJ!"
+            elif hand.busted: status = f"Bust ({score})"
+            elif hand.stood: status = f"Stay ({score})"
+            else: status = f"{score}"
+            
+            name = f"HAND {i+1}" if len(self.player_hands) > 1 else "YOURS"
+            player_labels.append(f"{name}: {status}")
+            
+        card_height = dealer_strip.height
+        line_height = 50
+        gap = 40
+        
+        total_height = line_height + card_height + gap + (len(player_strips) * (line_height + card_height + gap))
+        
+        # 3. Create Board
+        board = Image.new("RGBA", (board_width, total_height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(board)
         
         try:
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            cards_dir = os.path.join(base_dir, "images", "playingcards")
+            font_path = os.path.join(base_dir, "assets", "fonts", "Avenger.ttf")
+            if os.path.exists(font_path):
+                f_header = ImageFont.truetype(font_path, 32)
+            else:
+                f_header = ImageFont.load_default()
+        except:
+            f_header = ImageFont.load_default()
             
-            # 1. Send Dealer Message
-            dealer_cards = self.dealer_hand.cards if self.resolved else [self.dealer_hand.cards[0]]
-            dealer_img = self.generate_hand_image(dealer_cards, cards_dir)
-            dealer_file = discord.File(dealer_img, filename="dealer.png") if dealer_img else None
-            await self.ctx.send(dealer_text, file=dealer_file)
-            
-            # 2. Send Player Message(s)
-            # If there's only one hand, we send it in one go. If multiple (splits), we iterate.
-            for i, hand in enumerate(self.player_hands):
-                hand_text = player_texts[i]
-                player_img = self.generate_hand_image(hand.cards, cards_dir)
-                player_file = discord.File(player_img, filename=f"player_{i}.png") if player_img else None
-                
-                # If it's the current/last hand, add footer
-                combined_text = hand_text
-                if i == self.current_hand_index and not self.resolved:
-                    combined_text += f"\n\n{footer_text}"
-                elif i == len(self.player_hands) - 1 and self.resolved:
-                    combined_text += f"\n{player_footer or ''}"
-                
-                await self.ctx.send(combined_text, file=player_file)
-                
-        except Exception as e:
-            logger.error(f"Error in send_status: {e}")
-            await self.ctx.send("Dealer is having trouble with the cards...")
-
-    def generate_hand_image(self, cards, cards_dir):
-        """Combine card images into a horizontal strip."""
-        if not cards: return None
+        curr_y = 10
         
+        # Draw Dealer
+        draw.text((20, curr_y), dealer_label, font=f_header, fill=(255, 255, 255))
+        curr_y += line_height
+        board.paste(dealer_strip, (20, curr_y), dealer_strip)
+        curr_y += card_height + gap
+        
+        # Draw Player Hands
+        for i, strip in enumerate(player_strips):
+            draw.text((20, curr_y), player_labels[i], font=f_header, fill=(255, 255, 255))
+            curr_y += line_height
+            board.paste(strip, (20, curr_y), strip)
+            curr_y += card_height + gap
+            
+        # Crop trailing gap
+        board = board.crop((0, 0, board_width, curr_y - gap + 10))
+            
+        buf = io.BytesIO()
+        board.save(buf, format="PNG")
+        buf.seek(0)
+        return buf
+
+    def render_hand_strip(self, cards, cards_dir):
+        """Combine card images into a horizontal strip (internal helper)."""
+        if not cards: return None
         images = []
         total_width = 0
         max_height = 0
@@ -342,7 +347,7 @@ class BlackjackGame:
             filename = BlackjackHand().get_card_filename(card)
             path = os.path.join(cards_dir, filename)
             if os.path.exists(path):
-                img = Image.open(path)
+                img = Image.open(path).convert("RGBA")
                 images.append(img)
                 total_width += img.width
                 max_height = max(max_height, img.height)
@@ -352,13 +357,9 @@ class BlackjackGame:
         combined = Image.new("RGBA", (total_width, max_height), (0, 0, 0, 0))
         x_offset = 0
         for img in images:
-            combined.paste(img, (x_offset, 0))
+            combined.paste(img, (x_offset, 0), img)
             x_offset += img.width
-            
-        buf = io.BytesIO()
-        combined.save(buf, format="PNG")
-        buf.seek(0)
-        return buf
+        return combined
 
 
 
@@ -1178,13 +1179,10 @@ class GamesCog(commands.Cog):
         await self.process_reaping(ctx)
 
         # Create game
-        game = BlackjackGame(ctx, self, bet)
+        game = BlackjackGame(self.bot, self, bet)  # Passing bot for potential utility, but ctx is used mostly
+        game.ctx = ctx # Ensure ctx is set (though __init__ takes it)
         self.active_bj_games[user_id] = game
         
-        # Show the player's second card image for the initial deal
-        card = game.player_hands[0].cards[1]
-        game.last_card_filename = game.player_hands[0].get_card_filename(card)
-
         await game.send_status()
         
         # Check for instant blackjack
