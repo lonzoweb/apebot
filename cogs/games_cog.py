@@ -32,6 +32,10 @@ DICE_EMOJIS = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️�
 SUITS = ["♠️", "❤️", "♦️", "♣️"]
 RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
 
+# In-Memory Cache for Blackjack Assets
+_BJ_IMAGE_CACHE = {}
+_BJ_FONT_CACHE = None
+
 class BlackjackHand:
     def __init__(self, cards=None):
         self.cards = cards or []
@@ -105,6 +109,7 @@ class BlackjackGame:
         # Game state
         self.resolved = False
         self.message = None # The single message we will update
+        self.timeout_task = None
         
         # Initial deal
         for _ in range(2):
@@ -130,6 +135,7 @@ class BlackjackGame:
 
     async def process_hit(self):
         if self.resolved: return
+        self.reset_timeout()
         hand = self.player_hands[self.current_hand_index]
         hand.add_card(self.draw())
         
@@ -145,6 +151,7 @@ class BlackjackGame:
 
     async def process_stand(self):
         if self.resolved: return
+        self.reset_timeout()
         hand = self.player_hands[self.current_hand_index]
         hand.stood = True
         
@@ -155,6 +162,7 @@ class BlackjackGame:
 
     async def process_split(self):
         if self.resolved: return
+        self.reset_timeout()
         hand = self.player_hands[self.current_hand_index]
         
         if len(hand.cards) != 2 or hand.cards[0][0] != hand.cards[1][0] or len(self.player_hands) >= 4:
@@ -189,6 +197,7 @@ class BlackjackGame:
         return True
 
     async def resolve_dealer(self):
+        if self.timeout_task: self.timeout_task.cancel()
         self.resolved = True
         
         # Dealer hits until 17
@@ -233,15 +242,15 @@ class BlackjackGame:
         # Build combined header line based on outcome
         if total_payout > total_bet:
             words = ["BIG W", "CLUTCH", "TOO EASY"]
-            header = f"**{random.choice(words)}**"
+            header = f"**{random.choice(words)}** ... +{total_payout} {economy.CURRENCY_SYMBOL}"
             
             await update_balance(self.ctx.author.id, total_payout)
-            result_text += f"\n\nApeiron provides ... payout + {total_payout} {economy.CURRENCY_SYMBOL}"
+            result_text += f"\n\nApeiron provides"
             
         elif total_payout < total_bet:
             words = ["COOKED", "RAPED", "LOSER"]
             loss_amount = total_bet - total_payout
-            header = f"**{random.choice(words)}** ... Dealer takes your {loss_amount} {economy.CURRENCY_SYMBOL}"
+            header = f"**{random.choice(words)}** ... -{loss_amount} {economy.CURRENCY_SYMBOL}"
             
             if total_payout > 0: await update_balance(self.ctx.author.id, total_payout) # Partial return
             result_text += f"\n\nApeiron collects."
@@ -255,14 +264,35 @@ class BlackjackGame:
         await self.ctx.send(final_msg)
         
         # Cleanup
+        if self.timeout_task: self.timeout_task.cancel()
         if self.ctx.author.id in self.cog.active_bj_games:
             del self.cog.active_bj_games[self.ctx.author.id]
 
+    def reset_timeout(self):
+        if self.timeout_task:
+            self.timeout_task.cancel()
+        if getattr(self, "resolved", False):
+            return
+        if hasattr(self.cog, "bot"):
+            self.timeout_task = self.cog.bot.loop.create_task(self.check_timeout())
+
+    async def check_timeout(self):
+        try:
+            await asyncio.sleep(60)
+            if not getattr(self, "resolved", False):
+                await self.ctx.send(f"⏳ {self.ctx.author.mention}, you took too long! Auto-standing.")
+                # Force stand all remaining hands
+                while self.current_hand_index < len(self.player_hands):
+                    self.player_hands[self.current_hand_index].stood = True
+                    self.current_hand_index += 1
+                await self.resolve_dealer()
+        except asyncio.CancelledError:
+            pass
+
     async def send_status(self):
         """Update the existing message with a new combined game board image."""
-        status_text = self.build_status_text()
-        content = f"{self.ctx.author.mention}\n{status_text}" if self.message is None else status_text
-        
+        content = self.ctx.author.mention
+            
         board_img = self.generate_game_board()
         if not board_img:
             return await self.ctx.send("Error generating game board.")
@@ -272,7 +302,6 @@ class BlackjackGame:
         if self.message is None:
             self.message = await self.ctx.send(content, file=file)
         else:
-            # Note: discord.py message.edit() allows updating the file
             await self.message.edit(content=content, attachments=[file])
 
     def generate_game_board(self):
@@ -324,21 +353,26 @@ class BlackjackGame:
         card_height = dealer_strip.height
         line_height = 50
         gap = 40
+        command_height = 50 if not self.resolved else 0
         
-        total_height = line_height + card_height + gap + (len(player_strips) * (line_height + card_height + gap))
+        total_height = line_height + card_height + gap + (len(player_strips) * (line_height + card_height + gap)) + command_height
         
         # 3. Create Board
         board = Image.new("RGBA", (board_width, total_height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(board)
         
-        try:
-            font_path = os.path.join(base_dir, "assets", "fonts", "Avenger.ttf")
-            if os.path.exists(font_path):
-                f_header = ImageFont.truetype(font_path, 32)
-            else:
-                f_header = ImageFont.load_default()
-        except:
-            f_header = ImageFont.load_default()
+        global _BJ_FONT_CACHE
+        if _BJ_FONT_CACHE is None:
+            try:
+                font_path = os.path.join(base_dir, "assets", "fonts", "Avenger.ttf")
+                if os.path.exists(font_path):
+                    _BJ_FONT_CACHE = ImageFont.truetype(font_path, 32)
+                else:
+                    _BJ_FONT_CACHE = ImageFont.load_default()
+            except:
+                _BJ_FONT_CACHE = ImageFont.load_default()
+                
+        f_header = _BJ_FONT_CACHE
             
         curr_y = 10
         
@@ -355,6 +389,15 @@ class BlackjackGame:
             board.paste(strip, (20, curr_y), strip)
             curr_y += card_height + gap
             
+        # Draw Commands if not resolved
+        if not self.resolved:
+            commands = ".hit  .stay"
+            current_hand = self.player_hands[self.current_hand_index]
+            if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(self.player_hands) < 4:
+                commands += "  .split"
+            draw.text((20, curr_y), commands, font=f_header, fill=(200, 200, 200))
+            curr_y += command_height
+            
         # Crop trailing gap
         board = board.crop((0, 0, board_width, curr_y - gap + 10))
             
@@ -370,14 +413,23 @@ class BlackjackGame:
         total_width = 0
         max_height = 0
         
+        global _BJ_IMAGE_CACHE
         for card in cards:
             filename = BlackjackHand().get_card_filename(card)
-            path = os.path.join(cards_dir, filename)
-            if os.path.exists(path):
-                img = Image.open(path).convert("RGBA")
-                images.append(img)
-                total_width += img.width
-                max_height = max(max_height, img.height)
+            
+            if filename in _BJ_IMAGE_CACHE:
+                img = _BJ_IMAGE_CACHE[filename]
+            else:
+                path = os.path.join(cards_dir, filename)
+                if os.path.exists(path):
+                    img = Image.open(path).convert("RGBA")
+                    _BJ_IMAGE_CACHE[filename] = img
+                else:
+                    continue
+                    
+            images.append(img)
+            total_width += img.width
+            max_height = max(max_height, img.height)
         
         if not images: return None
         
@@ -1184,7 +1236,7 @@ class GamesCog(commands.Cog):
         
         # Concurrency check
         if user_id in self.active_bj_games:
-            return await ctx.reply("❌ Finish your current hand before you start another.", mention_author=False)
+            return await ctx.reply("❌ BJ in progress.", mention_author=False)
 
         balance = await get_balance(user_id)
 
@@ -1196,8 +1248,8 @@ class GamesCog(commands.Cog):
             except (ValueError, TypeError):
                 return await ctx.reply("Usage: `.bj <amount> or .bj all`\n*\"Put your bread on the felt...\"*", mention_author=False)
 
-        if bet <= 0:
-            return await ctx.reply("❌ Enter a real bet.", mention_author=False)
+        if bet < 5:
+            return await ctx.reply("❌ Minimum bet is 5 gems.", mention_author=False)
         if balance < bet:
             return await ctx.reply(f"❌ You're flat. Need {economy.format_balance(bet)} to play.", mention_author=False)
 
@@ -1209,6 +1261,8 @@ class GamesCog(commands.Cog):
         game = BlackjackGame(self.bot, self, bet)  # Passing bot for potential utility, but ctx is used mostly
         game.ctx = ctx # Ensure ctx is set (though __init__ takes it)
         self.active_bj_games[user_id] = game
+        
+        game.reset_timeout()
         
         await game.send_status()
         
