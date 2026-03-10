@@ -65,9 +65,8 @@ class BlackjackHand:
         return " ".join([f"[{r}{s}]" for r, s in self.cards])
 
 
-class BlackjackView(discord.ui.View):
+class BlackjackGame:
     def __init__(self, ctx, cog, bet):
-        super().__init__(timeout=60.0)
         self.ctx = ctx
         self.cog = cog
         self.base_bet = bet
@@ -104,8 +103,8 @@ class BlackjackView(discord.ui.View):
         if hand.stood: return f"Stay ({score})"
         return f"Total: {score}"
 
-    def build_embed(self, show_all_dealer=False):
-        embed = discord.Embed(title="🃏 Blackjack", color=discord.Color.dark_grey())
+    def build_text(self, show_all_dealer=False):
+        lines = ["**Blackjack**", ""]
         
         # Dealer
         if show_all_dealer:
@@ -119,63 +118,54 @@ class BlackjackView(discord.ui.View):
             dealer_score = BlackjackHand(cards=[self.dealer_hand.cards[0]]).get_score()
             dealer_status = f"Total: {dealer_score}+"
 
-        embed.add_field(name=f"Dealer's Hand", value=f"{dealer_str}\n*{dealer_status}*", inline=False)
+        lines.append(f"**Dealer's Hand**: {dealer_str} (*{dealer_status}*)")
         
         # Player Hands
         for i, hand in enumerate(self.player_hands):
             marker = " **<< CURRENT**" if i == self.current_hand_index and not self.resolved else ""
             status = self.get_hand_status(hand)
-            name = f"Your Hand {i+1}" if len(self.player_hands) > 1 else "Your Hand"
-            embed.add_field(name=name + marker, value=f"{str(hand)}\n*{status}*\nBet: {economy.format_balance(hand.bet)}", inline=False)
+            name = f"Hand {i+1}" if len(self.player_hands) > 1 else "Your Hand"
+            lines.append(f"**{name}**: {str(hand)} (*{status}*) | Bet: {economy.format_balance(hand.bet)}{marker}")
         
         if self.resolved:
-            embed.set_footer(text="Cooked")
+            lines.append("\n*Cooked*")
         else:
-            embed.set_footer(text="Use .hit / .stay / .split")
+            lines.append("\n*Type .hit, .stay, or .split*")
             
-        return embed
+        return "\n".join(lines)
 
-    def update_buttons(self):
-        # Buttons removed as per user request
-        self.clear_items()
-
-    async def process_hit(self, interaction=None):
+    async def process_hit(self):
+        if self.resolved: return
         current_hand = self.player_hands[self.current_hand_index]
         
-        # Add a bit of suspense
-        if interaction:
-            await interaction.response.edit_message(content="⏳ *The Dealer slides a card to you...*", view=None)
-        elif self.message:
-            await self.message.edit(content="⏳ *The Dealer slides a card to you...*", view=None)
+        if self.message:
+            await self.message.edit(content=self.build_text() + "\n\n⏳ *The Dealer slides a card to you...*")
             
         await asyncio.sleep(1.2)
         current_hand.add_card(self.draw())
         
         if current_hand.busted:
-            await self.move_to_next_hand(interaction)
+            await self.move_to_next_hand()
         else:
-            await self.update_message(interaction)
+            await self.update_message()
 
-    async def process_stand(self, interaction=None):
+    async def process_stand(self):
+        if self.resolved: return
         self.player_hands[self.current_hand_index].stood = True
         
-        if interaction:
-            await interaction.response.edit_message(content="⏳ *The Dealer nods and moves on...*", view=None)
-        elif self.message:
-            await self.message.edit(content="⏳ *The Dealer nods and moves on...*", view=None)
+        if self.message:
+            await self.message.edit(content=self.build_text() + "\n\n⏳ *The Dealer nods and moves on...*")
             
         await asyncio.sleep(1.0)
-        await self.move_to_next_hand(interaction)
+        await self.move_to_next_hand()
 
-    async def process_split(self, interaction=None):
+    async def process_split(self):
+        if self.resolved: return
         user_id = self.ctx.author.id
         balance = await get_balance(user_id)
         
         if balance < self.base_bet:
-            if interaction:
-                return await interaction.response.send_message("You're too short for a split.", ephemeral=True)
-            else:
-                return await self.ctx.send("You're too short for a split.")
+            return await self.ctx.reply("❌ You're too short for a split.", mention_author=False)
 
         await update_balance(user_id, -self.base_bet)
         
@@ -188,17 +178,16 @@ class BlackjackView(discord.ui.View):
         
         self.player_hands.insert(self.current_hand_index + 1, new_hand)
         
-        # If current hand is now blackjack/21, it might stand automatically or needs hit
-        await self.update_message(interaction)
+        await self.update_message()
 
-    async def move_to_next_hand(self, interaction=None):
+    async def move_to_next_hand(self):
         self.current_hand_index += 1
         if self.current_hand_index >= len(self.player_hands):
-            await self.resolve_dealer(interaction)
+            await self.resolve_dealer()
         else:
-            await self.update_message(interaction)
+            await self.update_message()
 
-    async def resolve_dealer(self, interaction=None):
+    async def resolve_dealer(self):
         self.resolved = True
         
         # If all hands busted, dealer doesn't need to roll
@@ -206,18 +195,15 @@ class BlackjackView(discord.ui.View):
         
         if not all_busted:
             while self.dealer_hand.get_score() < 17:
-                # Update visual to show dealer thinking/drawing
-                if interaction:
-                    await interaction.followup.edit_message(self.message.id, content="⏳ *The Dealer is drawing cards...*", embed=self.build_embed(show_all_dealer=True), view=None)
-                elif self.message:
-                    await self.message.edit(content="⏳ *The Dealer is drawing cards...*", embed=self.build_embed(show_all_dealer=True), view=None)
+                if self.message:
+                    await self.message.edit(content=self.build_text(show_all_dealer=True) + "\n\n⏳ *The Dealer is drawing cards...*")
                 
                 await asyncio.sleep(1.5)
                 self.dealer_hand.add_card(self.draw())
         
-        await self.finalize_game(interaction)
+        await self.finalize_game()
 
-    async def finalize_game(self, interaction=None):
+    async def finalize_game(self):
         dealer_score = self.dealer_hand.get_score()
         dealer_bj = self.dealer_hand.is_blackjack()
         
@@ -262,8 +248,6 @@ class BlackjackView(discord.ui.View):
             await update_balance(self.ctx.author.id, total_payout)
             await self.cog.process_reaping(self.ctx)
 
-        embed = self.build_embed(show_all_dealer=True)
-        
         result_text = "\n".join(outcomes)
         if total_payout > 0:
             formatted_winnings = economy.format_balance(total_payout)
@@ -271,41 +255,22 @@ class BlackjackView(discord.ui.View):
         else:
             result_text += f"\n\n**The house takes it all.**"
             
-        embed.description = result_text
-        
         # Custom verbiage
         footer_msg = "The Dealer tips his cap. Well played." if total_payout > 0 else "The Dealer slides your tokens away. 'Next time, perhaps.'"
-        embed.set_footer(text=footer_msg)
-
-        if interaction:
-            await interaction.response.edit_message(embed=embed, view=None)
-        elif self.message:
-            await self.message.edit(embed=embed, view=None)
+        
+        final_content = self.build_text(show_all_dealer=True) + "\n\n" + result_text + "\n\n*" + footer_msg + "*"
+        
+        if self.message:
+            await self.message.edit(content=final_content)
         
         # Cleanup
         if self.ctx.author.id in self.cog.active_bj_games:
             del self.cog.active_bj_games[self.ctx.author.id]
-        self.stop()
 
-    async def update_message(self, interaction=None):
-        self.update_buttons()
-        embed = self.build_embed()
-        
-        if interaction:
-            await interaction.response.edit_message(embed=embed, view=self)
-        elif self.message:
-            await self.message.edit(embed=embed, view=self)
-
-    async def on_timeout(self):
-        # Auto-stand and resolve if timeout
-        if not self.resolved:
-            for hand in self.player_hands:
-                if not hand.stood and not hand.busted:
-                    hand.stood = True
-            await self.resolve_dealer()
-        
-        if self.ctx.author.id in self.cog.active_bj_games:
-            del self.cog.active_bj_games[self.ctx.author.id]
+    async def update_message(self):
+        content = self.build_text()
+        if self.message:
+            await self.message.edit(content=content)
 
 
 
@@ -1088,7 +1053,7 @@ class GamesCog(commands.Cog):
 
 
 
-    @commands.command(name="bj", aliases=["blackjack"])
+    @commands.command(name="bj", aliases=[" "])
     async def bj_command(self, ctx, amount: str = None):
         """Play Blackjack against the dealer. Usage: .bj <amount>"""
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
@@ -1125,45 +1090,41 @@ class GamesCog(commands.Cog):
         await self.process_reaping(ctx)
 
         # Create game
-        view = BlackjackView(ctx, self, bet)
-        self.active_bj_games[user_id] = view
+        game = BlackjackGame(ctx, self, bet)
+        self.active_bj_games[user_id] = game
         
-        embed = view.build_embed()
-        view.update_buttons()
+        content = game.build_text()
+        game.message = await ctx.send(content)
         
         # Check for instant blackjack
-        if view.player_hands[0].is_blackjack():
-            # Still send the message but resolve it immediately
-            view.message = await ctx.send(embed=embed, view=view)
-            await view.resolve_dealer()
-        else:
-            view.message = await ctx.send(embed=embed, view=view)
+        if game.player_hands[0].is_blackjack():
+            await game.resolve_dealer()
 
     @commands.command(name="hit")
     async def hit_command(self, ctx):
         """Hit in an active Blackjack game."""
         user_id = ctx.author.id
         if user_id in self.active_bj_games:
-            view = self.active_bj_games[user_id]
-            await view.process_hit()
+            game = self.active_bj_games[user_id]
+            await game.process_hit()
 
     @commands.command(name="stay", aliases=["stand"])
     async def stay_command(self, ctx):
         """Stay in an active Blackjack game."""
         user_id = ctx.author.id
         if user_id in self.active_bj_games:
-            view = self.active_bj_games[user_id]
-            await view.process_stand()
+            game = self.active_bj_games[user_id]
+            await game.process_stand()
 
     @commands.command(name="split")
     async def split_command(self, ctx):
         """Split in an active Blackjack game."""
         user_id = ctx.author.id
         if user_id in self.active_bj_games:
-            view = self.active_bj_games[user_id]
-            current_hand = view.player_hands[view.current_hand_index]
-            if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(view.player_hands) < 4:
-                await view.process_split()
+            game = self.active_bj_games[user_id]
+            current_hand = game.player_hands[game.current_hand_index]
+            if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(game.player_hands) < 4:
+                await game.process_split()
 
     @commands.command(name="jugg", aliases=["lick"])
     @commands.cooldown(1, 600, commands.BucketType.user)
