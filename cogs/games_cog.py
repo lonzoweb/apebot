@@ -399,7 +399,8 @@ class BlackjackGame:
         card_height = dealer_strip.height
         line_height = 50
         gap = 40
-        command_height = 50 if not self.resolved else 0
+        is_revealed = getattr(self, "revealed", False)
+        command_height = 50 if not is_revealed else 0
         
         total_height = 20 + line_height + card_height + gap + (len(player_strips) * (line_height + card_height + gap)) + command_height
         
@@ -436,7 +437,7 @@ class BlackjackGame:
             curr_y += card_height + gap
             
         # Draw Commands if not resolved
-        if not self.resolved:
+        if not is_revealed:
             current_hand = self.player_hands[self.current_hand_index]
             if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(self.player_hands) < 4:
                 commands = ".HIT  .STAY or .SPLIT"
@@ -446,7 +447,7 @@ class BlackjackGame:
             curr_y += command_height
             
         # Crop trailing gap
-        if not self.resolved:
+        if not is_revealed:
             board = board.crop((0, 0, board_width, curr_y + 10))
         else:
             board = board.crop((0, 0, board_width, curr_y - gap + 10))
