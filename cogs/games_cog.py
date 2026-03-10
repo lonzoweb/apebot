@@ -126,36 +126,41 @@ class BlackjackGame:
         return f"Total: {score}"
 
     def build_text(self, show_all_dealer=False):
-        lines = ["**Blackjack**", ""]
+        # We now return a tuple: (dealer_text, player_texts_list, footer_text)
         
         # Dealer
         if show_all_dealer:
             dealer_score = self.dealer_hand.get_score()
-            dealer_status = f"Total: {dealer_score}"
+            dealer_status = f"{dealer_score}"
             if self.dealer_hand.is_blackjack(): dealer_status = "BJ!"
             elif self.dealer_hand.busted: dealer_status = f"Bust ({dealer_score})"
         else:
             dealer_score = BlackjackHand(cards=[self.dealer_hand.cards[0]]).get_score()
-            dealer_status = f"Total: {dealer_score}+"
+            dealer_status = f"{dealer_score}+"
 
-        lines.append(f"DEALER: ({dealer_status})")
+        dealer_text = f"DEALER: {dealer_status}"
         
         # Player Hands
+        player_texts = []
         for i, hand in enumerate(self.player_hands):
             status = self.get_hand_status(hand)
+            # Remove parentheses from score/status for minimal look
+            if "Total: " in status: status = status.replace("Total: ", "")
+            elif "Stay (" in status: status = status.replace("Stay (", "").replace(")", "")
+            elif "Bust (" in status: status = status.replace("Bust (", "").replace(")", "")
+            
             name = f"Hand {i+1}" if len(self.player_hands) > 1 else "YOURS"
-            lines.append(f"{name}: ({status})")
+            player_texts.append(f"{name}: {status}")
         
-        if self.resolved:
-            lines.append("\n*Cooked*")
-        else:
+        footer_text = ""
+        if not self.resolved:
             commands = ".hit .stay"
             current_hand = self.player_hands[self.current_hand_index]
             if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(self.player_hands) < 4:
                 commands += " .split"
-            lines.append(f"\n{commands}")
+            footer_text = commands
             
-        return "\n".join(lines)
+        return dealer_text, player_texts, footer_text
 
     async def process_hit(self):
         if self.resolved: return
@@ -284,41 +289,46 @@ class BlackjackGame:
         # Custom verbiage
         footer_msg = "The Dealer tips his cap. Well played." if total_payout > 0 else "The Dealer slides your tokens away. 'Next time, perhaps.'"
         
-        final_content = self.build_text(show_all_dealer=True) + "\n\n" + result_text + "\n\n*" + footer_msg + "*"
+        final_footer = f"\n*Cooked*\n\n{result_text}\n\n*{footer_msg}*"
         
-        await self.send_status(content=final_content)
+        await self.send_status(player_footer=final_footer)
         
         # Cleanup
         if self.ctx.author.id in self.cog.active_bj_games:
             del self.cog.active_bj_games[self.ctx.author.id]
 
-    async def send_status(self, content=None):
-        if not content:
-            content = self.build_text()
-            
-        files = []
+    async def send_status(self, player_footer=None):
+        dealer_text, player_texts, footer_text = self.build_text(show_all_dealer=self.resolved)
+        
         try:
-            # Use relative path from this script's location
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             cards_dir = os.path.join(base_dir, "images", "playingcards")
             
-            # Dealer hand image
+            # 1. Send Dealer Message
             dealer_cards = self.dealer_hand.cards if self.resolved else [self.dealer_hand.cards[0]]
             dealer_img = self.generate_hand_image(dealer_cards, cards_dir)
-            if dealer_img:
-                files.append(discord.File(dealer_img, filename="dealer.png"))
+            dealer_file = discord.File(dealer_img, filename="dealer.png") if dealer_img else None
+            await self.ctx.send(dealer_text, file=dealer_file)
             
-            # Current player hand image
-            player_hand = self.player_hands[self.current_hand_index]
-            player_img = self.generate_hand_image(player_hand.cards, cards_dir)
-            if player_img:
-                files.append(discord.File(player_img, filename="player.png"))
+            # 2. Send Player Message(s)
+            # If there's only one hand, we send it in one go. If multiple (splits), we iterate.
+            for i, hand in enumerate(self.player_hands):
+                hand_text = player_texts[i]
+                player_img = self.generate_hand_image(hand.cards, cards_dir)
+                player_file = discord.File(player_img, filename=f"player_{i}.png") if player_img else None
+                
+                # If it's the current/last hand, add footer
+                combined_text = hand_text
+                if i == self.current_hand_index and not self.resolved:
+                    combined_text += f"\n\n{footer_text}"
+                elif i == len(self.player_hands) - 1 and self.resolved:
+                    combined_text += f"\n{player_footer or ''}"
+                
+                await self.ctx.send(combined_text, file=player_file)
                 
         except Exception as e:
-            logger.error(f"Error generating hand images: {e}")
-        
-        await self.ctx.send(content, files=files)
-        self.last_card_filename = None
+            logger.error(f"Error in send_status: {e}")
+            await self.ctx.send("Dealer is having trouble with the cards...")
 
     def generate_hand_image(self, cards, cards_dir):
         """Combine card images into a horizontal strip."""
