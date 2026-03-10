@@ -127,11 +127,10 @@ class BlackjackGame:
         if self.resolved:
             return "" # Results sent in a separate message
             
-        commands = ".hit .stay"
         current_hand = self.player_hands[self.current_hand_index]
         if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(self.player_hands) < 4:
-            commands += " .split"
-        return commands
+            return ".HIT  .STAY or .SPLIT"
+        return ".HIT or .STAY"
 
     async def process_hit(self):
         if self.resolved: return
@@ -280,7 +279,6 @@ class BlackjackGame:
         try:
             await asyncio.sleep(60)
             if not getattr(self, "resolved", False):
-                await self.ctx.send(f"⏳ {self.ctx.author.mention}, you took too long! Auto-standing.")
                 # Force stand all remaining hands
                 while self.current_hand_index < len(self.player_hands):
                     self.player_hands[self.current_hand_index].stood = True
@@ -355,7 +353,7 @@ class BlackjackGame:
         gap = 40
         command_height = 50 if not self.resolved else 0
         
-        total_height = line_height + card_height + gap + (len(player_strips) * (line_height + card_height + gap)) + command_height
+        total_height = 20 + line_height + card_height + gap + (len(player_strips) * (line_height + card_height + gap)) + command_height
         
         # 3. Create Board
         board = Image.new("RGBA", (board_width, total_height), (0, 0, 0, 0))
@@ -391,15 +389,19 @@ class BlackjackGame:
             
         # Draw Commands if not resolved
         if not self.resolved:
-            commands = ".hit  .stay"
             current_hand = self.player_hands[self.current_hand_index]
             if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(self.player_hands) < 4:
-                commands += "  .split"
+                commands = ".HIT  .STAY or .SPLIT"
+            else:
+                commands = ".HIT or .STAY"
             draw.text((20, curr_y), commands, font=f_header, fill=(200, 200, 200))
             curr_y += command_height
             
         # Crop trailing gap
-        board = board.crop((0, 0, board_width, curr_y - gap + 10))
+        if not self.resolved:
+            board = board.crop((0, 0, board_width, curr_y + 10))
+        else:
+            board = board.crop((0, 0, board_width, curr_y - gap + 10))
             
         buf = io.BytesIO()
         board.save(buf, format="PNG")
