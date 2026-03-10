@@ -345,10 +345,12 @@ class BlackjackGame:
             combined.paste(img, (x_offset, 0))
             x_offset += img.width
             
-        # Optional: Resize if too large
-        if combined.width > 2000:
-            ratio = 2000 / combined.width
-            combined = combined.resize((2000, int(combined.height * ratio)), Image.LANCZOS)
+        # Scale down to 120px height
+        target_height = 120
+        if combined.height > target_height:
+            ratio = target_height / combined.height
+            new_width = int(combined.width * ratio)
+            combined = combined.resize((new_width, target_height), Image.LANCZOS)
             
         buf = io.BytesIO()
         combined.save(buf, format="PNG")
