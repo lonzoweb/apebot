@@ -308,11 +308,18 @@ class BlackjackGame:
         try:
             await asyncio.sleep(60)
             if not getattr(self, "resolved", False):
-                # Force stand all remaining hands
-                while self.current_hand_index < len(self.player_hands):
-                    self.player_hands[self.current_hand_index].stood = True
-                    self.current_hand_index += 1
-                await self.resolve_dealer()
+                self.resolved = True
+                # Refund all bets (original + any split bets)
+                from database import update_balance
+                import economy
+                total_refund = sum(hand.bet for hand in self.player_hands)
+                await update_balance(self.ctx.author.id, total_refund)
+                await self.ctx.send(
+                    f"⏳ **Game expired.** {self.ctx.author.mention}'s **{total_refund}** {economy.CURRENCY_SYMBOL} returned."
+                )
+                # Cleanup
+                if self.ctx.author.id in self.cog.active_bj_games:
+                    del self.cog.active_bj_games[self.ctx.author.id]
         except asyncio.CancelledError:
             pass
 
