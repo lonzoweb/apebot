@@ -509,9 +509,9 @@ class QuotesCog(commands.Cog):
                 for guild in self.bot.guilds:
                     channel = discord.utils.get(guild.text_channels, name="forum")
                     if channel:
-                        # Activity check: only drop if someone sent a message in last 15 min
+                        # Activity check: only drop if someone sent a message in last 3 min
                         import datetime
-                        cutoff = discord.utils.utcnow() - datetime.timedelta(minutes=15)
+                        cutoff = discord.utils.utcnow() - datetime.timedelta(minutes=3)
                         recent = [msg async for msg in channel.history(limit=1, after=cutoff) if not msg.author.bot]
                         if not recent:
                             logger.debug("Quote drop skipped — #forum inactive.")
