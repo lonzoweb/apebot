@@ -254,6 +254,20 @@ async def _post_or_update_hof(
         trigger_emoji=trigger_emoji
     )
 
+    # ── AUTO-QUOTE: add short text-only HoF entries to quotes DB ──
+    if (
+        message.content
+        and len(message.content.strip()) <= 25
+        and not message.attachments
+        and not message.embeds
+    ):
+        try:
+            from database import add_quote_to_db
+            await add_quote_to_db(message.content.strip())
+            logger.info(f"📜 Auto-quoted HoF entry: \"{message.content.strip()}\"")
+        except Exception as e:
+            logger.warning(f"Auto-quote failed: {e}")
+
 
 # ─────────────────────────────────────────────────────────────
 # UI HELPERS

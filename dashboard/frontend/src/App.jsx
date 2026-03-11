@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   Home, Sparkles, Gift, Layers, Database, 
-  Settings, TrendingUp, Users, Trophy, Trash2, Plus, Save, Download, RefreshCw, Bell, Info, Mail, CreditCard
+  Settings, TrendingUp, Users, Trophy, Trash2, Plus, Save, Download, RefreshCw, Bell, Info, Mail, CreditCard, BookOpen
 } from 'lucide-react';
 
 const API_BASE = window.location.origin;
@@ -34,6 +34,9 @@ function App() {
   const [pruneThreshold, setPruneThreshold] = useState('100');
   const [importOptions, setImportOptions] = useState({ importXP: true, importSettings: false });
   const [importFile, setImportFile] = useState(null);
+  const [quotes, setQuotes] = useState([]);
+  const [quotesPerDay, setQuotesPerDay] = useState(0);
+  const [newQuote, setNewQuote] = useState('');
 
   // Form states for new entries
   const [newReward, setNewReward] = useState({ level: '', role_id: '', stack_role: true });
@@ -42,6 +45,18 @@ function App() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'quotes') {
+      Promise.all([
+        axios.get(`${API_BASE}/quotes`),
+        axios.get(`${API_BASE}/quotes/settings`),
+      ]).then(([qRes, sRes]) => {
+        setQuotes(qRes.data);
+        setQuotesPerDay(sRes.data.quotes_per_day);
+      }).catch(err => console.error('Failed to fetch quotes:', err));
+    }
+  }, [activeTab]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -194,6 +209,7 @@ function App() {
     { id: 'rewards', icon: Gift, label: 'Reward Roles' },
     { id: 'rank', icon: CreditCard, label: 'Rank Card' },
     { id: 'multipliers', icon: Layers, label: 'Multipliers' },
+    { id: 'quotes', icon: BookOpen, label: 'Quotes' },
     { id: 'data', icon: Database, label: 'Data Management' },
   ];
 
@@ -1022,6 +1038,111 @@ function App() {
               >
                 Import!
               </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'quotes' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="card">
+              <h2 style={{ marginBottom: '0.25rem' }}>Quote Drops</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>The bot will randomly drop quotes in #forum throughout the day. Set how many times per day it should happen.</p>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                <label className="label" style={{ margin: 0, whiteSpace: 'nowrap' }}>Drops per day</label>
+                <input 
+                  className="input" type="number" min="0" max="100" style={{ width: '100px' }}
+                  value={quotesPerDay}
+                  onChange={(e) => setQuotesPerDay(parseInt(e.target.value) || 0)}
+                />
+                <button 
+                  className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}
+                  onClick={async () => {
+                    try {
+                      await axios.post(`${API_BASE}/quotes/settings`, { quotes_per_day: quotesPerDay });
+                      alert('✅ Quote drop frequency saved!');
+                    } catch (err) { alert('Failed to save setting'); }
+                  }}
+                >
+                  <Save size={14} style={{ marginRight: '0.4rem' }} /> Save
+                </button>
+              </div>
+
+              <div style={{ padding: '0.75rem 1rem', background: 'rgba(99,102,241,0.08)', borderRadius: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                <Info size={14} style={{ marginRight: '0.4rem', verticalAlign: '-2px' }} />
+                Quotes are also added when someone replies to a message with <code>=quote</code>, and text-only Hall of Fame entries (≤25 chars) are auto-added. Pinging the bot has a 40% chance of triggering a random quote.
+              </div>
+            </div>
+
+            <div className="card">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <h3 style={{ margin: 0 }}>All Quotes ({quotes.length})</h3>
+                <button className="btn" style={{ fontSize: '0.8rem' }} onClick={async () => {
+                  try {
+                    const [qRes, sRes] = await Promise.all([
+                      axios.get(`${API_BASE}/quotes`),
+                      axios.get(`${API_BASE}/quotes/settings`),
+                    ]);
+                    setQuotes(qRes.data);
+                    setQuotesPerDay(sRes.data.quotes_per_day);
+                  } catch (err) { console.error(err); }
+                }}>
+                  <RefreshCw size={14} style={{ marginRight: '0.3rem' }} /> Refresh
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                <input 
+                  className="input" style={{ flex: 1 }}
+                  placeholder="Add a new quote..."
+                  value={newQuote}
+                  onChange={(e) => setNewQuote(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newQuote.trim()) {
+                      axios.post(`${API_BASE}/quotes`, { quote: newQuote.trim() }).then(() => {
+                        setQuotes(prev => [{ id: Date.now(), quote: newQuote.trim() }, ...prev]);
+                        setNewQuote('');
+                      }).catch(() => alert('Failed to add quote'));
+                    }
+                  }}
+                />
+                <button 
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    if (!newQuote.trim()) return;
+                    try {
+                      await axios.post(`${API_BASE}/quotes`, { quote: newQuote.trim() });
+                      setQuotes(prev => [{ id: Date.now(), quote: newQuote.trim() }, ...prev]);
+                      setNewQuote('');
+                    } catch (err) { alert('Failed to add quote'); }
+                  }}
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+
+              <div style={{ maxHeight: '500px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {quotes.map(q => (
+                  <div key={q.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ flex: 1, fontSize: '0.9rem' }}>{q.quote}</span>
+                    <button
+                      className="btn"
+                      style={{ color: 'var(--danger)', background: 'transparent', padding: '0.25rem 0.5rem', flexShrink: 0 }}
+                      onClick={async () => {
+                        try {
+                          await axios.delete(`${API_BASE}/quotes/${q.id}`);
+                          setQuotes(prev => prev.filter(x => x.id !== q.id));
+                        } catch (err) { alert('Delete failed'); }
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+                {quotes.length === 0 && (
+                  <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>No quotes yet. Add one above or use <code>=quote</code> in Discord!</p>
+                )}
+              </div>
             </div>
           </div>
         )}

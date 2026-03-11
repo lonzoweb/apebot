@@ -342,6 +342,63 @@ async def export_txt():
     return PlainTextResponse("\n".join(lines), media_type="text/plain",
         headers={"Content-Disposition": "attachment; filename=apeiron_export.txt"})
 
+# ============================================================
+# QUOTE MANAGEMENT ENDPOINTS
+# ============================================================
+
+class QuoteAdd(BaseModel):
+    quote: str
+
+class QuoteDropSetting(BaseModel):
+    quotes_per_day: int
+
+@app.get("/quotes")
+async def get_quotes():
+    """Return all quotes."""
+    async with aiosqlite.connect(DB_FILE) as db:
+        async with db.execute("SELECT id, quote FROM quotes ORDER BY id DESC") as cursor:
+            rows = await cursor.fetchall()
+            return [{"id": row[0], "quote": row[1]} for row in rows]
+
+@app.post("/quotes")
+async def add_quote(data: QuoteAdd):
+    """Add a new quote."""
+    if not data.quote.strip():
+        raise HTTPException(status_code=400, detail="Quote cannot be empty.")
+    async with aiosqlite.connect(DB_FILE) as db:
+        await db.execute("INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (data.quote.strip(),))
+        await db.commit()
+    return {"status": "ok"}
+
+@app.delete("/quotes/{quote_id}")
+async def delete_quote(quote_id: int):
+    """Delete a quote by ID."""
+    async with aiosqlite.connect(DB_FILE) as db:
+        await db.execute("DELETE FROM quotes WHERE id = ?", (quote_id,))
+        await db.commit()
+    return {"status": "ok"}
+
+@app.get("/quotes/settings")
+async def get_quote_settings():
+    """Get quote drop frequency setting."""
+    async with aiosqlite.connect(DB_FILE) as db:
+        async with db.execute(
+            "SELECT setting_value FROM global_settings WHERE setting_key = 'quotes_per_day'"
+        ) as cursor:
+            row = await cursor.fetchone()
+            return {"quotes_per_day": int(row[0]) if row else 0}
+
+@app.post("/quotes/settings")
+async def update_quote_settings(data: QuoteDropSetting):
+    """Update quote drop frequency."""
+    async with aiosqlite.connect(DB_FILE) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('quotes_per_day', ?)",
+            (str(data.quotes_per_day),)
+        )
+        await db.commit()
+    return {"status": "ok"}
+
 # --- Serve Frontend ---
 # Search for frontend/dist relative to project root
 base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

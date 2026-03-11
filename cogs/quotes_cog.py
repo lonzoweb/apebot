@@ -419,7 +419,83 @@ class QuotesCog(commands.Cog):
             embed.set_footer(text=f"Chosen by {member.display_name} via reaction")
             await channel.send(embed=embed)
 
+    # ── =quote REPLY LISTENER ─────────────────────────────────
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Handle =quote (reply-based quote saving) and bot ping quote drops."""
+        if message.author.bot or not message.guild:
+            return
 
+        content = message.content.strip()
+
+        # --- =quote: save the replied-to message as a quote ---
+        if content.lower() == "=quote" and message.reference and message.reference.message_id:
+            try:
+                ref_msg = await message.channel.fetch_message(message.reference.message_id)
+                if not ref_msg.content or len(ref_msg.content) > 2000:
+                    return await message.reply("❌ That message can't be quoted.", mention_author=False)
+                
+                quote_text = ref_msg.content.strip()
+                await add_quote_to_db(quote_text)
+                await message.reply(f"📜 Quote added: *\"{quote_text[:100]}{'...' if len(quote_text) > 100 else ''}\"*", mention_author=False)
+            except Exception as e:
+                logger.error(f"Error in =quote: {e}")
+            return
+
+        # --- Bot ping: 40% chance to drop a random quote ---
+        if self.bot.user in message.mentions:
+            if random.random() < 0.40:
+                quotes = await load_quotes_from_db()
+                if quotes:
+                    quote = random.choice(quotes)
+                    await message.reply(f"📜 *\"{quote}\"*", mention_author=False)
+
+    # ── QUOTE DROP LOOP ───────────────────────────────────────
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not hasattr(self, '_quote_drop_started'):
+            self._quote_drop_started = True
+            self.bot.loop.create_task(self._quote_drop_loop())
+
+    async def _quote_drop_loop(self):
+        """Background task that drops random quotes to #forum based on quotes_per_day setting."""
+        await self.bot.wait_until_ready()
+        
+        while not self.bot.is_closed():
+            try:
+                from database import get_setting
+                per_day = await get_setting("quotes_per_day", "0")
+                per_day = int(per_day)
+                
+                if per_day <= 0:
+                    await asyncio.sleep(300)  # Check again in 5 minutes
+                    continue
+                
+                # Calculate interval: spread drops evenly across 24 hours
+                interval = (24 * 3600) / per_day
+                # Add some randomness (±25%)
+                jitter = interval * 0.25
+                wait_time = interval + random.uniform(-jitter, jitter)
+                wait_time = max(wait_time, 60)  # At least 1 minute between drops
+                
+                await asyncio.sleep(wait_time)
+                
+                quotes = await load_quotes_from_db()
+                if not quotes:
+                    continue
+                
+                # Find #forum channel
+                for guild in self.bot.guilds:
+                    channel = discord.utils.get(guild.text_channels, name="forum")
+                    if channel:
+                        quote = random.choice(quotes)
+                        await channel.send(f"📜 *\"{quote}\"*")
+                        logger.info(f"📜 Quote drop: {quote[:60]}...")
+                        break
+                        
+            except Exception as e:
+                logger.error(f"Error in quote drop loop: {e}", exc_info=True)
+                await asyncio.sleep(300)
 
 
 async def setup(bot):
