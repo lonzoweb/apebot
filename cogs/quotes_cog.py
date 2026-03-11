@@ -475,59 +475,44 @@ class QuotesCog(commands.Cog):
                 except Exception as e:
                     logger.error(f"Error in ping quote: {e}")
 
-    # ── QUOTE DROP LOOP ───────────────────────────────────────
-    @commands.Cog.listener()
-    async def on_ready(self):
-        if not hasattr(self, '_quote_drop_started'):
-            self._quote_drop_started = True
-            self.bot.loop.create_task(self._quote_drop_loop())
+        # --- Quote drop: piggyback on #forum messages ---
+        if hasattr(message.channel, 'name') and message.channel.name == "forum":
+            await self._maybe_drop_quote(message.channel)
 
-    async def _quote_drop_loop(self):
-        """Background task that drops random quotes from quote_drops to #forum when chat is active."""
-        await self.bot.wait_until_ready()
-        
-        while not self.bot.is_closed():
-            try:
-                from database import get_setting
-                per_day = await get_setting("quote_drops_per_day", "0")
-                per_day = int(per_day)
-                
-                if per_day <= 0:
-                    await asyncio.sleep(300)  # Check again in 5 minutes
-                    continue
-                
-                # Calculate interval: spread drops evenly across 24 hours
-                interval = (24 * 3600) / per_day
-                # Add some randomness (±25%)
-                jitter = interval * 0.25
-                wait_time = interval + random.uniform(-jitter, jitter)
-                wait_time = max(wait_time, 60)  # At least 1 minute between drops
-                
-                await asyncio.sleep(wait_time)
-                
-                # Find #forum channel and check activity before dropping
-                for guild in self.bot.guilds:
-                    channel = discord.utils.get(guild.text_channels, name="forum")
-                    if channel:
-                        # Activity check: only drop if someone sent a message in last 3 min
-                        import datetime
-                        cutoff = discord.utils.utcnow() - datetime.timedelta(minutes=3)
-                        recent = [msg async for msg in channel.history(limit=1, after=cutoff) if not msg.author.bot]
-                        if not recent:
-                            logger.debug("Quote drop skipped — #forum inactive.")
-                            break
+    # ── QUOTE DROP (message-driven, no polling) ────────────────
+    # Piggybacks on on_message — when a human messages #forum,
+    # check if enough time has passed to drop a quote.
+    _last_quote_drop = 0  # epoch timestamp of last drop
+    _next_drop_interval = 0  # seconds until next eligible drop
 
-                        from database import get_random_quote_drop
-                        quote = await get_random_quote_drop()
-                        if quote:
-                            await channel.send(quote)
-                            logger.info(f"📜 Quote drop: {quote[:60]}...")
-                        break
-                        
-            except Exception as e:
-                logger.error(f"Error in quote drop loop: {e}", exc_info=True)
-                await asyncio.sleep(300)
+    async def _maybe_drop_quote(self, channel):
+        """Check if it's time to drop a quote in #forum. Called on every #forum message."""
+        import time as _t
+
+        now = _t.time()
+        if now < self._last_quote_drop + self._next_drop_interval:
+            return  # Not time yet
+
+        from database import get_setting
+        per_day = int(await get_setting("quote_drops_per_day", "0"))
+        if per_day <= 0:
+            return
+
+        from database import get_random_quote_drop
+        quote = await get_random_quote_drop()
+        if not quote:
+            return
+
+        await channel.send(quote)
+        logger.info(f"📜 Quote drop: {quote[:60]}...")
+
+        # Calculate next interval with jitter
+        interval = (24 * 3600) / per_day
+        jitter = interval * 0.25
+        self._next_drop_interval = max(60, interval + random.uniform(-jitter, jitter))
+        self._last_quote_drop = now
 
 
 async def setup(bot):
     await bot.add_cog(QuotesCog(bot))
+
