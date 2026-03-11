@@ -388,6 +388,48 @@ async def init_db():
                 pass # Already exists
 
             await conn.commit()
+
+        # ── ONE-TIME BACKFILL: HoF → quote_drops (REMOVE AFTER FIRST DEPLOY) ──
+        try:
+            import re as _re
+            _emoji_pat = _re.compile(
+                r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF'
+                r'\U0001F1E0-\U0001F1FF\U00002702-\U000027B0\U000024C2-\U0001F251'
+                r'\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF'
+                r'\U00002600-\U000026FF\U0000FE0F]+'
+            )
+            async with get_db() as conn:
+                async with conn.execute("""
+                    SELECT content, author_id FROM hof_entries
+                    WHERE hof_message_id IS NOT NULL
+                      AND content IS NOT NULL AND content != ''
+                      AND (image_url IS NULL OR image_url = '')
+                      AND (voice_url IS NULL OR voice_url = '')
+                """) as cursor:
+                    hof_rows = await cursor.fetchall()
+                
+                _added = 0
+                for _content, _author in hof_rows:
+                    _text = _content.strip()
+                    _text = _re.sub(r'<a?:\w+:\d+>', '', _text)
+                    _text = _emoji_pat.sub('', _text).strip()
+                    if _re.search(r'https?://\S+', _text):
+                        continue
+                    if not _text or len(_text) > 25:
+                        continue
+                    import time as _t
+                    await conn.execute(
+                        "INSERT OR IGNORE INTO quote_drops (quote, added_by, added_at) VALUES (?, ?, ?)",
+                        (_text, _author, _t.time())
+                    )
+                    _added += 1
+                await conn.commit()
+                if _added:
+                    logger.info(f"📜 Backfilled {_added} HoF entries into quote_drops.")
+        except Exception as _e:
+            logger.warning(f"HoF backfill skipped or failed: {_e}")
+        # ── END ONE-TIME BACKFILL ──
+
         logger.info("✅ Database tables initialized (all modules unified).")
     except Exception as e:
         logger.error(f"Error initializing database: {e}", exc_info=True)

@@ -471,7 +471,7 @@ class QuotesCog(commands.Cog):
                     from database import get_random_quote_drop
                     quote = await get_random_quote_drop()
                     if quote:
-                        await message.reply(f"📜 *\"{quote}\"*", mention_author=False)
+                        await message.reply(quote, mention_author=False)
                 except Exception as e:
                     logger.error(f"Error in ping quote: {e}")
 
@@ -520,7 +520,7 @@ class QuotesCog(commands.Cog):
                         from database import get_random_quote_drop
                         quote = await get_random_quote_drop()
                         if quote:
-                            await channel.send(f"📜 *\"{quote}\"*")
+                            await channel.send(quote)
                             logger.info(f"📜 Quote drop: {quote[:60]}...")
                         break
                         
