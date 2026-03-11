@@ -503,6 +503,7 @@ class QuotesCog(commands.Cog):
         if not quote:
             return
 
+        await asyncio.sleep(5)
         await channel.send(quote)
         logger.info(f"📜 Quote drop: {quote[:60]}...")
 
