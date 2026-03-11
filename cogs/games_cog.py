@@ -199,8 +199,8 @@ class BlackjackGame:
         await self.send_status()
         
         # If current hand hit 21, move to next
-        if hand.get_score() == 21:
-            hand.stood = True
+        if hand.get_score() >= 21:
+            if hand.get_score() == 21: hand.stood = True
             if not self.move_to_next_hand():
                 await asyncio.sleep(1.5)
                 await self.resolve_dealer()
@@ -358,7 +358,7 @@ class BlackjackGame:
         # Calculate scores/status
         if is_revealed:
             d_score = self.dealer_hand.get_score()
-            if self.dealer_hand.is_blackjack(): d_status = "BJ!"
+            if self.dealer_hand.is_blackjack(): d_status = "(BLACKJACK!)"
             elif self.dealer_hand.busted: d_status = f"Bust ({d_score})"
             else: d_status = f"{d_score}"
         else:
@@ -403,9 +403,9 @@ class BlackjackGame:
 
         for i, hand in enumerate(self.player_hands):
             score = hand.get_score()
-            if hand.is_blackjack(): status = "BJ!"
-            elif hand.busted: status = f"Bust ({score})"
-            elif hand.stood: status = f"{score} (Stay)"
+            if hand.is_blackjack(): status = "(BLACKJACK!)"
+            elif hand.busted: status = f"{score} (BUST)"
+            elif hand.stood: status = f"{score} (STAY)"
             else: status = f"{score}"
             
             user_name = self.ctx.author.display_name.upper()
@@ -1302,8 +1302,14 @@ class GamesCog(commands.Cog):
         user_id = ctx.author.id
         
         # Concurrency check
-        if user_id in self.active_bj_games:
-            return await ctx.reply("❌ BJ in progress.", mention_author=False)
+        if self.active_bj_games:
+            if user_id in self.active_bj_games:
+                return await ctx.reply("❌ You already have a BJ game in progress.", mention_author=False)
+            try:
+                await ctx.message.delete()
+            except Exception:
+                pass
+            return
 
         balance = await get_balance(user_id)
 
@@ -1343,27 +1349,45 @@ class GamesCog(commands.Cog):
     async def hit_command(self, ctx):
         """Hit in an active Blackjack game."""
         user_id = ctx.author.id
-        if user_id in self.active_bj_games:
-            game = self.active_bj_games[user_id]
-            await game.process_hit()
+        if self.active_bj_games:
+            if user_id in self.active_bj_games:
+                game = self.active_bj_games[user_id]
+                await game.process_hit()
+            else:
+                try:
+                    await ctx.message.delete()
+                except Exception:
+                    pass
 
     @commands.command(name="stay", aliases=["stand"])
     async def stay_command(self, ctx):
         """Stay in an active Blackjack game."""
         user_id = ctx.author.id
-        if user_id in self.active_bj_games:
-            game = self.active_bj_games[user_id]
-            await game.process_stand()
+        if self.active_bj_games:
+            if user_id in self.active_bj_games:
+                game = self.active_bj_games[user_id]
+                await game.process_stand()
+            else:
+                try:
+                    await ctx.message.delete()
+                except Exception:
+                    pass
 
     @commands.command(name="split")
     async def split_command(self, ctx):
         """Split in an active Blackjack game."""
         user_id = ctx.author.id
-        if user_id in self.active_bj_games:
-            game = self.active_bj_games[user_id]
-            current_hand = game.player_hands[game.current_hand_index]
-            if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(game.player_hands) < 4:
-                await game.process_split()
+        if self.active_bj_games:
+            if user_id in self.active_bj_games:
+                game = self.active_bj_games[user_id]
+                current_hand = game.player_hands[game.current_hand_index]
+                if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(game.player_hands) < 4:
+                    await game.process_split()
+            else:
+                try:
+                    await ctx.message.delete()
+                except Exception:
+                    pass
 
     @commands.command(name="jugg", aliases=["lick"])
     @commands.cooldown(1, 600, commands.BucketType.user)
