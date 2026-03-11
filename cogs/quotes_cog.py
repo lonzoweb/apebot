@@ -445,10 +445,15 @@ class QuotesCog(commands.Cog):
         # --- Bot ping: 40% chance to drop a random quote ---
         if self.bot.user in message.mentions:
             if random.random() < 0.40:
-                quotes = await load_quotes_from_db()
-                if quotes:
-                    quote = random.choice(quotes)
-                    await message.reply(f"📜 *\"{quote}\"*", mention_author=False)
+                try:
+                    from database import get_db
+                    async with get_db() as conn:
+                        async with conn.execute("SELECT quote FROM quotes ORDER BY RANDOM() LIMIT 1") as cur:
+                            row = await cur.fetchone()
+                    if row:
+                        await message.reply(f"📜 *\"{row[0]}\"*", mention_author=False)
+                except Exception as e:
+                    logger.error(f"Error in ping quote: {e}")
 
     # ── QUOTE DROP LOOP ───────────────────────────────────────
     @commands.Cog.listener()
@@ -480,17 +485,17 @@ class QuotesCog(commands.Cog):
                 
                 await asyncio.sleep(wait_time)
                 
-                quotes = await load_quotes_from_db()
-                if not quotes:
-                    continue
-                
-                # Find #forum channel
+                # Find #forum channel and drop a random quote
                 for guild in self.bot.guilds:
                     channel = discord.utils.get(guild.text_channels, name="forum")
                     if channel:
-                        quote = random.choice(quotes)
-                        await channel.send(f"📜 *\"{quote}\"*")
-                        logger.info(f"📜 Quote drop: {quote[:60]}...")
+                        from database import get_db
+                        async with get_db() as conn:
+                            async with conn.execute("SELECT quote FROM quotes ORDER BY RANDOM() LIMIT 1") as cur:
+                                row = await cur.fetchone()
+                        if row:
+                            await channel.send(f"📜 *\"{row[0]}\"*")
+                            logger.info(f"📜 Quote drop: {row[0][:60]}...")
                         break
                         
             except Exception as e:

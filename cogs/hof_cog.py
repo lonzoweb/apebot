@@ -295,7 +295,7 @@ class HofCog(commands.Cog):
 
     @tasks.loop(hours=24)
     async def cleanup_task(self):
-        """Purge non-HOF entries older than 30 days."""
+        """Purge non-HOF entries older than 30 days and prune stale locks."""
         thirty_days_ago = time.time() - (30 * 24 * 60 * 60)
         async with get_db() as conn:
             await conn.execute(
@@ -303,6 +303,9 @@ class HofCog(commands.Cog):
                 (thirty_days_ago,)
             )
             await conn.commit()
+        # Prune reaction locks — if dict gets large, clear it entirely
+        if len(self.locks) > 500:
+            self.locks.clear()
         logger.info("🧹 Cleaned up old Hall of Fame rejects.")
 
     @cleanup_task.before_loop

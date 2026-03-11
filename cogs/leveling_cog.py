@@ -99,6 +99,17 @@ class LevelingCog(commands.Cog):
         while not self.bot.is_closed():
             await asyncio.sleep(300) # Every 5 minutes
             await self.refresh_cache_now()
+            self._prune_stale_dicts()
+
+    def _prune_stale_dicts(self):
+        """Prune stale entries from cooldown and sync tracking dicts to prevent unbounded growth."""
+        now = time.time()
+        # xp_cooldowns: entries older than 5 minutes are useless (cooldown is ~60s)
+        self.xp_cooldowns = {uid: t for uid, t in self.xp_cooldowns.items() if now - t < 300}
+        # profile_sync_times: entries older than 13 hours are useless (sync every 12h)
+        self.profile_sync_times = {uid: t for uid, t in self.profile_sync_times.items() if now - t < 46800}
+        # rank cooldowns: entries older than 1 minute are useless (cooldown is 10s)
+        self._rank_cooldowns = {uid: t for uid, t in self._rank_cooldowns.items() if now - t < 60}
 
     async def role_sync_task(self):
         """Periodically sync server roles to cache for the dashboard."""
