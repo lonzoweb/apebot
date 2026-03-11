@@ -82,9 +82,10 @@ async def flush_activity_to_db():
 
             # The context manager (get_db) handles conn.commit()
 
-        logger.info(
-            f"✅ Activity data flushed to database - Hourly: {len(hourly_data)} keys, Users: {len(user_data)} keys"
-        )
+        if hourly_data or user_data:
+            logger.info(
+                f"✅ Activity data flushed to database - Hourly: {len(hourly_data)} keys, Users: {len(user_data)} keys"
+            )
 
     except Exception as e:
         logger.error(f"Error flushing activity: {e}", exc_info=True)

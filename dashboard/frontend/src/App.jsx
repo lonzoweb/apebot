@@ -296,7 +296,17 @@ function App() {
       <div className="main-content">
         <header className="header">
           <h1>{navItems.find(i => i.id === activeTab).label}</h1>
-          <p>Manage your server's leveling ecosystem.</p>
+          <p>{{
+            home: "Server stats and leaderboard at a glance.",
+            xp: "Configure how members earn XP.",
+            notifications: "Customize level-up messages and delivery.",
+            rewards: "Assign roles automatically at level milestones.",
+            rank: "Personalize rank card appearance and behavior.",
+            multipliers: "Boost XP rates for specific roles or channels.",
+            quotes: "Manage the quote drop bank and frequency.",
+            daily_quotes: "Manage quotes for the .quote command and daily posts.",
+            data: "Export, import, reset, and prune server data.",
+          }[activeTab]}</p>
         </header>
 
         {activeTab === 'home' && (
@@ -484,7 +494,7 @@ function App() {
                 className="input" 
                 style={{ width: '100%', minHeight: '120px', fontFamily: 'monospace', fontSize: '0.9rem', padding: '1rem', marginBottom: '1.5rem' }}
                 value={pendingSettings.lvl_msg_template || ''}
-                onChange={(e) => setSettings({ ...settings, lvl_msg_template: e.target.value })}
+                onChange={(e) => setPendingSettings({ ...pendingSettings, lvl_msg_template: e.target.value })}
                 onBlur={(e) => updateSetting('lvl_msg_template', e.target.value)}
               />
 

@@ -403,7 +403,7 @@ class BlackjackGame:
 
         for i, hand in enumerate(self.player_hands):
             score = hand.get_score()
-            if hand.is_blackjack(): status = "(BLACKJACK!)"
+            if score == 21: status = "(BLACKJACK!)"
             elif hand.busted: status = f"{score} (BUST)"
             elif hand.stood: status = f"{score} (STAY)"
             else: status = f"{score}"
