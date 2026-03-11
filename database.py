@@ -185,6 +185,18 @@ async def init_db():
             """
             )
 
+            # 📜 Quote Drops Table (separate from daily quotes)
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS quote_drops (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    quote TEXT UNIQUE,
+                    added_by TEXT,
+                    added_at REAL
+                )
+            """
+            )
+
             # Add indexes
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_quotes_text ON quotes(quote)")
             await conn.execute(
@@ -875,6 +887,54 @@ async def add_quote_to_db(quote):
                     logger.warning(f"Quote already exists (skipped): {quote[:50]}...")
     except Exception as e:
         logger.error(f"Error adding quote: {e}")
+        raise
+
+
+# ============================================================
+# QUOTE DROPS (Separate from daily quotes)
+# ============================================================
+
+async def add_quote_drop(quote: str, added_by: str = None):
+    """Add a quote to the quote drops table."""
+    import time as _time
+    try:
+        async with get_db() as conn:
+            await conn.execute(
+                "INSERT OR IGNORE INTO quote_drops (quote, added_by, added_at) VALUES (?, ?, ?)",
+                (quote, added_by, _time.time())
+            )
+    except Exception as e:
+        logger.error(f"Error adding quote drop: {e}")
+        raise
+
+async def get_random_quote_drop():
+    """Get a single random quote drop."""
+    try:
+        async with get_db() as conn:
+            async with conn.execute("SELECT quote FROM quote_drops ORDER BY RANDOM() LIMIT 1") as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else None
+    except Exception as e:
+        logger.error(f"Error getting random quote drop: {e}")
+        return None
+
+async def get_all_quote_drops():
+    """Get all quote drops (for dashboard)."""
+    try:
+        async with get_db() as conn:
+            async with conn.execute("SELECT id, quote, added_by, added_at FROM quote_drops ORDER BY id DESC") as cursor:
+                return await cursor.fetchall()
+    except Exception as e:
+        logger.error(f"Error loading quote drops: {e}")
+        return []
+
+async def delete_quote_drop(quote_id: int):
+    """Delete a quote drop by ID."""
+    try:
+        async with get_db() as conn:
+            await conn.execute("DELETE FROM quote_drops WHERE id = ?", (quote_id,))
+    except Exception as e:
+        logger.error(f"Error deleting quote drop: {e}")
         raise
 
 

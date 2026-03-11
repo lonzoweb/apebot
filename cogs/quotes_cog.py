@@ -422,36 +422,56 @@ class QuotesCog(commands.Cog):
     # ── =quote REPLY LISTENER ─────────────────────────────────
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        """Handle =quote (reply-based quote saving) and bot ping quote drops."""
+        """Handle =quote (reply-based quote saving to quote_drops) and bot ping quote drops."""
         if message.author.bot or not message.guild:
             return
 
         content = message.content.strip()
 
-        # --- =quote: save the replied-to message as a quote ---
+        # --- =quote: save the replied-to message as a quote drop ---
         if content.lower() == "=quote" and message.reference and message.reference.message_id:
             try:
                 ref_msg = await message.channel.fetch_message(message.reference.message_id)
-                if not ref_msg.content or len(ref_msg.content) > 2000:
-                    return await message.reply("❌ That message can't be quoted.", mention_author=False)
-                
+                if not ref_msg.content:
+                    return await message.reply("❌ That message has no text to quote.", mention_author=False)
+
                 quote_text = ref_msg.content.strip()
-                await add_quote_to_db(quote_text)
-                await message.reply(f"📜 Quote added: *\"{quote_text[:100]}{'...' if len(quote_text) > 100 else ''}\"*", mention_author=False)
+
+                # Reject if it contains URLs or is just a link
+                import re
+                if re.search(r'https?://\S+', quote_text):
+                    return await message.reply("❌ Can't quote messages with links.", mention_author=False)
+
+                # Strip emoji (both unicode and custom Discord emoji)
+                # Remove custom Discord emoji <:name:id> and <a:name:id>
+                quote_text = re.sub(r'<a?:\w+:\d+>', '', quote_text)
+                # Remove unicode emoji
+                quote_text = re.sub(
+                    r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF'
+                    r'\U0001F1E0-\U0001F1FF\U00002702-\U000027B0\U000024C2-\U0001F251'
+                    r'\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF'
+                    r'\U00002600-\U000026FF\U0000FE0F]+', '', quote_text
+                )
+                quote_text = quote_text.strip()
+
+                if not quote_text or len(quote_text) > 2000:
+                    return await message.reply("❌ Nothing quotable after cleanup.", mention_author=False)
+
+                from database import add_quote_drop
+                await add_quote_drop(quote_text, str(message.author.id))
+                await message.reply(f"📜 Quote saved: *\"{quote_text[:100]}{'...' if len(quote_text) > 100 else ''}\"*", mention_author=False)
             except Exception as e:
                 logger.error(f"Error in =quote: {e}")
             return
 
-        # --- Bot ping: 40% chance to drop a random quote ---
+        # --- Bot ping: 40% chance to drop a random quote from quote_drops ---
         if self.bot.user in message.mentions:
             if random.random() < 0.40:
                 try:
-                    from database import get_db
-                    async with get_db() as conn:
-                        async with conn.execute("SELECT quote FROM quotes ORDER BY RANDOM() LIMIT 1") as cur:
-                            row = await cur.fetchone()
-                    if row:
-                        await message.reply(f"📜 *\"{row[0]}\"*", mention_author=False)
+                    from database import get_random_quote_drop
+                    quote = await get_random_quote_drop()
+                    if quote:
+                        await message.reply(f"📜 *\"{quote}\"*", mention_author=False)
                 except Exception as e:
                     logger.error(f"Error in ping quote: {e}")
 
@@ -463,13 +483,13 @@ class QuotesCog(commands.Cog):
             self.bot.loop.create_task(self._quote_drop_loop())
 
     async def _quote_drop_loop(self):
-        """Background task that drops random quotes to #forum based on quotes_per_day setting."""
+        """Background task that drops random quotes from quote_drops to #forum when chat is active."""
         await self.bot.wait_until_ready()
         
         while not self.bot.is_closed():
             try:
                 from database import get_setting
-                per_day = await get_setting("quotes_per_day", "0")
+                per_day = await get_setting("quote_drops_per_day", "0")
                 per_day = int(per_day)
                 
                 if per_day <= 0:
@@ -485,17 +505,23 @@ class QuotesCog(commands.Cog):
                 
                 await asyncio.sleep(wait_time)
                 
-                # Find #forum channel and drop a random quote
+                # Find #forum channel and check activity before dropping
                 for guild in self.bot.guilds:
                     channel = discord.utils.get(guild.text_channels, name="forum")
                     if channel:
-                        from database import get_db
-                        async with get_db() as conn:
-                            async with conn.execute("SELECT quote FROM quotes ORDER BY RANDOM() LIMIT 1") as cur:
-                                row = await cur.fetchone()
-                        if row:
-                            await channel.send(f"📜 *\"{row[0]}\"*")
-                            logger.info(f"📜 Quote drop: {row[0][:60]}...")
+                        # Activity check: only drop if someone sent a message in last 15 min
+                        import datetime
+                        cutoff = discord.utils.utcnow() - datetime.timedelta(minutes=15)
+                        recent = [msg async for msg in channel.history(limit=1, after=cutoff) if not msg.author.bot]
+                        if not recent:
+                            logger.debug("Quote drop skipped — #forum inactive.")
+                            break
+
+                        from database import get_random_quote_drop
+                        quote = await get_random_quote_drop()
+                        if quote:
+                            await channel.send(f"📜 *\"{quote}\"*")
+                            logger.info(f"📜 Quote drop: {quote[:60]}...")
                         break
                         
             except Exception as e:

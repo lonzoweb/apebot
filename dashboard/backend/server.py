@@ -343,18 +343,15 @@ async def export_txt():
         headers={"Content-Disposition": "attachment; filename=apeiron_export.txt"})
 
 # ============================================================
-# QUOTE MANAGEMENT ENDPOINTS
+# DAILY QUOTES MANAGEMENT (existing .quote system)
 # ============================================================
 
 class QuoteAdd(BaseModel):
     quote: str
 
-class QuoteDropSetting(BaseModel):
-    quotes_per_day: int
-
 @app.get("/quotes")
 async def get_quotes():
-    """Return all quotes."""
+    """Return all daily quotes."""
     async with aiosqlite.connect(DB_FILE) as db:
         async with db.execute("SELECT id, quote FROM quotes ORDER BY id DESC") as cursor:
             rows = await cursor.fetchall()
@@ -362,7 +359,7 @@ async def get_quotes():
 
 @app.post("/quotes")
 async def add_quote(data: QuoteAdd):
-    """Add a new quote."""
+    """Add a new daily quote."""
     if not data.quote.strip():
         raise HTTPException(status_code=400, detail="Quote cannot be empty.")
     async with aiosqlite.connect(DB_FILE) as db:
@@ -372,29 +369,69 @@ async def add_quote(data: QuoteAdd):
 
 @app.delete("/quotes/{quote_id}")
 async def delete_quote(quote_id: int):
-    """Delete a quote by ID."""
+    """Delete a daily quote by ID."""
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute("DELETE FROM quotes WHERE id = ?", (quote_id,))
         await db.commit()
     return {"status": "ok"}
 
-@app.get("/quotes/settings")
-async def get_quote_settings():
+# ============================================================
+# QUOTE DROPS (new =quote / random drop system)
+# ============================================================
+
+class QuoteDropAdd(BaseModel):
+    quote: str
+
+class QuoteDropSetting(BaseModel):
+    quote_drops_per_day: int
+
+@app.get("/quote-drops")
+async def get_quote_drops():
+    """Return all quote drops."""
+    async with aiosqlite.connect(DB_FILE) as db:
+        async with db.execute("SELECT id, quote, added_by, added_at FROM quote_drops ORDER BY id DESC") as cursor:
+            rows = await cursor.fetchall()
+            return [{"id": row[0], "quote": row[1], "added_by": row[2], "added_at": row[3]} for row in rows]
+
+@app.post("/quote-drops")
+async def add_quote_drop_endpoint(data: QuoteDropAdd):
+    """Add a new quote drop."""
+    if not data.quote.strip():
+        raise HTTPException(status_code=400, detail="Quote cannot be empty.")
+    import time
+    async with aiosqlite.connect(DB_FILE) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO quote_drops (quote, added_by, added_at) VALUES (?, ?, ?)",
+            (data.quote.strip(), "dashboard", time.time())
+        )
+        await db.commit()
+    return {"status": "ok"}
+
+@app.delete("/quote-drops/{drop_id}")
+async def delete_quote_drop_endpoint(drop_id: int):
+    """Delete a quote drop by ID."""
+    async with aiosqlite.connect(DB_FILE) as db:
+        await db.execute("DELETE FROM quote_drops WHERE id = ?", (drop_id,))
+        await db.commit()
+    return {"status": "ok"}
+
+@app.get("/quote-drops/settings")
+async def get_quote_drop_settings():
     """Get quote drop frequency setting."""
     async with aiosqlite.connect(DB_FILE) as db:
         async with db.execute(
-            "SELECT setting_value FROM global_settings WHERE setting_key = 'quotes_per_day'"
+            "SELECT setting_value FROM global_settings WHERE setting_key = 'quote_drops_per_day'"
         ) as cursor:
             row = await cursor.fetchone()
-            return {"quotes_per_day": int(row[0]) if row else 0}
+            return {"quote_drops_per_day": int(row[0]) if row else 0}
 
-@app.post("/quotes/settings")
-async def update_quote_settings(data: QuoteDropSetting):
+@app.post("/quote-drops/settings")
+async def update_quote_drop_settings(data: QuoteDropSetting):
     """Update quote drop frequency."""
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute(
-            "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('quotes_per_day', ?)",
-            (str(data.quotes_per_day),)
+            "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('quote_drops_per_day', ?)",
+            (str(data.quote_drops_per_day),)
         )
         await db.commit()
     return {"status": "ok"}
