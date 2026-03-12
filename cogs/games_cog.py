@@ -176,7 +176,13 @@ class BlackjackGame:
         
         hand = self.player_hands[self.current_hand_index]
         
-        if len(hand.cards) != 2 or hand.cards[0][0] != hand.cards[1][0] or len(self.player_hands) >= 4:
+        if len(hand.cards) != 2 or len(self.player_hands) >= 4:
+            return
+            
+        def get_split_val(rank):
+            return 10 if rank in ["J", "Q", "K", "10"] else rank
+
+        if get_split_val(hand.cards[0][0]) != get_split_val(hand.cards[1][0]):
             return
             
         # Check balance for second bet
