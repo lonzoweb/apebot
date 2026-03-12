@@ -468,7 +468,11 @@ class BlackjackGame:
         # Draw Commands if not resolved
         if not is_revealed:
             current_hand = self.player_hands[self.current_hand_index]
-            if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(self.player_hands) < 4:
+            
+            def get_split_val(rank):
+                return 10 if rank in ["J", "Q", "K", "10"] else rank
+
+            if len(current_hand.cards) == 2 and get_split_val(current_hand.cards[0][0]) == get_split_val(current_hand.cards[1][0]) and len(self.player_hands) < 4:
                 commands = ".HIT  .STAY or .SPLIT"
             else:
                 commands = ".HIT or .STAY"
@@ -1394,7 +1398,11 @@ class GamesCog(commands.Cog):
             if user_id in self.active_bj_games:
                 game = self.active_bj_games[user_id]
                 current_hand = game.player_hands[game.current_hand_index]
-                if len(current_hand.cards) == 2 and current_hand.cards[0][0] == current_hand.cards[1][0] and len(game.player_hands) < 4:
+                
+                def get_split_val(rank):
+                    return 10 if rank in ["J", "Q", "K", "10"] else rank
+
+                if len(current_hand.cards) == 2 and get_split_val(current_hand.cards[0][0]) == get_split_val(current_hand.cards[1][0]) and len(game.player_hands) < 4:
                     await game.process_split()
             else:
                 try:
