@@ -315,6 +315,7 @@ function App() {
             multipliers: "Boost XP rates for specific roles or channels.",
             quotes: "Manage the quote drop bank and frequency.",
             daily_quotes: "Manage quotes for the .quote command and daily posts.",
+            misc: "Configure global channel boundaries and command whitelists.",
             data: "Export, import, reset, and prune server data.",
           }[activeTab]}</p>
         </header>
