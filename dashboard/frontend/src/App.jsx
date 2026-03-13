@@ -1286,8 +1286,8 @@ function App() {
                         onChange={(e) => setChannelConfig({ ...channelConfig, [role]: e.target.value })}
                       >
                         <option value="">-- Disabled --</option>
-                        {Object.entries(channels).map(([id, name]) => (
-                          <option key={id} value={id}>#{name}</option>
+                        {Object.entries(channels).map(([id, channelObj]) => (
+                          <option key={id} value={id}>#{channelObj.name}</option>
                         ))}
                       </select>
                       <button 
