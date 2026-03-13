@@ -191,10 +191,6 @@ class EconomyCog(commands.Cog):
                 "🚫 You can only check your own balance or an admin can check others."
             )
 
-        # Channel Restriction: Only forum
-        if ctx.channel.name.lower() not in ["forum", "forum-livi"] and not ctx.author.guild_permissions.administrator:
-            return
-
         await economy.handle_balance_command(ctx, member)
 
     @app_commands.command(name="balance", description="View your current token balance")
@@ -221,9 +217,6 @@ class EconomyCog(commands.Cog):
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def send_command(self, ctx, member: discord.Member, *, content: str):
         """Transfer tokens or items to another user. Usage: .send @user <amount/item>"""
-        # Channel Restriction: Only forum
-        if ctx.channel.name.lower() not in ["forum", "forum-livi"] and not ctx.author.guild_permissions.administrator:
-            return
         content = content.strip()
         
         # Try numeric (tokens) - extract first number and ignore trailing text
@@ -326,10 +319,6 @@ class EconomyCog(commands.Cog):
         """View the shop menu (via DM) or purchase an item."""
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: The spirits have locked the exchange. Economy is currently disabled.", mention_author=False)
-
-        # Channel Restriction: Only forum-livi
-        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
-            return
 
         if item_name is None or (item_name.lower() == "hidden" and has_authorized_role(ctx.author)):
             embed = discord.Embed(
@@ -460,10 +449,6 @@ class EconomyCog(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def inventory_command(self, ctx):
         """DMs the user their current items."""
-        # Channel Restriction: Only forum-livi
-        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
-            return
-
         inventory = await get_user_inventory(ctx.author.id)
 
         if not inventory:
@@ -1012,10 +997,6 @@ class EconomyCog(commands.Cog):
         """Claim your daily 88 tokens."""
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: The treasury is sealed. Economy is disabled.", mention_author=False)
-
-        # Channel Restriction: forum and forum-livi
-        if ctx.channel.name not in ["forum", "forum-livi"] and not ctx.author.guild_permissions.administrator:
-            return
 
         if await can_claim_daily(ctx.author.id, "beg"):
             await update_balance(ctx.author.id, 88)

@@ -644,10 +644,6 @@ class GamesCog(commands.Cog):
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: The underground casinos are closed while the economy is disabled.", mention_author=False)
         
-        # Channel Restriction: Only forum-livi
-        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
-            return
-        
         # Handle help command
         if bet and bet.lower() == "help":
             help_embed = discord.Embed(
@@ -887,10 +883,6 @@ class GamesCog(commands.Cog):
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: Slot machines are powered off. Economy is disabled.", mention_author=False)
 
-        # Channel Restriction: Only forum-livi
-        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
-            return
-
         user_id = ctx.author.id
         now = time.time()
 
@@ -1062,10 +1054,6 @@ class GamesCog(commands.Cog):
     @commands.command(name="torture")
     async def torture_command(self, ctx):
         """Display a random historical torture method"""
-        # Channel Restriction: Only forum-livi
-        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
-            return
-
         torture_cooldowns = getattr(self.bot, "torture_cooldowns", {})
         user_id = ctx.author.id
         current_time = time.time()
@@ -1228,10 +1216,6 @@ class GamesCog(commands.Cog):
         if not amount or not side:
             return await ctx.reply("Usage: `.bt <amount> <h/t>`\n*\"Put some bread on the line... h or t?\"*", mention_author=False)
 
-        # Channel Restriction: Only forum-livi
-        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
-            return
-
         user_id = ctx.author.id
         balance = await get_balance(user_id)
 
@@ -1310,11 +1294,6 @@ class GamesCog(commands.Cog):
         """Play Blackjack against the dealer. Usage: .bj <amount>"""
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("**System Notice**: The Pit is closed while the economy is disabled.", mention_author=False)
-
-        # Channel Restriction: forum or forum-livi
-        valid_channels = ["forum", "forum-livi"]
-        if ctx.channel.name.lower() not in valid_channels and not ctx.author.guild_permissions.administrator:
-            return
 
         user_id = ctx.author.id
         
@@ -1414,9 +1393,6 @@ class GamesCog(commands.Cog):
     @commands.cooldown(1, 600, commands.BucketType.user)
     async def lick_command(self, ctx, target: discord.Member = None):
         """Hit a lick on a user or a random non-mod. (Cost: 357 tokens)"""
-        # Channel Restriction: Only forum-livi
-        if ctx.channel.name.lower() != "forum-livi" and not ctx.author.guild_permissions.administrator:
-            return
         try:
             logger.info(f"Lick triggered by {ctx.author.name}")
             if not await is_economy_on() and not ctx.author.guild_permissions.administrator:

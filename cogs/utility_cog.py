@@ -126,11 +126,6 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 30, commands.BucketType.user)
     async def reverse_command(self, ctx):
         """Reverse search the most relevant image in chat using Google Lens (costs 2 tokens)"""
-        # Channel Restriction: forum and forum-livi
-        parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        parent_name = getattr(parent_ch, "name", "").lower()
-        if parent_name not in ["forum", "forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
-            return
         async with ctx.channel.typing():
             image_url = None
             if ctx.message.reference:
@@ -205,11 +200,6 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def urban_command(self, ctx, *, term: str):
         """Look up a term on Urban Dictionary"""
-        # Channel Restriction: forum and forum-livi
-        parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        parent_name = getattr(parent_ch, "name", "").lower()
-        if parent_name not in ["forum", "forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
-            return
         if len(term) > 100:
             return await ctx.send("❌ Term too long (max 100 characters)")
 
@@ -236,11 +226,6 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def flip_command(self, ctx):
         """Flip a coin"""
-        # Channel Restriction: Only forum-livi
-        parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        parent_name = getattr(parent_ch, "name", "").lower()
-        if parent_name not in ["forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
-            return
         await asyncio.sleep(1)
         result = random.choice(["Heads", "Tails"])
         await ctx.send(f"🪙 **{result}**")
@@ -249,11 +234,6 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def roll_command(self, ctx):
         """Roll a random number between 1-33"""
-        # Channel Restriction: forum and forum-livi
-        parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        parent_name = getattr(parent_ch, "name", "").lower()
-        if parent_name not in ["forum", "forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
-            return
         await asyncio.sleep(0.5)
         result = random.randint(1, 33)
         await ctx.send(f"{ctx.author.display_name} rolls 🎲 **{result}**")
@@ -378,11 +358,6 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def lifepathnumber_command(self, ctx, date: str = None):
         """Calculate Life Path Number from birthdate with Chinese Zodiac"""
-        # Channel Restriction: Only forum-livi
-        parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        parent_name = getattr(parent_ch, "name", "").lower()
-        if parent_name not in ["forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
-            return
         if not date:
             return await ctx.send(
                 "❌ Please provide a date.\n"
@@ -612,12 +587,6 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def crypto_command(self, ctx):
         """Displays real-time prices for the top 5 cryptocurrencies."""
-        # Channel Restriction: Only forum-livi
-        parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        parent_name = getattr(parent_ch, "name", "").lower()
-        if parent_name not in ["forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
-            return
-
         if self.bot.aiohttp_session is None or self.bot.aiohttp_session.closed:
             self.bot.aiohttp_session = aiohttp.ClientSession()
 
@@ -677,11 +646,6 @@ class UtilityCog(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def gifs_command(self, ctx):
         """Show top 10 most sent GIFs"""
-        # Channel Restriction: Only forum-livi
-        parent_ch = getattr(ctx.channel, "parent", ctx.channel)
-        parent_name = getattr(parent_ch, "name", "").lower()
-        if parent_name not in ["forum-livi", "livi", "emperor"] and not ctx.author.guild_permissions.administrator:
-            return
         top_gifs = await get_top_gifs(limit=10)
 
         if not top_gifs:
@@ -731,10 +695,6 @@ class UtilityCog(commands.Cog):
     @commands.command(name="key")
     async def kek_command(self, ctx):
         """Sends a specific sticker 6 times (1 min cooldown for non-admins)"""
-        # Channel Restriction: forum and forum-livi
-        if ctx.channel.name not in ["forum", "forum-livi"] and not ctx.author.guild_permissions.administrator:
-            return
-
         REWARD_AMOUNT = 3
         last_used = getattr(self.bot, 'key_last_used', {})
         current_time = time.time()

@@ -398,10 +398,37 @@ async def globally_block_commands(ctx):
     if getattr(bot, "DEBUG_MODE", False):
         return False
 
-    # Allow channels in these channel names
-    ALLOWED_CHANNEL_NAMES = ["forum", "forum-livi", "bot-logs"]
-    if ctx.channel.name not in ALLOWED_CHANNEL_NAMES:
-        return False
+    # Fetch DB configuration for channels and commands
+    from database import get_channel_assigns, get_command_restrictions
+    config = await get_channel_assigns()
+    restrictions = await get_command_restrictions()
+
+    ch_id = str(ctx.channel.id)
+
+    # 1. Admin Channel bypasses all channel restrictions
+    if "admin" in config and config["admin"] == ch_id:
+        pass # Allow
+
+    # 2. If it's the target Main channel
+    elif "main" in config and config["main"] == ch_id:
+        if not restrictions.get("main", {}).get(ctx.command.name):
+            return False # Not whitelisted in main
+
+    # 3. If it's the target Spam channel
+    elif "spam" in config and config["spam"] == ch_id:
+        if not restrictions.get("spam", {}).get(ctx.command.name):
+            return False # Not whitelisted in spam
+            
+    # 4. If it's NONE of the assigned channels, block it completely 
+    # (Fallback safety, mostly acts like the old hardcode list)
+    else:
+        # If no config is set yet, fallback to old hardcoded names for safety
+        if not config:
+            ALLOWED_CHANNEL_NAMES = ["forum", "forum-livi", "bot-logs"]
+            if ctx.channel.name not in ALLOWED_CHANNEL_NAMES:
+                return False
+        else:
+            return False
 
 
     # YAP SYSTEM (20s Window)
@@ -442,30 +469,24 @@ async def on_command_error(ctx, error):
     if hasattr(ctx.command, "on_error"):
         return
 
-    # Cooldown feedback
+    # Cooldown feedback (silent to chat, but could log if desired)
     if isinstance(error, commands.CommandOnCooldown):
-        minutes, seconds = divmod(error.retry_after, 60)
-        time_hint = f"{int(minutes)}m {int(seconds)}s" if minutes > 0 else f"{int(seconds)}s"
-        return await ctx.reply(
-            f"⏳ **PATIENCE.** The shadows need time to settle. Try again in `{time_hint}`.",
-            mention_author=False,
-            delete_after=10
-        )
+        return
 
     # Ignore unknown commands
     elif isinstance(error, commands.CommandNotFound):
         return
 
-    # Handle specific permission errors
+    # Handle specific permission errors (silent to chat)
     elif isinstance(error, commands.MissingPermissions):
-        await ctx.send("🚫 You don't have permission to use this command.")
+        return
 
     # Silence unauthorized channel errors
     elif isinstance(error, commands.CheckFailure):
         return
 
     # REDIRECT ERRORS TO LOGS (with simple rate limiting to prevent 429s)
-    elif isinstance(error, (commands.MemberNotFound, commands.UserNotFound, commands.CommandInvokeError)):
+    elif isinstance(error, (commands.MemberNotFound, commands.UserNotFound, commands.CommandInvokeError, Exception)):
         # Simple local rate limiting for errors
         if not hasattr(bot, "_error_cooldowns"):
             bot._error_cooldowns = {}
@@ -480,7 +501,15 @@ async def on_command_error(ctx, error):
 
         bot._error_cooldowns[error_key] = now
 
-        log_channel = await get_log_channel(ctx.guild)
+        log_channel = None
+        from database import get_channel_assigns
+        config = await get_channel_assigns()
+        if "error" in config and config["error"]:
+            log_channel = bot.get_channel(int(config["error"]))
+            
+        if not log_channel:
+            log_channel = await get_log_channel(ctx.guild)
+            
         if log_channel:
             embed = discord.Embed(
                 title=f"⚠️ System Error: {type(error).__name__}",
@@ -489,18 +518,10 @@ async def on_command_error(ctx, error):
                 timestamp=datetime.now()
             )
             await log_channel.send(embed=embed)
-        
-        # Don't show technical MemberNotFound or InvokeErrors in public
-        if isinstance(error, (commands.MemberNotFound, commands.UserNotFound)):
-            return await ctx.reply("❌ That soul is not found in this realm.", mention_author=False)
-        return # Silence CommandInvokeError in public
-
-    # Handle all other UNHANDLED errors
-    else:
-        logger.error(
-            f"UNHANDLED COMMAND ERROR in {ctx.command}: {error}", exc_info=True
-        )
-        await ctx.send(f"❌ An unexpected error occurred: `{type(error).__name__}`")
+        else:
+            logger.error(f"UNHANDLED COMMAND ERROR in {ctx.command}: {error}", exc_info=True)
+            
+        return
 
 
 @bot.event

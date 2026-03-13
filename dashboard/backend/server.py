@@ -436,6 +436,101 @@ async def update_quote_drop_settings(data: QuoteDropSetting):
         await db.commit()
     return {"status": "ok"}
 
+class QuoteDropSendReq(BaseModel):
+    drop_id: Optional[int] = None
+
+@app.post("/quote-drops/send")
+async def send_quote_drop(req: QuoteDropSendReq):
+    """Manually send a quote drop to the #forum channel via the bot."""
+    import asyncio
+    try:
+        from main import bot
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Bot instance not available.")
+    
+    quote_text = None
+    async with aiosqlite.connect(DB_FILE) as db:
+        if req.drop_id is not None:
+            async with db.execute("SELECT quote FROM quote_drops WHERE id = ?", (req.drop_id,)) as cursor:
+                row = await cursor.fetchone()
+                if row: quote_text = row[0]
+        else:
+            async with db.execute("SELECT quote FROM quote_drops ORDER BY RANDOM() LIMIT 1") as cursor:
+                row = await cursor.fetchone()
+                if row: quote_text = row[0]
+                
+    if not quote_text:
+        raise HTTPException(status_code=404, detail="Quote not found or database empty.")
+        
+    async def _send_to_forum():
+        for guild in bot.guilds:
+            import discord
+            channel = discord.utils.get(guild.text_channels, name="forum")
+            if channel:
+                await channel.send(quote_text)
+                return True
+        return False
+        
+    try:
+        success = asyncio.run_coroutine_threadsafe(_send_to_forum(), bot.loop).result()
+        if not success:
+            raise HTTPException(status_code=500, detail="Could not find #forum channel.")
+    except Exception as e:
+        logger.error(f"Failed to push message via bot loop: {e}")
+        raise HTTPException(status_code=500, detail=f"Bot send failed: {str(e)}")
+        
+    return {"status": "ok", "sent_quote": quote_text}
+
+# ============================================================
+# CHANNEL & COMMAND CONFIGURATION
+# ============================================================
+
+from database import (
+    get_channel_assigns, set_channel_assign, 
+    get_command_restrictions, set_command_restriction
+)
+
+@app.get("/channel-config")
+async def api_get_channel_config():
+    """Get the assigned channel IDs for each role (main, spam, admin, error)."""
+    return await get_channel_assigns()
+
+@app.get("/commands")
+async def api_get_commands():
+    """Get a list of all registered bot commands."""
+    try:
+        from main import bot
+        cmds = [c.name for c in bot.commands if not c.hidden]
+        return sorted(cmds)
+    except ImportError:
+        return []
+
+class ChannelConfigUpdate(BaseModel):
+    role: str
+    channel_id: str
+
+@app.post("/channel-config")
+async def api_set_channel_config(data: ChannelConfigUpdate):
+    """Set the assigned channel ID for a role."""
+    await set_channel_assign(data.role, data.channel_id)
+    return {"status": "ok"}
+
+@app.get("/command-restrictions")
+async def api_get_command_restrictions():
+    """Get which commands are allowed in which channel roles."""
+    return await get_command_restrictions()
+
+class CommandRestrictionUpdate(BaseModel):
+    command_name: str
+    role: str
+    is_allowed: bool
+
+@app.post("/command-restrictions")
+async def api_set_command_restriction(data: CommandRestrictionUpdate):
+    """Enable or disable a command in a specific channel role."""
+    await set_command_restriction(data.command_name, data.role, data.is_allowed)
+    return {"status": "ok"}
+
 # --- Serve Frontend ---
 # Search for frontend/dist relative to project root
 base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

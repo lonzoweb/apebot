@@ -381,6 +381,28 @@ async def init_db():
                 )
                 """
             )
+            
+            # 🏢 Channel Assignments (Main, Spam, Admin, Error)
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS channel_config (
+                    role TEXT PRIMARY KEY,
+                    channel_id TEXT
+                )
+                """
+            )
+            
+            # 🛑 Command Restrictions (Checkbox matrix)
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS command_restrictions (
+                    command_name TEXT,
+                    channel_role TEXT,
+                    is_allowed INTEGER DEFAULT 0,
+                    PRIMARY KEY(command_name, channel_role)
+                )
+                """
+            )
             # Migration: Ensure display_type column exists for users who already had the table
             try:
                 await conn.execute("ALTER TABLE rank_card_prefs ADD COLUMN display_type TEXT DEFAULT 'username'")
@@ -538,6 +560,46 @@ async def set_setting(key: str, value: str):
         await conn.execute(
             "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES (?, ?)",
             (key, value),
+        )
+
+# ============================================================
+# CHANNEL CONFIG & COMMAND RESTRICTIONS
+# ============================================================
+
+async def get_channel_assigns() -> dict:
+    """Returns a dict mapping role -> channel_id."""
+    async with get_db() as conn:
+        async with conn.execute("SELECT role, channel_id FROM channel_config") as cursor:
+            rows = await cursor.fetchall()
+            return {r[0]: r[1] for r in rows}
+
+async def set_channel_assign(role: str, channel_id: str):
+    async with get_db() as conn:
+        if not channel_id:
+            await conn.execute("DELETE FROM channel_config WHERE role = ?", (role,))
+        else:
+            await conn.execute(
+                "INSERT OR REPLACE INTO channel_config (role, channel_id) VALUES (?, ?)",
+                (role, channel_id)
+            )
+
+async def get_command_restrictions() -> dict:
+    """Returns { 'role': { 'command_name': True/False } }"""
+    res = {}
+    async with get_db() as conn:
+        async with conn.execute("SELECT command_name, channel_role, is_allowed FROM command_restrictions") as cursor:
+            rows = await cursor.fetchall()
+            for cmd, role, allowed in rows:
+                if role not in res:
+                    res[role] = {}
+                res[role][cmd] = bool(allowed)
+    return res
+
+async def set_command_restriction(command_name: str, role: str, is_allowed: bool):
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO command_restrictions (command_name, channel_role, is_allowed) VALUES (?, ?, ?)",
+            (command_name, role, 1 if is_allowed else 0)
         )
 
 

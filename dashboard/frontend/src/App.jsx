@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   Home, Sparkles, Gift, Layers, Database, 
-  Settings, TrendingUp, Users, Trophy, Trash2, Plus, Save, Download, RefreshCw, Bell, Info, Mail, CreditCard, BookOpen, MessageCircle
+  Settings, TrendingUp, Users, Trophy, Trash2, Plus, Save, Download, RefreshCw, Bell, Info, Mail, CreditCard, BookOpen, MessageCircle, Send
 } from 'lucide-react';
 
 const API_BASE = window.location.origin;
@@ -39,6 +39,9 @@ function App() {
   const [newQuoteDrop, setNewQuoteDrop] = useState('');
   const [dailyQuotes, setDailyQuotes] = useState([]);
   const [newDailyQuote, setNewDailyQuote] = useState('');
+  const [channelConfig, setChannelConfig] = useState({});
+  const [commandRestrictions, setCommandRestrictions] = useState({});
+  const [botCommands, setBotCommands] = useState([]);
 
   // Form states for new entries
   const [newReward, setNewReward] = useState({ level: '', role_id: '', stack_role: true });
@@ -68,7 +71,7 @@ function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [sRes, setRes, rRes, mRes, lRes, rlRes, chRes] = await Promise.all([
+      const [sRes, setRes, rRes, mRes, lRes, rlRes, chRes, ccRes, crRes, cmdsRes] = await Promise.all([
         axios.get(`${API_BASE}/stats`),
         axios.get(`${API_BASE}/settings`),
         axios.get(`${API_BASE}/rewards`),
@@ -76,6 +79,9 @@ function App() {
         axios.get(`${API_BASE}/leaderboard`),
         axios.get(`${API_BASE}/roles`),
         axios.get(`${API_BASE}/channels`),
+        axios.get(`${API_BASE}/channel-config`),
+        axios.get(`${API_BASE}/command-restrictions`),
+        axios.get(`${API_BASE}/commands`)
       ]);
       setStats(sRes.data);
       setSettings(setRes.data);
@@ -86,6 +92,9 @@ function App() {
       setLeaderboard(lRes.data);
       setRoles(rlRes.data);
       setChannels(chRes.data);
+      setChannelConfig(ccRes.data);
+      setCommandRestrictions(crRes.data);
+      setBotCommands(cmdsRes.data);
     } catch (err) {
       console.error("Failed to fetch data:", err);
     }
@@ -218,6 +227,7 @@ function App() {
     { id: 'multipliers', icon: Layers, label: 'Multipliers' },
     { id: 'quotes', icon: BookOpen, label: 'Quotes' },
     { id: 'daily_quotes', icon: MessageCircle, label: 'Daily Quotes' },
+    { id: 'misc', icon: Settings, label: 'Misc' },
     { id: 'data', icon: Database, label: 'Data Management' },
   ];
 
@@ -1067,22 +1077,19 @@ function App() {
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>The bot randomly drops user-submitted quotes in #forum when chat is active. These are added via <code>=quote</code> (reply to a message) in Discord.</p>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-                <label className="label" style={{ margin: 0, whiteSpace: 'nowrap' }}>Drops per day</label>
-                <input 
-                  className="input" type="number" min="0" max="100" style={{ width: '100px' }}
-                  value={quoteDropsPerDay}
-                  onChange={(e) => setQuoteDropsPerDay(parseInt(e.target.value) || 0)}
-                />
                 <button 
-                  className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}
+                  className="btn btn-primary" 
                   onClick={async () => {
+                    if (!confirm('Are you sure you want to drop a random quote into the #forum channel right now?')) return;
                     try {
-                      await axios.post(`${API_BASE}/quote-drops/settings`, { quote_drops_per_day: quoteDropsPerDay });
-                      alert('\u2705 Quote drop frequency saved!');
-                    } catch (err) { alert('Failed to save setting'); }
+                      const res = await axios.post(`${API_BASE}/quote-drops/send`, {});
+                      alert(`\u2705 Random quote sent!\n\n"${res.data.sent_quote}"`);
+                    } catch (err) { 
+                      alert('Failed to send quote: ' + (err.response?.data?.detail || err.message)); 
+                    }
                   }}
                 >
-                  <Save size={14} style={{ marginRight: '0.4rem' }} /> Save
+                  <Send size={16} style={{ marginRight: '0.5rem' }} /> Send Random Quote
                 </button>
               </div>
 
@@ -1143,18 +1150,37 @@ function App() {
                 {quoteDrops.map(q => (
                   <div key={q.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <span style={{ flex: 1, fontSize: '0.9rem' }}>{q.quote}</span>
-                    <button
-                      className="btn"
-                      style={{ color: 'var(--danger)', background: 'transparent', padding: '0.25rem 0.5rem', flexShrink: 0 }}
-                      onClick={async () => {
-                        try {
-                          await axios.delete(`${API_BASE}/quote-drops/${q.id}`);
-                          setQuoteDrops(prev => prev.filter(x => x.id !== q.id));
-                        } catch (err) { alert('Delete failed'); }
-                      }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+                      <button
+                        className="btn"
+                        title="Send this specific quote to #forum"
+                        style={{ color: 'var(--primary)', background: 'transparent', padding: '0.25rem 0.5rem' }}
+                        onClick={async () => {
+                          if (!confirm(`Drop this quote into #forum now?\n\n"${q.quote}"`)) return;
+                          try {
+                            await axios.post(`${API_BASE}/quote-drops/send`, { drop_id: q.id });
+                            alert('\u2705 Quote sent successfully!');
+                          } catch (err) { 
+                            alert('Send failed: ' + (err.response?.data?.detail || err.message)); 
+                          }
+                        }}
+                      >
+                        <Send size={14} />
+                      </button>
+                      <button
+                        className="btn"
+                        title="Delete quote"
+                        style={{ color: 'var(--danger)', background: 'transparent', padding: '0.25rem 0.5rem' }}
+                        onClick={async () => {
+                          try {
+                            await axios.delete(`${API_BASE}/quote-drops/${q.id}`);
+                            setQuoteDrops(prev => prev.filter(x => x.id !== q.id));
+                          } catch (err) { alert('Delete failed'); }
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {quoteDrops.length === 0 && (
@@ -1236,6 +1262,94 @@ function App() {
                 {dailyQuotes.length === 0 && (
                   <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>No daily quotes yet. Add one above!</p>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'misc' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="card">
+              <h2 style={{ marginBottom: '0.25rem' }}>Channel Configuration</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Specify specific channels for roles like Main, Spam, Admin, and Error log routes.</p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                {['main', 'spam', 'admin', 'error'].map(role => (
+                  <div key={role} style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <label className="label" style={{ textTransform: 'capitalize', fontWeight: 'bold' }}>{role} Channel</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <select
+                        className="input"
+                        style={{ flex: 1 }}
+                        value={channelConfig[role] || ''}
+                        onChange={(e) => setChannelConfig({ ...channelConfig, [role]: e.target.value })}
+                      >
+                        <option value="">-- Disabled --</option>
+                        {Object.entries(channels).map(([id, name]) => (
+                          <option key={id} value={id}>#{name}</option>
+                        ))}
+                      </select>
+                      <button 
+                        className="btn btn-primary"
+                        title="Save Channel"
+                        onClick={async () => {
+                          try {
+                            await axios.post(`${API_BASE}/channel-config`, { role, channel_id: channelConfig[role] || '' });
+                            alert(`\u2705 Saved ${role} channel`);
+                          } catch (err) { alert('Save failed'); }
+                        }}
+                      >
+                        <Save size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="card">
+              <h2 style={{ marginBottom: '0.25rem' }}>Command Restrictions</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Select which commands are allowed to be run in the <strong>Main</strong> or <strong>Spam</strong> channels. Admin channel bypasses all restrictions.</p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                {['main', 'spam'].map(role => (
+                  <div key={role} style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <h3 style={{ textTransform: 'capitalize', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>{role} Whitelist</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.75rem' }}>
+                      {botCommands.map(cmd => {
+                        const isAllowed = commandRestrictions[role]?.[cmd] || false;
+                        return (
+                          <label key={cmd} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={isAllowed}
+                              onChange={async (e) => {
+                                const checked = e.target.checked;
+                                // Optimistic UI update
+                                setCommandRestrictions(prev => ({
+                                  ...prev,
+                                  [role]: { ...(prev[role] || {}), [cmd]: checked }
+                                }));
+                                try {
+                                  await axios.post(`${API_BASE}/command-restrictions`, { command_name: cmd, role, is_allowed: checked });
+                                } catch (err) {
+                                  alert(`Failed to save restriction for ${cmd}`);
+                                  // Revert optimistic update
+                                  setCommandRestrictions(prev => ({
+                                    ...prev,
+                                    [role]: { ...(prev[role] || {}), [cmd]: isAllowed }
+                                  }));
+                                }
+                              }}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <code>.{cmd}</code>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

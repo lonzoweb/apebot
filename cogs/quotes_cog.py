@@ -475,43 +475,8 @@ class QuotesCog(commands.Cog):
                 except Exception as e:
                     logger.error(f"Error in ping quote: {e}")
 
-        # --- Quote drop: piggyback on #forum messages ---
-        if hasattr(message.channel, 'name') and message.channel.name == "forum":
-            await self._maybe_drop_quote(message.channel)
-
-    # ── QUOTE DROP (message-driven, no polling) ────────────────
-    # Piggybacks on on_message — when a human messages #forum,
-    # check if enough time has passed to drop a quote.
-    _last_quote_drop = 0  # epoch timestamp of last drop
-    _next_drop_interval = 0  # seconds until next eligible drop
-
-    async def _maybe_drop_quote(self, channel):
-        """Check if it's time to drop a quote in #forum. Called on every #forum message."""
-        import time as _t
-
-        now = _t.time()
-        if now < self._last_quote_drop + self._next_drop_interval:
-            return  # Not time yet
-
-        from database import get_setting
-        per_day = int(await get_setting("quote_drops_per_day", "0"))
-        if per_day <= 0:
-            return
-
-        from database import get_random_quote_drop
-        quote = await get_random_quote_drop()
-        if not quote:
-            return
-
-        await asyncio.sleep(5)
-        await channel.send(quote)
-        logger.info(f"📜 Quote drop: {quote[:60]}...")
-
-        # Calculate next interval with jitter
-        interval = (24 * 3600) / per_day
-        jitter = interval * 0.25
-        self._next_drop_interval = max(60, interval + random.uniform(-jitter, jitter))
-        self._last_quote_drop = now
+    # Quote drops are now manually triggered via the dashboard API
+    # (or via the 40% chance on bot pings handled above).
 
 
 async def setup(bot):
