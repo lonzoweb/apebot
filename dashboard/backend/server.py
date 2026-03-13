@@ -441,13 +441,17 @@ class QuoteDropSendReq(BaseModel):
 
 @app.post("/quote-drops/send")
 async def send_quote_drop(req: QuoteDropSendReq):
-    """Manually send a quote drop to the #forum channel via the bot."""
-    import asyncio
-    try:
-        from main import bot
-    except ImportError:
-        raise HTTPException(status_code=500, detail="Bot instance not available.")
+    """Manually send a quote drop to the configured main channel via Discord REST API."""
+    from config import TOKEN
+    from database import get_channel_assigns
     
+    # Get the target channel from DB config
+    assigns = await get_channel_assigns()
+    channel_id = assigns.get("main", "")
+    if not channel_id:
+        raise HTTPException(status_code=400, detail="No 'main' channel configured. Go to Misc tab to set one.")
+    
+    # Pick the quote
     quote_text = None
     async with aiosqlite.connect(DB_FILE) as db:
         if req.drop_id is not None:
@@ -461,23 +465,23 @@ async def send_quote_drop(req: QuoteDropSendReq):
                 
     if not quote_text:
         raise HTTPException(status_code=404, detail="Quote not found or database empty.")
-        
-    async def _send_to_forum():
-        for guild in bot.guilds:
-            import discord
-            channel = discord.utils.get(guild.text_channels, name="forum")
-            if channel:
-                await channel.send(quote_text)
-                return True
-        return False
-        
+    
+    # Send via Discord REST API
     try:
-        success = asyncio.run_coroutine_threadsafe(_send_to_forum(), bot.loop).result()
-        if not success:
-            raise HTTPException(status_code=500, detail="Could not find #forum channel.")
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"https://discord.com/api/v10/channels/{channel_id}/messages",
+                headers={"Authorization": f"Bot {TOKEN}", "Content-Type": "application/json"},
+                json={"content": quote_text}
+            ) as resp:
+                if resp.status not in (200, 201):
+                    body = await resp.text()
+                    raise HTTPException(status_code=500, detail=f"Discord API error: {resp.status} - {body}")
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Failed to push message via bot loop: {e}")
-        raise HTTPException(status_code=500, detail=f"Bot send failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to send message: {str(e)}")
         
     return {"status": "ok", "sent_quote": quote_text}
 
@@ -497,13 +501,22 @@ async def api_get_channel_config():
 
 @app.get("/commands")
 async def api_get_commands():
-    """Get a list of all registered bot commands."""
-    try:
-        from main import bot
-        cmds = [c.name for c in bot.commands if not c.hidden]
-        return sorted(cmds)
-    except ImportError:
-        return []
+    """Get a list of all registered bot commands by scanning cog files."""
+    import re
+    cmds = set()
+    cogs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "cogs")
+    if os.path.isdir(cogs_dir):
+        for fname in os.listdir(cogs_dir):
+            if fname.endswith(".py"):
+                try:
+                    with open(os.path.join(cogs_dir, fname), "r") as f:
+                        content = f.read()
+                    # Match @commands.command(name="xxx")
+                    for m in re.finditer(r'@commands\.command\(name=["\']([^"\']+)["\']', content):
+                        cmds.add(m.group(1))
+                except Exception:
+                    pass
+    return sorted(cmds)
 
 class ChannelConfigUpdate(BaseModel):
     role: str

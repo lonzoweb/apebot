@@ -1278,7 +1278,7 @@ function App() {
                 {['main', 'spam', 'admin', 'error'].map(role => (
                   <div key={role} style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
                     <label className="label" style={{ textTransform: 'capitalize', fontWeight: 'bold' }}>{role} Channel</label>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       <select
                         className="input"
                         style={{ flex: 1 }}
@@ -1293,11 +1293,34 @@ function App() {
                       <button 
                         className="btn btn-primary"
                         title="Save Channel"
-                        onClick={async () => {
+                        onClick={async (e) => {
+                          const btn = e.currentTarget;
+                          const parent = btn.parentElement;
                           try {
                             await axios.post(`${API_BASE}/channel-config`, { role, channel_id: channelConfig[role] || '' });
-                            alert(`\u2705 Saved ${role} channel`);
-                          } catch (err) { alert('Save failed'); }
+                            // Show inline checkmark
+                            let indicator = parent.querySelector('.save-indicator');
+                            if (!indicator) {
+                              indicator = document.createElement('span');
+                              indicator.className = 'save-indicator';
+                              indicator.style.cssText = 'color: #22c55e; font-weight: bold; font-size: 1.1rem; transition: opacity 0.3s;';
+                              parent.appendChild(indicator);
+                            }
+                            indicator.textContent = '✓';
+                            indicator.style.opacity = '1';
+                            setTimeout(() => { indicator.style.opacity = '0'; }, 2000);
+                          } catch (err) {
+                            let indicator = parent.querySelector('.save-indicator');
+                            if (!indicator) {
+                              indicator = document.createElement('span');
+                              indicator.className = 'save-indicator';
+                              indicator.style.cssText = 'color: #ef4444; font-weight: bold; font-size: 0.85rem; transition: opacity 0.3s;';
+                              parent.appendChild(indicator);
+                            }
+                            indicator.textContent = '✗';
+                            indicator.style.opacity = '1';
+                            setTimeout(() => { indicator.style.opacity = '0'; }, 2000);
+                          }
                         }}
                       >
                         <Save size={14} />
