@@ -326,42 +326,55 @@ class HofCog(commands.Cog):
         if not payload.guild_id:
             return
 
+        logger.info(f"🔍 HOF reaction event: emoji={payload.emoji} msg={payload.message_id} ch={payload.channel_id} user={payload.user_id}")
+
         # Serialization: ensure one reaction at a time per message to prevent race induction
         lock = self.locks.setdefault(payload.message_id, asyncio.Lock())
         
         async with lock:
             s = await _get_settings(payload.guild_id)
             if not s["channel_id"]:
+                logger.info("🔍 HOF: No channel_id configured, skipping.")
                 return
 
             # Check blacklist (voter)
             if str(payload.user_id) in s.get("blacklisted_users", []):
+                logger.info(f"🔍 HOF: User {payload.user_id} is blacklisted, skipping.")
                 return
             if str(payload.emoji) not in s["emojis"]:
+                logger.info(f"🔍 HOF: Emoji {payload.emoji} not in tracked list {s['emojis']}, skipping.")
                 return
             if str(payload.channel_id) == s["channel_id"]:
+                logger.info("🔍 HOF: Reaction is on HOF channel itself, skipping.")
                 return  # Ignore reactions on HOF channel itself
             if str(payload.channel_id) in s["ignored_channels"]:
+                logger.info(f"🔍 HOF: Channel {payload.channel_id} is ignored, skipping.")
                 return
             if str(payload.message_id) in s["trashed_messages"]:
+                logger.info(f"🔍 HOF: Message {payload.message_id} is trashed, skipping.")
                 return
 
             guild   = self.bot.get_guild(payload.guild_id)
             channel = guild.get_channel(payload.channel_id)
             if not channel:
+                logger.info(f"🔍 HOF: Could not find channel {payload.channel_id}, skipping.")
                 return
             try:
                 message = await channel.fetch_message(payload.message_id)
-            except Exception:
+            except Exception as e:
+                logger.info(f"🔍 HOF: Could not fetch message {payload.message_id}: {e}")
                 return
 
             # Check blacklist (author)
             if str(message.author.id) in s.get("blacklisted_users", []):
+                logger.info(f"🔍 HOF: Author {message.author.id} is blacklisted, skipping.")
                 return
 
             emoji_counts = _count_by_emoji_from_reactions(message, s["emojis"])
             max_count = max(emoji_counts.values()) if emoji_counts else 0
             is_locked = str(payload.message_id) in s["locked_messages"]
+
+            logger.info(f"🔍 HOF: emoji_counts={emoji_counts} max_count={max_count} threshold={s['threshold']} locked={is_locked}")
 
             entry = await _get_entry(payload.message_id)
             persistent_trigger = entry[9] if entry else None
@@ -369,10 +382,12 @@ class HofCog(commands.Cog):
             if max_count >= s["threshold"]:
                 # Use persistent trigger if available, else current reaction
                 trigger = persistent_trigger or str(payload.emoji)
+                logger.info(f"🏆 HOF: Message {payload.message_id} met threshold ({max_count} >= {s['threshold']}), posting/updating.")
                 await _post_or_update_hof(self.bot, guild, message, emoji_counts, s, trigger_emoji=trigger)
                 # Cleanup lock after completion (optional, but keep it for threshold transitions)
             else:
                 if entry and entry[3] and not is_locked:
+                    logger.info(f"🏆 HOF: Message {payload.message_id} dropped below threshold, removing HOF entry.")
                     hof_ch = guild.get_channel(int(s["channel_id"]))
                     if hof_ch:
                         try:
@@ -387,6 +402,7 @@ class HofCog(commands.Cog):
                         trigger_emoji=persistent_trigger
                     )
                 elif max_count > 0:
+                    logger.info(f"🔍 HOF: Message {payload.message_id} has {max_count} reactions but below threshold ({s['threshold']}), tracking.")
                     # Always populate entries with at least 1 reaction to support "lost hall"
                     await _upsert_entry(
                         message.id, channel.id, message.author.id,
