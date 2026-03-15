@@ -44,6 +44,9 @@ function App() {
   const [botCommands, setBotCommands] = useState([]);
   const [hofSettings, setHofSettings] = useState({ channel_id: '', threshold: 3, emojis: ['⭐'], autostar_channels: [], ignored_channels: [], blacklisted_users: [] });
   const [hofEmojiInput, setHofEmojiInput] = useState('');
+  const [confirmSendRandom, setConfirmSendRandom] = useState(false);
+  const [confirmSendId, setConfirmSendId] = useState(null);
+  const [sendSuccess, setSendSuccess] = useState(null); // 'random' or id
 
   // Form states for new entries
   const [newReward, setNewReward] = useState({ level: '', role_id: '', stack_role: true });
@@ -52,6 +55,27 @@ function App() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (confirmSendRandom) {
+      const timer = setTimeout(() => setConfirmSendRandom(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [confirmSendRandom]);
+
+  useEffect(() => {
+    if (confirmSendId) {
+      const timer = setTimeout(() => setConfirmSendId(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [confirmSendId]);
+
+  useEffect(() => {
+    if (sendSuccess) {
+      const timer = setTimeout(() => setSendSuccess(null), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [sendSuccess]);
 
   useEffect(() => {
     if (activeTab === 'quotes') {
@@ -1083,20 +1107,36 @@ function App() {
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>The bot randomly drops user-submitted quotes in #forum when chat is active. These are added via <code>=quote</code> (reply to a message) in Discord.</p>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-                <button 
-                  className="btn btn-primary" 
-                  onClick={async () => {
-                    if (!confirm('Are you sure you want to drop a random quote into the #forum channel right now?')) return;
-                    try {
-                      const res = await axios.post(`${API_BASE}/quote-drops/send`, {});
-                      alert(`\u2705 Random quote sent!\n\n"${res.data.sent_quote}"`);
-                    } catch (err) { 
-                      alert('Failed to send quote: ' + (err.response?.data?.detail || err.message)); 
-                    }
-                  }}
-                >
-                  <Send size={16} style={{ marginRight: '0.5rem' }} /> Send Random Quote
-                </button>
+                {!confirmSendRandom && sendSuccess !== 'random' && (
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => setConfirmSendRandom(true)}
+                  >
+                    <Send size={16} style={{ marginRight: '0.5rem' }} /> Send Random Quote
+                  </button>
+                )}
+                {confirmSendRandom && (
+                  <button 
+                    className="btn" 
+                    style={{ background: '#f59e0b', color: '#fff', fontWeight: 'bold' }}
+                    onClick={async () => {
+                      setConfirmSendRandom(false);
+                      try {
+                        const res = await axios.post(`${API_BASE}/quote-drops/send`, {});
+                        setSendSuccess('random');
+                      } catch (err) { 
+                        alert('Failed to send quote: ' + (err.response?.data?.detail || err.message)); 
+                      }
+                    }}
+                  >
+                    Confirm Send?
+                  </button>
+                )}
+                {sendSuccess === 'random' && (
+                  <div style={{ color: '#22c55e', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Send size={16} /> Sent!
+                  </div>
+                )}
               </div>
 
               <div style={{ padding: '0.75rem 1rem', background: 'rgba(99,102,241,0.08)', borderRadius: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
@@ -1157,22 +1197,36 @@ function App() {
                   <div key={q.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <span style={{ flex: 1, fontSize: '0.9rem' }}>{q.quote}</span>
                     <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
-                      <button
-                        className="btn"
-                        title="Send this specific quote to #forum"
-                        style={{ color: 'var(--primary)', background: 'transparent', padding: '0.25rem 0.5rem' }}
-                        onClick={async () => {
-                          if (!confirm(`Drop this quote into #forum now?\n\n"${q.quote}"`)) return;
-                          try {
-                            await axios.post(`${API_BASE}/quote-drops/send`, { drop_id: q.id });
-                            alert('\u2705 Quote sent successfully!');
-                          } catch (err) { 
-                            alert('Send failed: ' + (err.response?.data?.detail || err.message)); 
-                          }
-                        }}
-                      >
-                        <Send size={14} />
-                      </button>
+                      {confirmSendId !== q.id && sendSuccess !== q.id && (
+                        <button
+                          className="btn"
+                          title="Send this specific quote to #forum"
+                          style={{ color: 'var(--primary)', background: 'transparent', padding: '0.25rem 0.5rem' }}
+                          onClick={() => setConfirmSendId(q.id)}
+                        >
+                          <Send size={14} />
+                        </button>
+                      )}
+                      {confirmSendId === q.id && (
+                        <button
+                          className="btn"
+                          style={{ color: '#f59e0b', background: 'transparent', padding: '0.25rem 0.5rem', fontWeight: 'bold', fontSize: '0.75rem' }}
+                          onClick={async () => {
+                            setConfirmSendId(null);
+                            try {
+                              await axios.post(`${API_BASE}/quote-drops/send`, { drop_id: q.id });
+                              setSendSuccess(q.id);
+                            } catch (err) { 
+                              alert('Send failed: ' + (err.response?.data?.detail || err.message)); 
+                            }
+                          }}
+                        >
+                          Send?
+                        </button>
+                      )}
+                      {sendSuccess === q.id && (
+                        <span style={{ color: '#22c55e', fontSize: '0.75rem', fontWeight: 'bold', padding: '0.25rem 0.5rem' }}>✓</span>
+                      )}
                       <button
                         className="btn"
                         title="Delete quote"
