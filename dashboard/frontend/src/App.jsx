@@ -42,6 +42,8 @@ function App() {
   const [channelConfig, setChannelConfig] = useState({});
   const [commandRestrictions, setCommandRestrictions] = useState({});
   const [botCommands, setBotCommands] = useState([]);
+  const [hofSettings, setHofSettings] = useState({ channel_id: '', threshold: 3, emojis: ['⭐'], autostar_channels: [], ignored_channels: [], blacklisted_users: [] });
+  const [hofEmojiInput, setHofEmojiInput] = useState('');
 
   // Form states for new entries
   const [newReward, setNewReward] = useState({ level: '', role_id: '', stack_role: true });
@@ -71,7 +73,7 @@ function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [sRes, setRes, rRes, mRes, lRes, rlRes, chRes, ccRes, crRes, cmdsRes] = await Promise.all([
+      const [sRes, setRes, rRes, mRes, lRes, rlRes, chRes, ccRes, crRes, cmdsRes, hofRes] = await Promise.all([
         axios.get(`${API_BASE}/stats`),
         axios.get(`${API_BASE}/settings`),
         axios.get(`${API_BASE}/rewards`),
@@ -81,7 +83,8 @@ function App() {
         axios.get(`${API_BASE}/channels`),
         axios.get(`${API_BASE}/channel-config`),
         axios.get(`${API_BASE}/command-restrictions`),
-        axios.get(`${API_BASE}/commands`)
+        axios.get(`${API_BASE}/commands`),
+        axios.get(`${API_BASE}/hof-settings`)
       ]);
       setStats(sRes.data);
       setSettings(setRes.data);
@@ -95,6 +98,8 @@ function App() {
       setChannelConfig(ccRes.data);
       setCommandRestrictions(crRes.data);
       setBotCommands(cmdsRes.data);
+      setHofSettings(hofRes.data);
+      setHofEmojiInput((hofRes.data.emojis || []).join(' '));
     } catch (err) {
       console.error("Failed to fetch data:", err);
     }
@@ -1374,6 +1379,192 @@ function App() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="card">
+              <h2 style={{ marginBottom: '0.25rem' }}>🏆 Hall of Fame</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Configure the starboard system — which channel, how many reactions, and which emojis to track.</p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                {/* HOF Channel */}
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <label className="label" style={{ fontWeight: 'bold' }}>HOF Channel</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <select
+                      className="input"
+                      style={{ flex: 1 }}
+                      value={hofSettings.channel_id || ''}
+                      onChange={(e) => setHofSettings({ ...hofSettings, channel_id: e.target.value })}
+                    >
+                      <option value="">-- Not Set --</option>
+                      {Object.entries(channels).map(([id, channelObj]) => (
+                        <option key={id} value={id}>#{channelObj.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      className="btn btn-primary"
+                      title="Save HOF Channel"
+                      onClick={async (e) => {
+                        const parent = e.currentTarget.parentElement;
+                        try {
+                          await axios.post(`${API_BASE}/hof-settings`, { channel_id: hofSettings.channel_id || '' });
+                          let indicator = parent.querySelector('.save-indicator');
+                          if (!indicator) { indicator = document.createElement('span'); indicator.className = 'save-indicator'; indicator.style.cssText = 'color: #22c55e; font-weight: bold; font-size: 1.1rem; transition: opacity 0.3s;'; parent.appendChild(indicator); }
+                          indicator.textContent = '✓'; indicator.style.opacity = '1';
+                          setTimeout(() => { indicator.style.opacity = '0'; }, 2000);
+                        } catch (err) {
+                          let indicator = parent.querySelector('.save-indicator');
+                          if (!indicator) { indicator = document.createElement('span'); indicator.className = 'save-indicator'; indicator.style.cssText = 'color: #ef4444; font-weight: bold; transition: opacity 0.3s;'; parent.appendChild(indicator); }
+                          indicator.textContent = '✗'; indicator.style.opacity = '1';
+                          setTimeout(() => { indicator.style.opacity = '0'; }, 2000);
+                        }
+                      }}
+                    >
+                      <Save size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Threshold */}
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <label className="label" style={{ fontWeight: 'bold' }}>Reaction Threshold</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      className="input"
+                      type="number"
+                      min="1"
+                      style={{ flex: 1 }}
+                      value={hofSettings.threshold}
+                      onChange={(e) => setHofSettings({ ...hofSettings, threshold: parseInt(e.target.value) || 1 })}
+                    />
+                    <button
+                      className="btn btn-primary"
+                      title="Save Threshold"
+                      onClick={async (e) => {
+                        const parent = e.currentTarget.parentElement;
+                        try {
+                          await axios.post(`${API_BASE}/hof-settings`, { threshold: hofSettings.threshold });
+                          let indicator = parent.querySelector('.save-indicator');
+                          if (!indicator) { indicator = document.createElement('span'); indicator.className = 'save-indicator'; indicator.style.cssText = 'color: #22c55e; font-weight: bold; font-size: 1.1rem; transition: opacity 0.3s;'; parent.appendChild(indicator); }
+                          indicator.textContent = '✓'; indicator.style.opacity = '1';
+                          setTimeout(() => { indicator.style.opacity = '0'; }, 2000);
+                        } catch (err) {
+                          let indicator = parent.querySelector('.save-indicator');
+                          if (!indicator) { indicator = document.createElement('span'); indicator.className = 'save-indicator'; indicator.style.cssText = 'color: #ef4444; font-weight: bold; transition: opacity 0.3s;'; parent.appendChild(indicator); }
+                          indicator.textContent = '✗'; indicator.style.opacity = '1';
+                          setTimeout(() => { indicator.style.opacity = '0'; }, 2000);
+                        }
+                      }}
+                    >
+                      <Save size={14} />
+                    </button>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>Reactions needed to enter the Hall of Fame</p>
+                </div>
+              </div>
+
+              {/* Tracked Emojis */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
+                <label className="label" style={{ fontWeight: 'bold' }}>Tracked Emojis</label>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Space-separated. Supports unicode emojis (⭐ 🔥) and custom Discord emojis (paste the full format like <code>&lt;:name:123456&gt;</code>).</p>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    className="input"
+                    style={{ flex: 1, fontFamily: 'monospace' }}
+                    value={hofEmojiInput}
+                    onChange={(e) => setHofEmojiInput(e.target.value)}
+                    placeholder="⭐ 🔥 💯 <:custom:123456789>"
+                  />
+                  <button
+                    className="btn btn-primary"
+                    title="Save Emojis"
+                    onClick={async (e) => {
+                      const parent = e.currentTarget.parentElement;
+                      const parsed = hofEmojiInput.trim().split(/\s+/).filter(Boolean);
+                      if (parsed.length === 0) { alert('Enter at least one emoji.'); return; }
+                      try {
+                        await axios.post(`${API_BASE}/hof-settings`, { emojis: parsed });
+                        setHofSettings(prev => ({ ...prev, emojis: parsed }));
+                        let indicator = parent.querySelector('.save-indicator');
+                        if (!indicator) { indicator = document.createElement('span'); indicator.className = 'save-indicator'; indicator.style.cssText = 'color: #22c55e; font-weight: bold; font-size: 1.1rem; transition: opacity 0.3s;'; parent.appendChild(indicator); }
+                        indicator.textContent = '✓'; indicator.style.opacity = '1';
+                        setTimeout(() => { indicator.style.opacity = '0'; }, 2000);
+                      } catch (err) {
+                        let indicator = parent.querySelector('.save-indicator');
+                        if (!indicator) { indicator = document.createElement('span'); indicator.className = 'save-indicator'; indicator.style.cssText = 'color: #ef4444; font-weight: bold; transition: opacity 0.3s;'; parent.appendChild(indicator); }
+                        indicator.textContent = '✗'; indicator.style.opacity = '1';
+                        setTimeout(() => { indicator.style.opacity = '0'; }, 2000);
+                      }
+                    }}
+                  >
+                    <Save size={14} />
+                  </button>
+                </div>
+                {hofSettings.emojis && hofSettings.emojis.length > 0 && (
+                  <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {hofSettings.emojis.map((e, i) => (
+                      <span key={i} style={{ padding: '0.25rem 0.6rem', background: 'rgba(99,102,241,0.15)', borderRadius: '0.5rem', fontSize: '0.9rem' }}>{e}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Autostar + Ignored Channels */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <label className="label" style={{ fontWeight: 'bold' }}>Auto-Star Channels</label>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Bot auto-reacts with tracked emojis on new messages in these channels.</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {Object.entries(channels).map(([id, channelObj]) => {
+                      const isAutostar = (hofSettings.autostar_channels || []).includes(id);
+                      return (
+                        <label key={id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={isAutostar}
+                            onChange={async (e) => {
+                              const newList = e.target.checked
+                                ? [...(hofSettings.autostar_channels || []), id]
+                                : (hofSettings.autostar_channels || []).filter(c => c !== id);
+                              setHofSettings(prev => ({ ...prev, autostar_channels: newList }));
+                              try { await axios.post(`${API_BASE}/hof-settings`, { autostar_channels: newList }); } catch (err) { alert('Save failed'); }
+                            }}
+                            style={{ width: '14px', height: '14px' }}
+                          />
+                          #{channelObj.name}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <label className="label" style={{ fontWeight: 'bold' }}>Ignored Channels</label>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Reactions in these channels will NOT count toward HOF.</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {Object.entries(channels).map(([id, channelObj]) => {
+                      const isIgnored = (hofSettings.ignored_channels || []).includes(id);
+                      return (
+                        <label key={id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={isIgnored}
+                            onChange={async (e) => {
+                              const newList = e.target.checked
+                                ? [...(hofSettings.ignored_channels || []), id]
+                                : (hofSettings.ignored_channels || []).filter(c => c !== id);
+                              setHofSettings(prev => ({ ...prev, ignored_channels: newList }));
+                              try { await axios.post(`${API_BASE}/hof-settings`, { ignored_channels: newList }); } catch (err) { alert('Save failed'); }
+                            }}
+                            style={{ width: '14px', height: '14px' }}
+                          />
+                          #{channelObj.name}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
