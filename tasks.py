@@ -12,10 +12,9 @@ from datetime import datetime, date
 from zoneinfo import ZoneInfo
 from discord.ext import tasks
 
-from config import CHANNEL_ID, TEST_CHANNEL_ID
+from config import CHANNEL_ID, TEST_CHANNEL_ID, GUILD_ID
 
 # Constants
-YOUR_GUILD_ID = 1167166210610298910
 MASOCHIST_ROLE_ID = 1167184822129664113
 
 import activity as activity_tracker

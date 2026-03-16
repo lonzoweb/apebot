@@ -54,6 +54,7 @@ MOD_CHANNEL_ID = int(mod_channel_id_str) if mod_channel_id_str else None
 # ============================================================
 
 AUTHORIZED_ROLES = ["Principe", "Capo", "Sottocapo", "Caporegime"]
+GUILD_ID = 1167166210610298910
 DAILY_COMMAND_ROLE = "Patrizio"
 ROLE_ADD_QUOTE = "Caporegime"
 

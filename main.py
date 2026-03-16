@@ -24,7 +24,7 @@ from discord.ext import commands
 import tasks
 import battle
 from items import aggressive_uwu
-from config import TOKEN, COMMAND_PREFIX, AUTHORIZED_ROLES
+from config import TOKEN, COMMAND_PREFIX, AUTHORIZED_ROLES, GUILD_ID
 from database import (
     init_db,
     add_active_effect,
@@ -93,7 +93,6 @@ bot.start_time = datetime.now()
 bot.DEBUG_MODE = False
 
 # Role name that denies "Use Application Commands" — must exist on the server
-GUILD_ID = 1167166210610298910  # From tasks.py
 MUZZLE_ROLE_NAME = "hexed"
 
 # ============================================================

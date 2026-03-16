@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional
 # Add parent dir to sys.path to import from database.py if needed, 
 # but better to have standalone DB logic here for safety or import it.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from config import DB_FILE
+from config import DB_FILE, GUILD_ID
 from database import calculate_level_for_xp, get_cached_roles, init_db, get_cached_channels
 
 import logging
@@ -554,11 +554,12 @@ async def api_get_hof_settings():
     async with aiosqlite.connect(DB_FILE) as db:
         async with db.execute(
             "SELECT guild_id, channel_id, threshold, emojis, autostar_channels, "
-            "ignored_channels, blacklisted_users FROM hof_settings LIMIT 1"
+            "ignored_channels, blacklisted_users FROM hof_settings WHERE guild_id = ?",
+            (str(GUILD_ID),)
         ) as cursor:
             row = await cursor.fetchone()
     if not row:
-        return {"channel_id": "", "threshold": 3, "emojis": ["⭐"], "autostar_channels": [], "ignored_channels": [], "blacklisted_users": []}
+        return {"guild_id": str(GUILD_ID), "channel_id": "", "threshold": 3, "emojis": ["⭐"], "autostar_channels": [], "ignored_channels": [], "blacklisted_users": []}
     return {
         "guild_id": row[0],
         "channel_id": row[1] or "",
@@ -582,7 +583,7 @@ async def api_set_hof_settings(data: HofSettingsUpdate):
     """Update Hall of Fame settings. Only provided fields are updated."""
     # Get current settings first
     current = await api_get_hof_settings()
-    guild_id = current.get("guild_id", "0")
+    guild_id = str(GUILD_ID)
     
     channel_id = data.channel_id if data.channel_id is not None else current["channel_id"]
     threshold = data.threshold if data.threshold is not None else current["threshold"]
