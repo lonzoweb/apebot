@@ -238,12 +238,15 @@ async def _post_or_update_hof(
 
     if hof_msg is None:
         hof_msg = await hof_ch.send(content=content, embed=embed)
-        # Bot self-reacts ONLY with the trigger emoji
-        if trigger_emoji:
-            try:
-                await hof_msg.add_reaction(trigger_emoji)
-            except Exception:
-                pass
+    
+    # Ensure bot self-reacts with the trigger emoji if possible
+    if trigger_emoji:
+        try:
+            # Check if reaction already exists from the bot
+            # (Simplest is to just try add_reaction, discord.py handles duplicates)
+            await hof_msg.add_reaction(trigger_emoji)
+        except Exception as e:
+            logger.debug(f"Failed to add HOF reaction: {e}")
 
     total = sum(emoji_counts.values()) if emoji_counts else 0
     await _upsert_entry(
@@ -355,10 +358,18 @@ class HofCog(commands.Cog):
                 return
 
             guild   = self.bot.get_guild(payload.guild_id)
+            if not guild:
+                logger.warning(f"🔍 HOF: Could not find guild {payload.guild_id}")
+                return
+
             channel = guild.get_channel(payload.channel_id)
             if not channel:
-                logger.info(f"🔍 HOF: Could not find channel {payload.channel_id}, skipping.")
-                return
+                try:
+                    channel = await guild.fetch_channel(payload.channel_id)
+                except Exception as e:
+                    logger.info(f"🔍 HOF: Could not fetch channel {payload.channel_id}: {e}")
+                    return
+
             try:
                 message = await channel.fetch_message(payload.message_id)
             except Exception as e:
@@ -370,9 +381,13 @@ class HofCog(commands.Cog):
                 logger.info(f"🔍 HOF: Author {message.author.id} is blacklisted, skipping.")
                 return
 
+            if not s["emojis"]:
+                logger.warning(f"🔍 HOF: No tracked emojis configured for guild {payload.guild_id}.")
+                return
+
             emoji_counts = _count_by_emoji_from_reactions(message, s["emojis"])
             max_count = max(emoji_counts.values()) if emoji_counts else 0
-            is_locked = str(payload.message_id) in s["locked_messages"]
+            is_locked = str(payload.message_id) in s.get("locked_messages", [])
 
             logger.info(f"🔍 HOF: emoji_counts={emoji_counts} max_count={max_count} threshold={s['threshold']} locked={is_locked}")
 
@@ -895,6 +910,7 @@ class HofCog(commands.Cog):
                 channel = await interaction.guild.fetch_channel(channel_id)
             message = await channel.fetch_message(message_id)
         except Exception as e:
+            logger.error(f"❌ HOF Sync fetch failed: {e}", exc_info=True)
             return await interaction.response.send_message(f"❌ Error fetching message: {e}", ephemeral=True)
 
         await _force_to_hof(interaction, message)
@@ -927,14 +943,22 @@ async def _force_to_hof(interaction: discord.Interaction, message: discord.Messa
         trashed.remove(str(message.id))
         await _set_settings(interaction.guild_id, trashed_messages=trashed)
 
-    # Build emoji counts from existing reactions (if any); empty dict if none
+    # Build emoji counts from existing reactions (if any)
     emoji_counts = {}
+    best_emoji = None
+    max_rc = 0
     for r in message.reactions:
-        if str(r.emoji) in s["emojis"]:
-            emoji_counts[str(r.emoji)] = r.count
+        es = str(r.emoji)
+        if es in s["emojis"]:
+            emoji_counts[es] = r.count
+            if r.count > max_rc:
+                max_rc = r.count
+                best_emoji = es
 
-    # Choose a random emoji for the header/self-react if forced
-    trigger = random.choice(s["emojis"]) if s["emojis"] else None
+    # Choose the best emoji (most reactions) or fallback to first configured
+    trigger = best_emoji or (s["emojis"][0] if s["emojis"] else None)
+    
+    logger.info(f"🏆 HOF Manual: Forcing message {message.id} into HOF. Trigger={trigger} Counts={emoji_counts}")
     await _force_post_to_hof(interaction.client, interaction.guild, message, emoji_counts, s, trigger)
 
     await interaction.response.send_message(
@@ -962,11 +986,12 @@ async def _force_post_to_hof(bot, guild, message, emoji_counts, s, trigger_emoji
 
     if hof_msg is None:
         hof_msg = await hof_ch.send(content=content, embed=embed)
-        if trigger_emoji:
-            try:
-                await hof_msg.add_reaction(trigger_emoji)
-            except Exception:
-                pass
+    
+    if trigger_emoji:
+        try:
+            await hof_msg.add_reaction(trigger_emoji)
+        except Exception as e:
+            logger.debug(f"Failed to add manual HOF reaction: {e}")
 
     total = sum(emoji_counts.values()) if emoji_counts else 0
     await _upsert_entry(
