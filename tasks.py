@@ -119,23 +119,14 @@ async def _send_morning_quote(bot, guild, target_channels):
 
     from quote_card import generate_quote_card
     buf = generate_quote_card(quote, "obsidian")
-    file = discord.File(buf, filename="quote.png")
-
-    embed = discord.Embed(
-        title="🌅 Blessings to Apeiron",
-        color=discord.Color.gold(),
-    )
-    embed.set_image(url="attachment://quote.png")
-    embed.set_footer(text="🕊️ Quote")
     
     for ch in target_channels:
         try:
-            # Reuse the buffer for multiple channels
             buf.seek(0)
             file = discord.File(buf, filename="quote.png")
-            await ch.send(file=file, embed=embed)
+            await ch.send(file=file)
         except Exception as e:
-            logger.error(f"Failed to send morning quote to {ch}: {e}")
+            logger.error(f"Failed to send morning quote image to {ch}: {e}")
 
     await _save_quote_state(quote)
     await _set_tomorrow_quote(None)   # clear for next day
@@ -148,22 +139,14 @@ async def _send_evening_quote(bot, guild, target_channels, emperor_channel, quot
     """Repost the quote at 6pm, then send candidates to #emperor."""
     from quote_card import generate_quote_card
     buf = generate_quote_card(quote, "cyberpunk")
-    file = discord.File(buf, filename="quote.png")
-
-    embed = discord.Embed(
-        description="", # Clear text description to prevent splitting issues
-        color=discord.Color.dark_gold(),
-    )
-    embed.set_image(url="attachment://quote.png")
-    embed.set_footer(text="🌇 Quote")
     
     for ch in target_channels:
         try:
             buf.seek(0)
             file = discord.File(buf, filename="quote.png")
-            await ch.send(file=file, embed=embed)
+            await ch.send(file=file)
         except Exception as e:
-            logger.error(f"Failed to send evening quote to {ch}: {e}")
+            logger.error(f"Failed to send evening quote image to {ch}: {e}")
 
     # Send 3 candidates to #emperor
     if emperor_channel:

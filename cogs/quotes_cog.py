@@ -241,14 +241,7 @@ class QuotesCog(commands.Cog):
 
                 buf = generate_quote_card(daily_quote, "obsidian")
                 file = discord.File(buf, filename="quote.png")
-
-                embed = discord.Embed(
-                    title="🌅 Blessings to Apeiron",
-                    color=discord.Color.gold(),
-                )
-                embed.set_image(url="attachment://quote.png")
-                embed.set_footer(text="🕊️ Daily Quote Recall")
-                await ctx.send(file=file, embed=embed)
+                await ctx.send(file=file)
             else:
                 await ctx.send("⚠️ The daily quote has not been generated yet today.")
         else:
