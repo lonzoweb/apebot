@@ -321,4 +321,4 @@ async def google_generate_image(prompt: str):
             return None, "Google Auth Error (401). Ensure Vertex AI API is enabled in project."
         if "403" in err_msg:
             return None, "Google Permission Error (403). Check Service Account roles."
-        return None, f"Google Error: {err_msg[:100]}"
+        return None, f"Google Error: {err_msg}"

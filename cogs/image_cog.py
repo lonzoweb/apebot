@@ -5,13 +5,38 @@ import time
 import asyncio
 import logging
 from api import google_generate_image
-from database import get_balance, update_balance, is_economy_on
+from database import get_balance, update_balance, is_economy_on, get_channel_assigns
 
 logger = logging.getLogger(__name__)
 
 class ImageCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    async def _report_error(self, ctx, prompt, error_msg):
+        """Send detailed error report to the configured error channel."""
+        try:
+            config = await get_channel_assigns()
+            error_channel_id = config.get("error")
+            if not error_channel_id:
+                return
+
+            error_channel = self.bot.get_channel(int(error_channel_id))
+            if not error_channel:
+                return
+
+            embed = discord.Embed(
+                title="⚠️ Image Generation Failure",
+                description=f"**User**: {ctx.author.mention} ({ctx.author.id})\n"
+                            f"**Prompt**: `{prompt}`\n"
+                            f"**Error**: ```{error_msg}```",
+                color=discord.Color.red(),
+                timestamp=discord.utils.utcnow()
+            )
+            embed.set_footer(text="System Error Reporting")
+            await error_channel.send(embed=embed)
+        except Exception as e:
+            logger.error(f"Failed to send detailed error report: {e}")
 
     @commands.command(name="img")
     @commands.cooldown(1, 15, commands.BucketType.user)
@@ -63,10 +88,17 @@ class ImageCog(commands.Cog):
             await status_msg.edit(content=f"🌑 **Finished {prompt}:**", embed=embed, attachments=[file])
 
         except Exception as e:
-            logger.error(f"Error in .img command: {e}", exc_info=True)
+            err_str = str(e)
+            logger.error(f"Error in .img command: {err_str}", exc_info=True)
+            
+            # Detailed reporting to error channel
+            await self._report_error(ctx, prompt or "None", err_str)
+            
             if not ctx.author.guild_permissions.administrator:
                 await update_balance(user_id, cost)
-            await loading_msg.edit(content="❌ **The gen failed.** Check the logs. (Refunded)")
+            await status_msg.edit(content=f"❌ **The gen failed.** Error details sent to spirits. (Refunded)")
+
+    @commands.Cog.listener()
 
 async def setup(bot):
     await bot.add_cog(ImageCog(bot))
