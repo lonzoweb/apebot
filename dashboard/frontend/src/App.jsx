@@ -42,7 +42,7 @@ function App() {
   const [channelConfig, setChannelConfig] = useState({});
   const [commandRestrictions, setCommandRestrictions] = useState({});
   const [botCommands, setBotCommands] = useState([]);
-  const [hofSettings, setHofSettings] = useState({ channel_id: '', threshold: 3, emojis: ['⭐'], autostar_channels: [], ignored_channels: [], blacklisted_users: [] });
+  const [hofSettings, setHofSettings] = useState({ channel_id: '', threshold: 3, emojis: ['⭐'], ignored_channels: [], blacklisted_users: [] });
   const [hofEmojiInput, setHofEmojiInput] = useState('');
   const [confirmSendRandom, setConfirmSendRandom] = useState(false);
   const [confirmSendId, setConfirmSendId] = useState(null);
@@ -1564,60 +1564,31 @@ function App() {
                 )}
               </div>
 
-              {/* Autostar + Ignored Channels */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <label className="label" style={{ fontWeight: 'bold' }}>Auto-Star Channels</label>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Bot auto-reacts with tracked emojis on new messages in these channels.</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {Object.entries(channels).map(([id, channelObj]) => {
-                      const isAutostar = (hofSettings.autostar_channels || []).includes(id);
-                      return (
-                        <label key={id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={isAutostar}
-                            onChange={async (e) => {
-                              const newList = e.target.checked
-                                ? [...(hofSettings.autostar_channels || []), id]
-                                : (hofSettings.autostar_channels || []).filter(c => c !== id);
-                              setHofSettings(prev => ({ ...prev, autostar_channels: newList }));
-                              try { await axios.post(`${API_BASE}/hof-settings`, { autostar_channels: newList }); } catch (err) { alert('Save failed'); }
-                            }}
-                            style={{ width: '14px', height: '14px' }}
-                          />
-                          #{channelObj.name}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <label className="label" style={{ fontWeight: 'bold' }}>Ignored Channels</label>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Reactions in these channels will NOT count toward HOF.</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {Object.entries(channels).map(([id, channelObj]) => {
-                      const isIgnored = (hofSettings.ignored_channels || []).includes(id);
-                      return (
-                        <label key={id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={isIgnored}
-                            onChange={async (e) => {
-                              const newList = e.target.checked
-                                ? [...(hofSettings.ignored_channels || []), id]
-                                : (hofSettings.ignored_channels || []).filter(c => c !== id);
-                              setHofSettings(prev => ({ ...prev, ignored_channels: newList }));
-                              try { await axios.post(`${API_BASE}/hof-settings`, { ignored_channels: newList }); } catch (err) { alert('Save failed'); }
-                            }}
-                            style={{ width: '14px', height: '14px' }}
-                          />
-                          #{channelObj.name}
-                        </label>
-                      );
-                    })}
-                  </div>
+              {/* Ignored Channels */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <label className="label" style={{ fontWeight: 'bold' }}>Ignored Channels</label>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Reactions in these channels will NOT count toward HOF.</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem' }}>
+                  {Object.entries(channels).map(([id, channelObj]) => {
+                    const isIgnored = (hofSettings.ignored_channels || []).includes(id);
+                    return (
+                      <label key={id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={isIgnored}
+                          onChange={async (e) => {
+                            const newList = e.target.checked
+                              ? [...(hofSettings.ignored_channels || []), id]
+                              : (hofSettings.ignored_channels || []).filter(c => c !== id);
+                            setHofSettings(prev => ({ ...prev, ignored_channels: newList }));
+                            try { await axios.post(`${API_BASE}/hof-settings`, { ignored_channels: newList }); } catch (err) { alert('Save failed'); }
+                          }}
+                          style={{ width: '14px', height: '14px' }}
+                        />
+                        #{channelObj.name}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             </div>

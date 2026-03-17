@@ -245,7 +245,6 @@ async def init_db():
                     channel_id TEXT,
                     threshold INTEGER DEFAULT 3,
                     emojis TEXT DEFAULT '["⭐"]',
-                    autostar_channels TEXT DEFAULT '[]',
                     ignored_channels TEXT DEFAULT '[]',
                     locked_messages TEXT DEFAULT '[]',
                     trashed_messages TEXT DEFAULT '[]',

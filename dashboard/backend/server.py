@@ -553,28 +553,26 @@ async def api_get_hof_settings():
     """Get Hall of Fame settings (single-guild)."""
     async with aiosqlite.connect(DB_FILE) as db:
         async with db.execute(
-            "SELECT guild_id, channel_id, threshold, emojis, autostar_channels, "
+            "SELECT guild_id, channel_id, threshold, emojis, "
             "ignored_channels, blacklisted_users FROM hof_settings WHERE guild_id = ?",
             (str(GUILD_ID),)
         ) as cursor:
             row = await cursor.fetchone()
     if not row:
-        return {"guild_id": str(GUILD_ID), "channel_id": "", "threshold": 3, "emojis": ["⭐"], "autostar_channels": [], "ignored_channels": [], "blacklisted_users": []}
+        return {"guild_id": str(GUILD_ID), "channel_id": "", "threshold": 3, "emojis": ["⭐"], "ignored_channels": [], "blacklisted_users": []}
     return {
         "guild_id": row[0],
         "channel_id": row[1] or "",
         "threshold": row[2],
         "emojis": json.loads(row[3]),
-        "autostar_channels": json.loads(row[4]),
-        "ignored_channels": json.loads(row[5]),
-        "blacklisted_users": json.loads(row[6]) if row[6] else [],
+        "ignored_channels":  json.loads(row[4]),
+        "blacklisted_users": json.loads(row[5]) if row[5] else [],
     }
 
 class HofSettingsUpdate(BaseModel):
     channel_id: Optional[str] = None
     threshold: Optional[int] = None
     emojis: Optional[list] = None
-    autostar_channels: Optional[list] = None
     ignored_channels: Optional[list] = None
     blacklisted_users: Optional[list] = None
 
@@ -588,7 +586,6 @@ async def api_set_hof_settings(data: HofSettingsUpdate):
     channel_id = data.channel_id if data.channel_id is not None else current["channel_id"]
     threshold = data.threshold if data.threshold is not None else current["threshold"]
     emojis = data.emojis if data.emojis is not None else current["emojis"]
-    autostar_channels = data.autostar_channels if data.autostar_channels is not None else current["autostar_channels"]
     ignored_channels = data.ignored_channels if data.ignored_channels is not None else current["ignored_channels"]
     blacklisted_users = data.blacklisted_users if data.blacklisted_users is not None else current["blacklisted_users"]
     
@@ -596,19 +593,18 @@ async def api_set_hof_settings(data: HofSettingsUpdate):
         await db.execute(
             """
             INSERT INTO hof_settings
-                (guild_id, channel_id, threshold, emojis, autostar_channels,
+                (guild_id, channel_id, threshold, emojis,
                  ignored_channels, locked_messages, trashed_messages, blacklisted_users)
-            VALUES (?, ?, ?, ?, ?, ?, '[]', '[]', ?)
+            VALUES (?, ?, ?, ?, ?, '[]', '[]', ?)
             ON CONFLICT(guild_id) DO UPDATE SET
                 channel_id         = excluded.channel_id,
                 threshold          = excluded.threshold,
                 emojis             = excluded.emojis,
-                autostar_channels  = excluded.autostar_channels,
                 ignored_channels   = excluded.ignored_channels,
                 blacklisted_users  = excluded.blacklisted_users
             """,
             (guild_id, channel_id, threshold,
-             json.dumps(emojis), json.dumps(autostar_channels),
+             json.dumps(emojis),
              json.dumps(ignored_channels), json.dumps(blacklisted_users)),
         )
         await db.commit()

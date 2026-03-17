@@ -26,7 +26,7 @@ async def _get_settings(guild_id: int) -> dict:
     gid = str(guild_id)
     async with get_db() as conn:
         async with conn.execute(
-            "SELECT channel_id, threshold, emojis, autostar_channels, "
+            "SELECT channel_id, threshold, emojis, "
             "ignored_channels, locked_messages, trashed_messages, blacklisted_users "
             "FROM hof_settings WHERE guild_id = ?", (gid,)
         ) as cur:
@@ -35,7 +35,7 @@ async def _get_settings(guild_id: int) -> dict:
         return {
             "channel_id": None, "threshold": 3,
             "emojis": ["⭐"],
-            "autostar_channels": [], "ignored_channels": [],
+            "ignored_channels": [],
             "locked_messages": [], "trashed_messages": [],
             "blacklisted_users": [],
         }
@@ -43,11 +43,10 @@ async def _get_settings(guild_id: int) -> dict:
         "channel_id": row[0],
         "threshold":  row[1],
         "emojis":            json.loads(row[2]),
-        "autostar_channels": json.loads(row[3]),
-        "ignored_channels":  json.loads(row[4]),
-        "locked_messages":   json.loads(row[5]),
-        "trashed_messages":  json.loads(row[6]),
-        "blacklisted_users": json.loads(row[7]) if len(row) > 7 else [],
+        "ignored_channels":  json.loads(row[3]),
+        "locked_messages":   json.loads(row[4]),
+        "trashed_messages":  json.loads(row[5]),
+        "blacklisted_users": json.loads(row[6]) if len(row) > 6 else [],
     }
 
 
@@ -60,14 +59,13 @@ async def _set_settings(guild_id: int, **fields):
         await conn.execute(
             """
             INSERT INTO hof_settings
-                (guild_id, channel_id, threshold, emojis, autostar_channels,
+                (guild_id, channel_id, threshold, emojis,
                  ignored_channels, locked_messages, trashed_messages, blacklisted_users)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(guild_id) DO UPDATE SET
                 channel_id         = excluded.channel_id,
                 threshold          = excluded.threshold,
                 emojis             = excluded.emojis,
-                autostar_channels  = excluded.autostar_channels,
                 ignored_channels   = excluded.ignored_channels,
                 locked_messages    = excluded.locked_messages,
                 trashed_messages   = excluded.trashed_messages,
@@ -76,7 +74,6 @@ async def _set_settings(guild_id: int, **fields):
             (gid,
              s["channel_id"], s["threshold"],
              json.dumps(s["emojis"]),
-             json.dumps(s["autostar_channels"]),
              json.dumps(s["ignored_channels"]),
              json.dumps(s["locked_messages"]),
              json.dumps(s["trashed_messages"]),
@@ -109,7 +106,7 @@ async def _upsert_entry(orig_msg_id, orig_ch_id, author_id, hof_msg_id,
                 content        = excluded.content,
                 image_url      = excluded.image_url,
                 voice_url      = excluded.voice_url,
-                trigger_emoji  = COALESCE(hof_entries.trigger_emoji, excluded.trigger_emoji)
+                trigger_emoji  = excluded.trigger_emoji
             """,
             (str(orig_msg_id), str(orig_ch_id), str(author_id),
              str(hof_msg_id) if hof_msg_id else None,
@@ -392,12 +389,22 @@ class HofCog(commands.Cog):
             logger.info(f"🔍 HOF: emoji_counts={emoji_counts} max_count={max_count} threshold={s['threshold']} locked={is_locked}")
 
             entry = await _get_entry(payload.message_id)
-            persistent_trigger = entry[9] if entry else None
+            # If already in HOF, keep the old trigger
+            if entry and entry[3]:
+                trigger = entry[9] or str(payload.emoji)
+            else:
+                # Not in HOF yet. Check if current reaction meets threshold.
+                # If multiple meet it, prioritize the one that just happened if it meets it.
+                eligible = [e for e, c in emoji_counts.items() if c >= s["threshold"]]
+                if str(payload.emoji) in eligible:
+                    trigger = str(payload.emoji)
+                elif eligible:
+                    trigger = eligible[0]
+                else:
+                    trigger = str(payload.emoji)
 
             if max_count >= s["threshold"]:
-                # Use persistent trigger if available, else current reaction
-                trigger = persistent_trigger or str(payload.emoji)
-                logger.info(f"🏆 HOF: Message {payload.message_id} met threshold ({max_count} >= {s['threshold']}), posting/updating.")
+                logger.info(f"🏆 HOF: Message {payload.message_id} met threshold ({max_count} >= {s['threshold']}), posting/updating with trigger {trigger}.")
                 await _post_or_update_hof(self.bot, guild, message, emoji_counts, s, trigger_emoji=trigger)
                 # Cleanup lock after completion (optional, but keep it for threshold transitions)
             else:
@@ -414,7 +421,7 @@ class HofCog(commands.Cog):
                         None, max_count,
                         message.content, _extract_image(message), message.jump_url,
                         voice_url=_extract_voice(message),
-                        trigger_emoji=persistent_trigger
+                        trigger_emoji=trigger
                     )
                 elif max_count > 0:
                     logger.info(f"🔍 HOF: Message {payload.message_id} has {max_count} reactions but below threshold ({s['threshold']}), tracking.")
@@ -424,23 +431,8 @@ class HofCog(commands.Cog):
                         None, max_count,
                         message.content, _extract_image(message), message.jump_url,
                         voice_url=_extract_voice(message),
-                        trigger_emoji=persistent_trigger or str(payload.emoji)
+                        trigger_emoji=trigger
                     )
-
-    # ── AUTO-STAR ─────────────────────────────────────────────
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if message.author.bot or not message.guild:
-            return
-        s = await _get_settings(message.guild.id)
-        if str(message.channel.id) not in s["autostar_channels"]:
-            return
-        for emoji in s["emojis"]:
-            try:
-                await message.add_reaction(emoji)
-            except Exception:
-                pass
 
     # ── PREFIX BROWSE (.hall random | .hall @user) ────────────
 
@@ -585,21 +577,7 @@ class HofCog(commands.Cog):
         await _set_settings(interaction.guild_id, ignored_channels=ignored)
         await interaction.response.send_message(f"✅ {channel.mention} unignored.", ephemeral=True)
 
-    @hall_group.command(name="autostar", description="Toggle auto-react in a channel")
-    @app_commands.describe(channel="Channel to toggle")
-    @app_commands.default_permissions(administrator=True)
-    async def slash_autostar(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        s = await _get_settings(interaction.guild_id)
-        asc = s["autostar_channels"]
-        cid = str(channel.id)
-        if cid in asc:
-            asc.remove(cid)
-            msg = f"✅ Auto-star **off** for {channel.mention}."
-        else:
-            asc.append(cid)
-            msg = f"✅ Auto-star **on** for {channel.mention}."
-        await _set_settings(interaction.guild_id, autostar_channels=asc)
-        await interaction.response.send_message(msg, ephemeral=True)
+
 
     @hall_group.command(name="lock", description="Freeze a HOF entry (won't be removed if stars drop)")
     @app_commands.describe(message_link="Right-click a message → Copy Message Link")
@@ -646,13 +624,11 @@ class HofCog(commands.Cog):
         s = await _get_settings(interaction.guild_id)
         hof_ch  = f"<#{s['channel_id']}>" if s["channel_id"] else "❌ Not set"
         emojis  = "  ".join(s["emojis"]) if s["emojis"] else "None"
-        autostr = ", ".join(f"<#{c}>" for c in s["autostar_channels"]) or "None"
         ignored = ", ".join(f"<#{c}>" for c in s["ignored_channels"]) or "None"
         embed = discord.Embed(title="🏆 Hall of Fame Settings", color=0xFFD700)
         embed.add_field(name="Channel",   value=hof_ch,              inline=True)
         embed.add_field(name="Threshold", value=str(s["threshold"]), inline=True)
         embed.add_field(name="Emojis",    value=emojis,              inline=True)
-        embed.add_field(name="Auto-star", value=autostr,             inline=False)
         embed.add_field(name="Ignored",   value=ignored,             inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
