@@ -8,6 +8,7 @@ import random
 import logging
 import asyncio
 import time
+import io
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 from discord.ext import tasks
@@ -116,14 +117,25 @@ async def _send_morning_quote(bot, guild, target_channels):
     else:
         quote = random.choice(quotes)
 
+    from quote_card import generate_quote_card
+    buf = generate_quote_card(quote, "obsidian")
+    file = discord.File(buf, filename="quote.png")
+
     embed = discord.Embed(
         title="🌅 Blessings to Apeiron",
-        description=f"📜 {quote}",
         color=discord.Color.gold(),
     )
+    embed.set_image(url="attachment://quote.png")
     embed.set_footer(text="🕊️ Quote")
+    
     for ch in target_channels:
-        await ch.send(embed=embed)
+        try:
+            # Reuse the buffer for multiple channels
+            buf.seek(0)
+            file = discord.File(buf, filename="quote.png")
+            await ch.send(file=file, embed=embed)
+        except Exception as e:
+            logger.error(f"Failed to send morning quote to {ch}: {e}")
 
     await _save_quote_state(quote)
     await _set_tomorrow_quote(None)   # clear for next day
@@ -134,13 +146,24 @@ async def _send_morning_quote(bot, guild, target_channels):
 
 async def _send_evening_quote(bot, guild, target_channels, emperor_channel, quote):
     """Repost the quote at 6pm, then send candidates to #emperor."""
+    from quote_card import generate_quote_card
+    buf = generate_quote_card(quote, "cyberpunk")
+    file = discord.File(buf, filename="quote.png")
+
     embed = discord.Embed(
-        description=f"📜 {quote}",
+        description="", # Clear text description to prevent splitting issues
         color=discord.Color.dark_gold(),
     )
+    embed.set_image(url="attachment://quote.png")
     embed.set_footer(text="🌇 Quote")
+    
     for ch in target_channels:
-        await ch.send(embed=embed)
+        try:
+            buf.seek(0)
+            file = discord.File(buf, filename="quote.png")
+            await ch.send(file=file, embed=embed)
+        except Exception as e:
+            logger.error(f"Failed to send evening quote to {ch}: {e}")
 
     # Send 3 candidates to #emperor
     if emperor_channel:
