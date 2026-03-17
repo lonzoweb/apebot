@@ -8,7 +8,6 @@ import random
 import logging
 import asyncio
 import time
-import io
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 from discord.ext import tasks
@@ -103,6 +102,20 @@ def get_daily_quote():
 # CORE QUOTE SEND LOGIC (called by task + startup catch-up)
 # ============================================================
 
+def _normalize_quote(text: str) -> str:
+    """
+    Cleans up a quote by replacing internal newlines/tabs with spaces
+    and collapsing multiple spaces into one. This prevents Discord 
+    from splitting words mid-line due to hard-coded newlines.
+    """
+    if not text:
+        return ""
+    # Replace newlines, carriage returns, and tabs with spaces
+    cleaned = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+    # Collapse multiple spaces and strip
+    return " ".join(cleaned.split()).strip()
+
+
 async def _send_morning_quote(bot, guild, target_channels):
     """Pick and send the 10am quote. Returns the quote string."""
     global _cached_quote
@@ -117,16 +130,17 @@ async def _send_morning_quote(bot, guild, target_channels):
     else:
         quote = random.choice(quotes)
 
-    from quote_card import generate_quote_card
-    buf = generate_quote_card(quote, "obsidian")
-    
+    # Normalize to prevent word splitting
+    quote = _normalize_quote(quote)
+
+    embed = discord.Embed(
+        title="🌅 Blessings to Apeiron",
+        description=f"📜 {quote}",
+        color=discord.Color.gold(),
+    )
+    embed.set_footer(text="🕊️ Quote")
     for ch in target_channels:
-        try:
-            buf.seek(0)
-            file = discord.File(buf, filename="quote.png")
-            await ch.send(file=file)
-        except Exception as e:
-            logger.error(f"Failed to send morning quote image to {ch}: {e}")
+        await ch.send(embed=embed)
 
     await _save_quote_state(quote)
     await _set_tomorrow_quote(None)   # clear for next day
@@ -137,16 +151,16 @@ async def _send_morning_quote(bot, guild, target_channels):
 
 async def _send_evening_quote(bot, guild, target_channels, emperor_channel, quote):
     """Repost the quote at 6pm, then send candidates to #emperor."""
-    from quote_card import generate_quote_card
-    buf = generate_quote_card(quote, "cyberpunk")
-    
+    # Normalize to prevent word splitting
+    quote = _normalize_quote(quote)
+
+    embed = discord.Embed(
+        description=f"📜 {quote}",
+        color=discord.Color.dark_gold(),
+    )
+    embed.set_footer(text="🌇 Quote")
     for ch in target_channels:
-        try:
-            buf.seek(0)
-            file = discord.File(buf, filename="quote.png")
-            await ch.send(file=file)
-        except Exception as e:
-            logger.error(f"Failed to send evening quote image to {ch}: {e}")
+        await ch.send(embed=embed)
 
     # Send 3 candidates to #emperor
     if emperor_channel:

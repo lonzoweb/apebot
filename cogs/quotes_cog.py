@@ -236,12 +236,17 @@ class QuotesCog(commands.Cog):
         ):
             daily_quote = await tasks.get_daily_quote_async()
             if daily_quote:
-                from quote_card import generate_quote_card
-                import io
-
-                buf = generate_quote_card(daily_quote, "obsidian")
-                file = discord.File(buf, filename="quote.png")
-                await ctx.send(file=file)
+                # Normalize to prevent word splitting
+                from tasks import _normalize_quote
+                normalized = _normalize_quote(daily_quote)
+                
+                embed = discord.Embed(
+                    title="🌅 Blessings to Apeiron",
+                    description=f"📜 {normalized}",
+                    color=discord.Color.gold(),
+                )
+                embed.set_footer(text="🕊️ Daily Quote Recall")
+                await ctx.send(embed=embed)
             else:
                 await ctx.send("⚠️ The daily quote has not been generated yet today.")
         else:
