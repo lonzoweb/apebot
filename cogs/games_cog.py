@@ -1,6 +1,6 @@
 """
 Games Cog - Game commands
-Commands: dice, pull, torture
+Commands: dice, slots, torture
 """
 
 import discord
@@ -875,9 +875,9 @@ class GamesCog(commands.Cog):
             )
         await msg.edit(content=final_output)
 
-    @commands.command(name="pull")
+    @commands.command(name="slots")
     async def pull_command(self, ctx):
-        """Slot machine with dark occult casino theme"""
+        """Slot machine with dark occult casino theme (.slots)"""
         if not await is_economy_on() and not ctx.author.guild_permissions.administrator:
             return await ctx.reply("🌑 **System Notice**: Slot machines are powered off. Economy is disabled.", mention_author=False)
 
