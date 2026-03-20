@@ -98,7 +98,6 @@ class ImageCog(commands.Cog):
                 await update_balance(user_id, cost)
             await status_msg.edit(content=f"❌ **The gen failed.** Error details sent to spirits. (Refunded)")
 
-    @commands.Cog.listener()
 
 async def setup(bot):
     await bot.add_cog(ImageCog(bot))
