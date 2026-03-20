@@ -610,7 +610,98 @@ async def api_set_hof_settings(data: HofSettingsUpdate):
         await db.commit()
     return {"status": "ok"}
 
+
+
+# ==========================================
+# .key COMMAND SETTINGS
+# ==========================================
+
+class KeyImageAdd(BaseModel):
+    url: str
+    label: Optional[str] = ""
+
+class KeyConfigUpdate(BaseModel):
+    send_count_user: int
+    send_count_admin: int
+
+@app.get("/key-settings")
+async def api_get_key_settings():
+    from database import get_key_settings
+    return await get_key_settings()
+
+@app.post("/key-settings/config")
+async def api_set_key_config(data: KeyConfigUpdate):
+    from database import set_key_config
+    if data.send_count_user < 1 or data.send_count_admin < 1:
+        raise HTTPException(status_code=400, detail="Send counts must be >= 1")
+    await set_key_config(data.send_count_user, data.send_count_admin)
+    return {"status": "ok"}
+
+@app.post("/key-settings/images")
+async def api_add_key_image(data: KeyImageAdd):
+    from database import add_key_image
+    await add_key_image(data.url, data.label or "")
+    return {"status": "ok"}
+
+@app.delete("/key-settings/images/{image_id}")
+async def api_delete_key_image(image_id: int):
+    from database import delete_key_image
+    await delete_key_image(image_id)
+    return {"status": "ok"}
+
+@app.post("/key-settings/images/{image_id}/activate")
+async def api_activate_key_image(image_id: int):
+    from database import set_key_active_image
+    await set_key_active_image(image_id)
+    return {"status": "ok"}
+
+
+# ==========================================
+# ADMIN CONFIG (Tarot, Economy, Yap)
+# ==========================================
+
+class AdminConfigUpdate(BaseModel):
+    tarot_deck: Optional[str] = None      # "thoth" | "rws" | "manara"
+    economy_enabled: Optional[bool] = None
+    yap_level: Optional[str] = None       # "low" | "high"
+
+@app.get("/admin-config")
+async def api_get_admin_config():
+    """Return all admin-configurable settings in one call."""
+    from database import is_economy_on, get_yap_level, get_guild_tarot_deck
+    guild_id = str(GUILD_ID)
+    economy = await is_economy_on()
+    yap = await get_yap_level()
+    tarot = await get_guild_tarot_deck(guild_id)
+    return {
+        "economy_enabled": economy,
+        "yap_level": yap,
+        "tarot_deck": tarot,
+    }
+
+@app.post("/admin-config")
+async def api_set_admin_config(data: AdminConfigUpdate):
+    """Update admin settings. Only provided fields are changed."""
+    from database import set_economy_status, set_yap_level, set_guild_tarot_deck
+    guild_id = str(GUILD_ID)
+
+    if data.economy_enabled is not None:
+        await set_economy_status(data.economy_enabled)
+
+    if data.yap_level is not None:
+        if data.yap_level not in ("low", "high"):
+            raise HTTPException(status_code=400, detail="yap_level must be 'low' or 'high'")
+        await set_yap_level(data.yap_level)
+
+    if data.tarot_deck is not None:
+        if data.tarot_deck not in ("thoth", "rws", "manara"):
+            raise HTTPException(status_code=400, detail="Invalid deck name")
+        await set_guild_tarot_deck(guild_id, data.tarot_deck)
+
+    return {"status": "ok"}
+
 # --- Serve Frontend ---
+
 # Search for frontend/dist relative to project root
 base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 frontend_path = os.path.join(base_dir, "dashboard", "frontend", "dist")

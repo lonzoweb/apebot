@@ -728,11 +728,13 @@ class UtilityCog(commands.Cog):
                     await ctx.send(random.choice(cooldown_messages))
                     return
 
-        image_url = "https://i.imgur.com/GQxOYGn.png"
+        from database import get_key_settings
+        key_cfg = await get_key_settings()
+        image_url = key_cfg["active_url"]
 
         await ctx.send(f"{ctx.author.display_name} ʰᵃˢ ᵖᵃᶦᵈ ᵗʳᶦᵇᵘᵗᵉ")
 
-        count = 6 if (is_admin or is_capo) else 2
+        count = key_cfg["send_count_admin"] if (is_admin or is_capo) else key_cfg["send_count_user"]
         for _ in range(count):
             await ctx.send(image_url)
 

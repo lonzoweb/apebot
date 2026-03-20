@@ -320,48 +320,6 @@ class AdminCog(commands.Cog):
         else:
             await status_msg.edit(content=f"🌑 **No bot messages found to prune.** requested by **{ctx.author.display_name}**")
 
-    @app_commands.command(name="configure", description="[ADMIN] Modify system-wide bot settings")
-    @app_commands.describe(
-        economy="Enable or disable the global economy system",
-        yap_level="Adjust the bot's response detail level (low/high)"
-    )
-    @app_commands.choices(yap_level=[
-        app_commands.Choice(name="Low (Concise)", value="low"),
-        app_commands.Choice(name="High (Detailed)", value="high")
-    ])
-    @app_commands.default_permissions(administrator=True)
-    async def slash_configure(
-        self, 
-        interaction: discord.Interaction, 
-        economy: bool = None, 
-        yap_level: app_commands.Choice[str] = None
-    ):
-        changes = []
-
-        if economy is not None:
-            await set_economy_status(economy)
-            status_text = "ENABLED" if economy else "DISABLED"
-            changes.append(f"• Economy: **{status_text}**")
-
-        if yap_level is not None:
-            await set_yap_level(yap_level.value)
-            changes.append(f"• Yap Level: **{yap_level.name}**")
-
-        if not changes:
-            curr_econ = await is_economy_on()
-            curr_yap = await get_yap_level()
-            msg = (
-                "⚙️ **Current Configuration:**\n"
-                f"• Economy: **{'ENABLED' if curr_econ else 'DISABLED'}**\n"
-                f"• Yap Level: **{curr_yap.upper()}**\n\n"
-                "*Use options to change these settings.*"
-            )
-            return await interaction.response.send_message(msg, ephemeral=True)
-
-        await interaction.response.send_message(
-            "✅ **System Configuration Updated:**\n" + "\n".join(changes),
-            ephemeral=True
-        )
 
     @app_commands.command(name="purge", description="[ADMIN] Modern cleanup for bot messages and prompts")
     @app_commands.describe(limit="Number of bot interactions to remove (max 50)")

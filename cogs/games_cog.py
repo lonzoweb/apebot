@@ -315,13 +315,11 @@ class BlackjackGame:
             await asyncio.sleep(60)
             if not getattr(self, "resolved", False):
                 self.resolved = True
-                # Refund all bets (original + any split bets)
-                from database import update_balance
+                # Gems are NOT returned — forfeited on timeout
+                total_forfeited = sum(hand.bet for hand in self.player_hands)
                 import economy
-                total_refund = sum(hand.bet for hand in self.player_hands)
-                await update_balance(self.ctx.author.id, total_refund)
                 await self.ctx.send(
-                    f"⏳ **Game expired.** {self.ctx.author.mention}'s **{total_refund}** {economy.CURRENCY_SYMBOL} returned."
+                    f"⏳ **BJ timeout.** {self.ctx.author.mention}'s **{total_forfeited}** {economy.CURRENCY_SYMBOL} forfeited."
                 )
                 # Cleanup
                 if self.ctx.author.id in self.cog.active_bj_games:

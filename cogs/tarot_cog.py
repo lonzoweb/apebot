@@ -102,48 +102,14 @@ class TarotCog(commands.Cog):
 
         await execute_draw()
 
-    @commands.command(name="tc")
-    async def tarot_card(self, ctx, action: str = None, deck_name: str = None):
-        """Tarot card command (.tc for draw, .tc set <deck> for config)"""
-        if action and action.lower() == "set":
-            if not ctx.author.guild_permissions.administrator:
-                return await ctx.reply("🚫 Peasant Detected. Begone!", mention_author=False)
-
-            if not deck_name:
-                return await ctx.reply("❌ Specify its name: `thoth`, `rws`, or `manara`.", mention_author=False)
-
-            deck_name = deck_name.lower()
-            valid_decks = {
-                "thoth": "thoth", "aleister": "thoth",
-                "rws": "rws", "rider": "rws", "waite": "rws",
-                "manara": "manara", "milo": "manara", "erotic": "manara"
-            }
-            
-            final_deck = valid_decks.get(deck_name)
-            if not final_deck:
-                return await ctx.reply(f"❌ Unknown deck `{deck_name}`. The spirits only know `thoth`, `rws` or `manara`.", mention_author=False)
-
-            await set_guild_tarot_deck(ctx.guild.id, final_deck)
-            await ctx.send(f"🌑 The deck has been swapped to **{final_deck.upper()}**. The cards never lie.")
-            return
-
+    @commands.command(name="pull", aliases=["tc"])  # TODO: Remove 'tc' alias in a few weeks
+    async def tarot_card(self, ctx):
+        """Draw a tarot card from the current deck (.pull)"""
         await self._handle_draw(ctx, ctx.author, ctx.guild)
 
     @tarot_group.command(name="draw", description="Draw a random tarot card from the current deck")
     async def slash_draw(self, interaction: discord.Interaction):
         await self._handle_draw(interaction, interaction.user, interaction.guild)
-
-    @tarot_group.command(name="config", description="[ADMIN] Set the default tarot deck for the server")
-    @app_commands.describe(deck="The card deck to use")
-    @app_commands.choices(deck=[
-        app_commands.Choice(name="Thoth (Aleister Crowley)", value="thoth"),
-        app_commands.Choice(name="Rider-Waite-Smith (Classic)", value="rws"),
-        app_commands.Choice(name="Manara (Erotic)", value="manara")
-    ])
-    @app_commands.default_permissions(administrator=True)
-    async def slash_config(self, interaction: discord.Interaction, deck: app_commands.Choice[str]):
-        await set_guild_tarot_deck(interaction.guild_id, deck.value)
-        await interaction.response.send_message(f"🌑 The deck has been swapped to **{deck.value.upper()}**. The cards never lie.")
 
 
 async def setup(bot):

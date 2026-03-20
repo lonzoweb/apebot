@@ -44,6 +44,15 @@ function App() {
   const [botCommands, setBotCommands] = useState([]);
   const [hofSettings, setHofSettings] = useState({ channel_id: '', threshold: 3, emojis: ['⭐'], ignored_channels: [], blacklisted_users: [] });
   const [hofEmojiInput, setHofEmojiInput] = useState('');
+  const [adminConfig, setAdminConfig] = useState({ tarot_deck: 'thoth', economy_enabled: true, yap_level: 'high' });
+  const [adminSaving, setAdminSaving] = useState(false);
+  const [adminSaveMsg, setAdminSaveMsg] = useState('');
+  const [keySettings, setKeySettings] = useState({ active_url: '', images: [], send_count_user: 2, send_count_admin: 6 });
+  const [keyImageInput, setKeyImageInput] = useState('');
+  const [keyLabelInput, setKeyLabelInput] = useState('');
+  const [keySendUser, setKeySendUser] = useState(2);
+  const [keySendAdmin, setKeySendAdmin] = useState(6);
+  const [keySaveMsg, setKeySaveMsg] = useState('');
   const [confirmSendRandom, setConfirmSendRandom] = useState(false);
   const [confirmSendId, setConfirmSendId] = useState(null);
   const [sendSuccess, setSendSuccess] = useState(null); // 'random' or id
@@ -97,7 +106,7 @@ function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [sRes, setRes, rRes, mRes, lRes, rlRes, chRes, ccRes, crRes, cmdsRes, hofRes] = await Promise.all([
+      const [sRes, setRes, rRes, mRes, lRes, rlRes, chRes, ccRes, crRes, cmdsRes, hofRes, adminRes] = await Promise.all([
         axios.get(`${API_BASE}/stats`),
         axios.get(`${API_BASE}/settings`),
         axios.get(`${API_BASE}/rewards`),
@@ -108,7 +117,8 @@ function App() {
         axios.get(`${API_BASE}/channel-config`),
         axios.get(`${API_BASE}/command-restrictions`),
         axios.get(`${API_BASE}/commands`),
-        axios.get(`${API_BASE}/hof-settings`)
+        axios.get(`${API_BASE}/hof-settings`),
+        axios.get(`${API_BASE}/admin-config`)
       ]);
       setStats(sRes.data);
       setSettings(setRes.data);
@@ -124,6 +134,11 @@ function App() {
       setBotCommands(cmdsRes.data);
       setHofSettings(hofRes.data);
       setHofEmojiInput((hofRes.data.emojis || []).join(' '));
+      setAdminConfig(adminRes.data);
+      const ks = (await axios.get(`${API_BASE}/key-settings`)).data;
+      setKeySettings(ks);
+      setKeySendUser(ks.send_count_user);
+      setKeySendAdmin(ks.send_count_admin);
     } catch (err) {
       console.error("Failed to fetch data:", err);
     }
@@ -257,6 +272,7 @@ function App() {
     { id: 'quotes', icon: BookOpen, label: 'Quotes' },
     { id: 'daily_quotes', icon: MessageCircle, label: 'Daily Quotes' },
     { id: 'misc', icon: Settings, label: 'Misc' },
+    { id: 'admin', icon: Users, label: 'Admin' },
     { id: 'data', icon: Database, label: 'Data Management' },
   ];
 
@@ -345,6 +361,7 @@ function App() {
             quotes: "Manage the quote drop bank and frequency.",
             daily_quotes: "Manage quotes for the .quote command and daily posts.",
             misc: "Configure global channel boundaries and command whitelists.",
+            admin: "Tarot deck, economy toggle, and yap level.",
             data: "Export, import, reset, and prune server data.",
           }[activeTab]}</p>
         </header>
@@ -1326,6 +1343,210 @@ function App() {
             </div>
           </div>
         )}
+
+        {activeTab === 'admin' && (() => {
+          const saveAdmin = async (patch) => {
+            setAdminSaving(true);
+            setAdminSaveMsg('');
+            try {
+              await axios.post(`${API_BASE}/admin-config`, patch);
+              setAdminConfig(prev => ({ ...prev, ...patch }));
+              setAdminSaveMsg('✅ Saved!');
+              setTimeout(() => setAdminSaveMsg(''), 2500);
+            } catch (err) {
+              setAdminSaveMsg('❌ Save failed');
+            }
+            setAdminSaving(false);
+          };
+
+          const decks = [
+            { id: 'thoth', label: 'Thoth', subtitle: 'Aleister Crowley', emoji: '🌑' },
+            { id: 'rws', label: 'Rider-Waite-Smith', subtitle: 'Classic', emoji: '🌟' },
+            { id: 'manara', label: 'Manara', subtitle: 'Erotic / Adult', emoji: '🔞' },
+          ];
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+              {/* Tarot Deck */}
+              <div className="card">
+                <h2 style={{ marginBottom: '0.25rem' }}>🃏 Tarot Deck</h2>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                  Select which deck is used when members run <code>.pull</code>. Replaces the old <code>/tarot config</code> slash command.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                  {decks.map(deck => {
+                    const isActive = adminConfig.tarot_deck === deck.id;
+                    return (
+                      <div
+                        key={deck.id}
+                        onClick={() => saveAdmin({ tarot_deck: deck.id })}
+                        style={{
+                          cursor: 'pointer',
+                          padding: '1.25rem',
+                          borderRadius: '0.75rem',
+                          border: isActive ? '2px solid var(--accent)' : '2px solid rgba(255,255,255,0.1)',
+                          background: isActive ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.02)',
+                          textAlign: 'center',
+                          transition: 'all 0.2s',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{deck.emoji}</div>
+                        <div style={{ fontWeight: 'bold', fontSize: '0.95rem' }}>{deck.label}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{deck.subtitle}</div>
+                        {isActive && <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 'bold' }}>✓ ACTIVE</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Economy + Yap Level */}
+              <div className="card">
+                <h2 style={{ marginBottom: '1.5rem' }}>⚙️ Bot Config</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                  {/* Economy Toggle */}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <h4 style={{ margin: 0 }}>Economy</h4>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>
+                          Enable or disable the global economy system.
+                        </p>
+                      </div>
+                      <div
+                        className={`toggle ${adminConfig.economy_enabled ? 'active' : ''}`}
+                        onClick={() => saveAdmin({ economy_enabled: !adminConfig.economy_enabled })}
+                      >
+                        <div className="toggle-handle"></div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Yap Level Toggle */}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <h4 style={{ margin: 0 }}>Yap Level</h4>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>
+                          <strong>{adminConfig.yap_level === 'high' ? 'High' : 'Low'}</strong> — {adminConfig.yap_level === 'high' ? 'Detailed responses.' : 'Concise responses.'}
+                        </p>
+                      </div>
+                      <div
+                        className={`toggle ${adminConfig.yap_level === 'high' ? 'active' : ''}`}
+                        onClick={() => saveAdmin({ yap_level: adminConfig.yap_level === 'high' ? 'low' : 'high' })}
+                      >
+                        <div className="toggle-handle"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {adminSaveMsg && (
+                  <div style={{ marginTop: '1rem', color: adminSaveMsg.startsWith('✅') ? 'var(--success)' : 'var(--danger)', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                    {adminSaveMsg}
+                  </div>
+                )}
+              </div>
+
+              {/* .key Command */}
+              <div className="card">
+                <h2 style={{ marginBottom: '0.25rem' }}>🔑 .key Command</h2>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                  Manage the image gallery for <code>.key</code> and how many times it sends per use.
+                </p>
+
+                {/* Gallery */}
+                <h4 style={{ marginBottom: '0.75rem' }}>Image Gallery (click to activate, up to 10)</h4>
+                {keySettings.images.length === 0 ? (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>No images saved yet. Add one below.</p>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                    {keySettings.images.map(img => (
+                      <div key={img.id} style={{
+                        position: 'relative',
+                        borderRadius: '0.6rem',
+                        border: img.is_active ? '2px solid var(--accent)' : '2px solid rgba(255,255,255,0.1)',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        background: '#111',
+                      }}>
+                        <img
+                          src={img.url} alt={img.label || 'key image'}
+                          onClick={async () => {
+                            await axios.post(`${API_BASE}/key-settings/images/${img.id}/activate`);
+                            const ks = (await axios.get(`${API_BASE}/key-settings`)).data;
+                            setKeySettings(ks);
+                          }}
+                          style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }}
+                          onError={e => { e.target.style.display='none'; }}
+                        />
+                        {img.is_active && (
+                          <div style={{ position: 'absolute', top: 4, left: 4, background: 'var(--accent)', borderRadius: '0.3rem', padding: '2px 6px', fontSize: '0.65rem', fontWeight: 'bold' }}>ACTIVE</div>
+                        )}
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await axios.delete(`${API_BASE}/key-settings/images/${img.id}`);
+                            const ks = (await axios.get(`${API_BASE}/key-settings`)).data;
+                            setKeySettings(ks);
+                          }}
+                          style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(200,50,50,0.85)', border: 'none', color: '#fff', borderRadius: '50%', width: 22, height: 22, cursor: 'pointer', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >✕</button>
+                        {img.label && <div style={{ padding: '4px 6px', fontSize: '0.7rem', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.6)' }}>{img.label}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Image */}
+                <h4 style={{ marginBottom: '0.5rem' }}>Add Image</h4>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+                  <input
+                    className="input"
+                    placeholder="Image URL (https://...)"
+                    value={keyImageInput}
+                    onChange={e => setKeyImageInput(e.target.value)}
+                    style={{ flex: '2 1 200px' }}
+                  />
+                  <input
+                    className="input"
+                    placeholder="Label (optional)"
+                    value={keyLabelInput}
+                    onChange={e => setKeyLabelInput(e.target.value)}
+                    style={{ flex: '1 1 120px' }}
+                  />
+                  <button className="btn btn-primary" style={{ padding: '0.5rem 1.2rem' }} onClick={async () => {
+                    if (!keyImageInput.trim()) return;
+                    await axios.post(`${API_BASE}/key-settings/images`, { url: keyImageInput.trim(), label: keyLabelInput.trim() });
+                    setKeyImageInput(''); setKeyLabelInput('');
+                    const ks = (await axios.get(`${API_BASE}/key-settings`)).data;
+                    setKeySettings(ks);
+                  }}>Add</button>
+                </div>
+
+                {/* Send Counts */}
+                <h4 style={{ marginBottom: '0.75rem' }}>Send Count Per Use</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>Users & Capos</label>
+                    <input className="input" type="number" min="1" max="20" value={keySendUser} onChange={e => setKeySendUser(parseInt(e.target.value) || 1)} style={{ width: '100%' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>Admins</label>
+                    <input className="input" type="number" min="1" max="20" value={keySendAdmin} onChange={e => setKeySendAdmin(parseInt(e.target.value) || 1)} style={{ width: '100%' }} />
+                  </div>
+                </div>
+                <button className="btn btn-primary" style={{ padding: '0.5rem 1.5rem' }} onClick={async () => {
+                  await axios.post(`${API_BASE}/key-settings/config`, { send_count_user: keySendUser, send_count_admin: keySendAdmin });
+                  setKeySaveMsg('✅ Saved!');
+                  setTimeout(() => setKeySaveMsg(''), 2500);
+                }}>Save Send Counts</button>
+                {keySaveMsg && <span style={{ marginLeft: '1rem', color: 'var(--success)', fontWeight: 'bold', fontSize: '0.9rem' }}>{keySaveMsg}</span>}
+              </div>
+
+            </div>
+          );
+        })()}
 
         {activeTab === 'misc' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

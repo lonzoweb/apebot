@@ -70,6 +70,27 @@ async def init_db():
                 "CREATE TABLE IF NOT EXISTS tarot_settings (guild_id TEXT PRIMARY KEY, deck_name TEXT DEFAULT 'thoth')"
             )
 
+            # .key Command — image gallery & send counts
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS key_settings (
+                    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                    image_url TEXT    NOT NULL,
+                    label     TEXT    DEFAULT '',
+                    is_active INTEGER DEFAULT 0,
+                    added_at  TEXT    DEFAULT (datetime('now'))
+                )
+                """
+            )
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS key_config (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
+
             # GIF Tracker
             await conn.execute(
                 "CREATE TABLE IF NOT EXISTS gif_tracker (gif_url TEXT PRIMARY KEY, count INTEGER DEFAULT 1, last_sent_by TEXT, last_sent_at TIMESTAMP)"
@@ -1095,6 +1116,89 @@ async def set_user_timezone(user_id, timezone_str, city):
         await conn.execute(
             "INSERT OR REPLACE INTO user_timezones (user_id, timezone, city) VALUES (?, ?, ?)",
             (str(user_id), timezone_str, city),
+        )
+
+
+# ============================================================
+# .key COMMAND SETTINGS
+# ============================================================
+
+DEFAULT_IMAGE_URL = "https://i.imgur.com/GQxOYGn.png"
+
+
+async def get_key_settings():
+    """Return the full .key config: active image URL, gallery, and send counts."""
+    async with get_db() as conn:
+        # Gallery
+        async with conn.execute(
+            "SELECT id, image_url, label, is_active, added_at FROM key_settings ORDER BY added_at DESC"
+        ) as cursor:
+            rows = await cursor.fetchall()
+
+        images = [
+            {"id": r[0], "url": r[1], "label": r[2], "is_active": bool(r[3]), "added_at": r[4]}
+            for r in rows
+        ]
+        active_url = next((i["url"] for i in images if i["is_active"]), DEFAULT_IMAGE_URL)
+
+        # Config values
+        async with conn.execute(
+            "SELECT key, value FROM key_config WHERE key IN ('send_count_user', 'send_count_admin')"
+        ) as cursor:
+            cfg_rows = await cursor.fetchall()
+
+        cfg = {r[0]: int(r[1]) for r in cfg_rows}
+        return {
+            "active_url": active_url,
+            "images": images,
+            "send_count_user": cfg.get("send_count_user", 2),
+            "send_count_admin": cfg.get("send_count_admin", 6),
+        }
+
+
+async def add_key_image(image_url: str, label: str = ""):
+    """Add an image to the .key gallery and set it as active. Trims to 10 entries."""
+    async with get_db() as conn:
+        # Deactivate all others
+        await conn.execute("UPDATE key_settings SET is_active = 0")
+        # Insert new (active)
+        await conn.execute(
+            "INSERT INTO key_settings (image_url, label, is_active) VALUES (?, ?, 1)",
+            (image_url, label),
+        )
+        # Trim to newest 10
+        await conn.execute(
+            """
+            DELETE FROM key_settings WHERE id NOT IN (
+                SELECT id FROM key_settings ORDER BY added_at DESC LIMIT 10
+            )
+            """
+        )
+
+
+async def set_key_active_image(image_id: int):
+    """Set a specific gallery image as active."""
+    async with get_db() as conn:
+        await conn.execute("UPDATE key_settings SET is_active = 0")
+        await conn.execute("UPDATE key_settings SET is_active = 1 WHERE id = ?", (image_id,))
+
+
+async def delete_key_image(image_id: int):
+    """Delete an image from the gallery. If it was active, no image will be active (bot uses fallback)."""
+    async with get_db() as conn:
+        await conn.execute("DELETE FROM key_settings WHERE id = ?", (image_id,))
+
+
+async def set_key_config(send_count_user: int, send_count_admin: int):
+    """Save the send count settings for .key."""
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO key_config (key, value) VALUES ('send_count_user', ?)",
+            (str(send_count_user),),
+        )
+        await conn.execute(
+            "INSERT OR REPLACE INTO key_config (key, value) VALUES ('send_count_admin', ?)",
+            (str(send_count_admin),),
         )
 
 
