@@ -109,6 +109,16 @@ async def init_db():
                 "CREATE TABLE IF NOT EXISTS masochist_roles (user_id TEXT PRIMARY KEY, removal_time REAL NOT NULL)"
             )
 
+            # COMMAND USAGE TRACKING
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS command_usage (
+                    command_name TEXT PRIMARY KEY,
+                    count INTEGER DEFAULT 0
+                )
+                """
+            )
+
             # 📦 NEW: User Inventory Table
             await conn.execute(
                 """
@@ -1805,3 +1815,28 @@ def calculate_level_for_xp(xp: int, c3: float, c2: float, c1: float, rounding: i
             break
             
     return level
+
+
+# ============================================================
+# COMMAND USAGE TRACKING
+# ============================================================
+
+async def increment_command_usage(command_name: str):
+    """Increment the usage count for a given command."""
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT INTO command_usage (command_name, count) VALUES (?, 1) "
+            "ON CONFLICT(command_name) DO UPDATE SET count = count + 1",
+            (command_name,)
+        )
+        await conn.commit()
+
+async def get_command_usage_stats(limit: int = 15):
+    """Get the top most used commands."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT command_name, count FROM command_usage ORDER BY count DESC LIMIT ?",
+            (limit,)
+        ) as cursor:
+            rows = await cursor.fetchall()
+        return [{"name": r[0], "count": r[1]} for r in rows]

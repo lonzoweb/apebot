@@ -511,12 +511,24 @@ async def api_get_commands():
                 try:
                     with open(os.path.join(cogs_dir, fname), "r") as f:
                         content = f.read()
-                    # Match @commands.command(name="xxx")
-                    for m in re.finditer(r'@commands\.command\(name=["\']([^"\']+)["\']', content):
+                    # Match name="..."
+                    for m in re.finditer(r'name=["\']([^"\']+)["\']', content):
                         cmds.add(m.group(1))
+                    # Match aliases=["...", "..."]
+                    for m in re.finditer(r'aliases=\[([^\]]+)\]', content):
+                        aliases_str = m.group(1)
+                        # Extract individual aliases between quotes
+                        for alias_match in re.finditer(r'["\']([^"\']+)["\']', aliases_str):
+                            cmds.add(alias_match.group(1))
                 except Exception:
                     pass
-    return sorted(cmds)
+    return sorted(list(cmds))
+
+@app.get("/command-stats")
+async def api_get_command_stats():
+    """Get the most used commands from the database."""
+    from database import get_command_usage_stats
+    return await get_command_usage_stats(limit=15)
 
 class ChannelConfigUpdate(BaseModel):
     role: str

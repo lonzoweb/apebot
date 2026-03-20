@@ -204,6 +204,23 @@ async def on_ready():
 
     logger.info(f"✅ Bot ready! Logged in as {bot.user}")
 
+# ============================================================
+# COMMAND TRACKING LISTENERS
+# ============================================================
+
+@bot.event
+async def on_command_completion(ctx):
+    """Tracks prefix command usage."""
+    from database import increment_command_usage
+    command_name = ctx.command.qualified_name
+    await increment_command_usage(command_name)
+
+@bot.event
+async def on_app_command_completion(interaction: discord.Interaction, command: discord.app_commands.Command | discord.app_commands.ContextMenu):
+    """Tracks slash command and context menu usage."""
+    from database import increment_command_usage
+    await increment_command_usage(f"/{command.name}")
+
 # --- Debug Commands ---
 @bot.command()
 @commands.has_permissions(administrator=True)

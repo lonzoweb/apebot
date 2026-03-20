@@ -42,6 +42,7 @@ function App() {
   const [channelConfig, setChannelConfig] = useState({});
   const [commandRestrictions, setCommandRestrictions] = useState({});
   const [botCommands, setBotCommands] = useState([]);
+  const [commandStats, setCommandStats] = useState([]);
   const [hofSettings, setHofSettings] = useState({ channel_id: '', threshold: 3, emojis: ['⭐'], ignored_channels: [], blacklisted_users: [] });
   const [hofEmojiInput, setHofEmojiInput] = useState('');
   const [adminConfig, setAdminConfig] = useState({ tarot_deck: 'thoth', economy_enabled: true, yap_level: 'high' });
@@ -135,10 +136,14 @@ function App() {
       setHofSettings(hofRes.data);
       setHofEmojiInput((hofRes.data.emojis || []).join(' '));
       setAdminConfig(adminRes.data);
-      const ks = (await axios.get(`${API_BASE}/key-settings`)).data;
-      setKeySettings(ks);
-      setKeySendUser(ks.send_count_user);
-      setKeySendAdmin(ks.send_count_admin);
+      const [ks, cs] = await Promise.all([
+        axios.get(`${API_BASE}/key-settings`),
+        axios.get(`${API_BASE}/command-stats`)
+      ]);
+      setKeySettings(ks.data);
+      setCommandStats(cs.data);
+      setKeySendUser(ks.data.send_count_user);
+      setKeySendAdmin(ks.data.send_count_admin);
     } catch (err) {
       console.error("Failed to fetch data:", err);
     }
@@ -1654,6 +1659,35 @@ function App() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="card">
+              <h2 style={{ marginBottom: '0.25rem' }}>📊 Command Usage Statistics</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Most used commands in the bot (prefix and slash).</p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                {commandStats.length > 0 ? (
+                  commandStats.map((stat, i) => (
+                    <div key={stat.name} style={{ 
+                      background: 'rgba(255,255,255,0.02)', 
+                      padding: '0.875rem', 
+                      borderRadius: '0.75rem', 
+                      border: '1px solid rgba(255,255,255,0.05)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <span style={{ color: i < 3 ? 'var(--accent)' : 'var(--text-muted)', fontWeight: 'bold', fontSize: '0.8rem' }}>#{i+1}</span>
+                        <code style={{ fontSize: '0.9rem' }}>{stat.name.startsWith('/') ? stat.name : `.${stat.name}`}</code>
+                      </div>
+                      <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{stat.count.toLocaleString()}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ color: 'var(--text-muted)', gridColumn: '1 / -1' }}>No command data recorded yet.</p>
+                )}
               </div>
             </div>
 
