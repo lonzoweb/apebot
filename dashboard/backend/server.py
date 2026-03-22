@@ -49,6 +49,13 @@ class RewardUpdate(BaseModel):
     role_id: str
     stack_role: int = 1
 
+class QuoteDropSettings(BaseModel):
+    quote_drops_enabled: bool
+    quote_drops_interval_hours: float
+
+class QuoteDropSendReq(BaseModel):
+    drop_id: Optional[int] = None
+
 @app.get("/stats")
 async def get_stats():
     async with aiosqlite.connect(DB_FILE) as db:
