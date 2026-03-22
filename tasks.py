@@ -33,6 +33,11 @@ TOMORROW_Q_KEY    = "tomorrow_quote"     # Admin-picked quote
 CANDIDATES_SENT_KEY = "candidates_sent_date"  # ISO date string of last candidate send
 PV_MSG_ID_KEY     = "pv_message_id"      # ID of the current candidate voting message
 
+# Automated Quote Drops (from quote_drops table)
+QUOTE_DROPS_ENABLED_KEY = "quote_drops_enabled"
+QUOTE_DROPS_INTERVAL_KEY = "quote_drops_interval_hours"
+LAST_QUOTE_DROP_TIME_KEY = "last_quote_drop_time"
+
 
 async def _get_today_str() -> str:
     return datetime.now(ZoneInfo("America/Los_Angeles")).date().isoformat()
@@ -443,3 +448,81 @@ def setup_tasks(bot, guild_id: int):
         await bot.wait_until_ready()
 
     wealth_tax_loop.start()
+
+    # --- 6. Automated Quote Drops (Every X hours) ---
+    @tasks.loop(minutes=15.0)
+    async def quote_drop_loop():
+        """
+        Sends a random quote from the 'quote_drops' table at configurable intervals.
+        Only fires if someone has chatted within the last 30 minutes. 
+        If no activity, it skips the 'turn' and waits for the next interval.
+        """
+        try:
+            enabled = await database.get_setting(QUOTE_DROPS_ENABLED_KEY, "0") == "1"
+            if not enabled:
+                return
+
+            # Default to 8 hours if unset
+            interval_hours_str = await database.get_setting(QUOTE_DROPS_INTERVAL_KEY, "8")
+            try:
+                interval_hours = float(interval_hours_str)
+            except ValueError:
+                interval_hours = 8.0
+
+            last_drop_str = await database.get_setting(LAST_QUOTE_DROP_TIME_KEY, "0")
+            try:
+                last_drop_time = float(last_drop_str)
+            except ValueError:
+                last_drop_time = 0.0
+
+            now = time.time()
+            if now - last_drop_time < (interval_hours * 3600):
+                return
+
+            # Window triggered: Check for activity in the last 30 minutes
+            if await activity_tracker.has_recent_activity(30):
+                guild = bot.get_guild(guild_id)
+                if not guild:
+                    return
+
+                # Get target channel (main)
+                from database import get_channel_assigns, get_random_quote_drop
+                assigns = await get_channel_assigns()
+                channel_id = assigns.get("main") # Should be mapped in dashboard
+                
+                if not channel_id:
+                    # Fallback to forum if main not set
+                    forum = discord.utils.get(guild.text_channels, name="forum")
+                    channel = forum
+                    if not forum:
+                        logger.warning("Quote drop loop: No 'main' channel or 'forum' found. Skipping.")
+                        return
+                else:
+                    channel = guild.get_channel(int(channel_id))
+                
+                if not channel:
+                    return
+
+                # Pick random quote drop
+                quote = await get_random_quote_drop()
+                if not quote:
+                    logger.warning("Quote drop loop: No quotes found in 'quote_drops' table.")
+                    return
+
+                # Send
+                await channel.send(quote)
+                await database.set_setting(LAST_QUOTE_DROP_TIME_KEY, str(now))
+                logger.info(f"🚀 Automated quote drop sent to {channel.name}: {quote[:50]}...")
+            else:
+                # SKIP TURN: Advance 'last_drop_time' so we wait a full interval before trying again
+                await database.set_setting(LAST_QUOTE_DROP_TIME_KEY, str(now))
+                logger.info("💤 Quote drop loop: Skipping turn due to inactivity (last 30m).")
+
+        except Exception as e:
+            logger.error(f"Error in quote_drop_loop: {e}", exc_info=True)
+
+    @quote_drop_loop.before_loop
+    async def before_quote_drop_loop():
+        await bot.wait_until_ready()
+
+    quote_drop_loop.start()

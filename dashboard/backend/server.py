@@ -417,21 +417,30 @@ async def delete_quote_drop_endpoint(drop_id: int):
 
 @app.get("/quote-drops/settings")
 async def get_quote_drop_settings():
-    """Get quote drop frequency setting."""
+    """Get quote drop automated cycle settings."""
     async with aiosqlite.connect(DB_FILE) as db:
         async with db.execute(
-            "SELECT setting_value FROM global_settings WHERE setting_key = 'quote_drops_per_day'"
+            "SELECT setting_key, setting_value FROM global_settings WHERE setting_key IN ('quote_drops_enabled', 'quote_drops_interval_hours')"
         ) as cursor:
-            row = await cursor.fetchone()
-            return {"quote_drops_per_day": int(row[0]) if row else 0}
+            rows = await cursor.fetchall()
+            settings = {row[0]: row[1] for row in rows}
+            
+            return {
+                "quote_drops_enabled": settings.get("quote_drops_enabled") == "1",
+                "quote_drops_interval_hours": int(settings.get("quote_drops_interval_hours", "8"))
+            }
 
 @app.post("/quote-drops/settings")
-async def update_quote_drop_settings(data: QuoteDropSetting):
-    """Update quote drop frequency."""
+async def update_quote_drop_settings(data: QuoteDropSettings):
+    """Update quote drop automated cycle settings."""
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute(
-            "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('quote_drops_per_day', ?)",
-            (str(data.quote_drops_per_day),)
+            "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('quote_drops_enabled', ?)",
+            ('1' if data.quote_drops_enabled else '0',)
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('quote_drops_interval_hours', ?)",
+            (str(data.quote_drops_interval_hours),)
         )
         await db.commit()
     return {"status": "ok"}

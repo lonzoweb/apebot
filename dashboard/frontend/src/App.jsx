@@ -35,7 +35,8 @@ function App() {
   const [importOptions, setImportOptions] = useState({ importXP: true, importSettings: false });
   const [importFile, setImportFile] = useState(null);
   const [quoteDrops, setQuoteDrops] = useState([]);
-  const [quoteDropsPerDay, setQuoteDropsPerDay] = useState(0);
+  const [quoteDropsEnabled, setQuoteDropsEnabled] = useState(false);
+  const [quoteDropsInterval, setQuoteDropsInterval] = useState(8);
   const [newQuoteDrop, setNewQuoteDrop] = useState('');
   const [dailyQuotes, setDailyQuotes] = useState([]);
   const [newDailyQuote, setNewDailyQuote] = useState('');
@@ -94,7 +95,8 @@ function App() {
         axios.get(`${API_BASE}/quote-drops/settings`),
       ]).then(([qRes, sRes]) => {
         setQuoteDrops(qRes.data);
-        setQuoteDropsPerDay(sRes.data.quote_drops_per_day);
+        setQuoteDropsEnabled(sRes.data.quote_drops_enabled);
+        setQuoteDropsInterval(sRes.data.quote_drops_interval_hours);
       }).catch(err => console.error('Failed to fetch quote drops:', err));
     }
     if (activeTab === 'daily_quotes') {
@@ -241,7 +243,7 @@ function App() {
   const handleImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
@@ -407,10 +409,10 @@ function App() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <img 
-                            src={user.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'} 
-                            alt="" 
-                            style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#2d2d2d' }} 
+                          <img
+                            src={user.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'}
+                            alt=""
+                            style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#2d2d2d' }}
                           />
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <span style={{ fontWeight: '600' }}>{user.username}</span>
@@ -434,33 +436,33 @@ function App() {
               <h3 style={{ marginBottom: '1.5rem' }}>Polaris Cubic Curve</h3>
               <div className="form-group">
                 <label className="label">Coefficient C3 (Cubic)</label>
-                <input 
+                <input
                   className="input" type="number" step="0.1"
-                  value={pendingSettings.c3 || 1} 
+                  value={pendingSettings.c3 || 1}
                   onChange={(e) => updateSetting('c3', e.target.value)}
                 />
               </div>
               <div className="form-group">
                 <label className="label">Coefficient C2 (Quadratic)</label>
-                <input 
+                <input
                   className="input" type="number" step="1"
-                  value={pendingSettings.c2 || 50} 
+                  value={pendingSettings.c2 || 50}
                   onChange={(e) => updateSetting('c2', e.target.value)}
                 />
               </div>
               <div className="form-group">
                 <label className="label">Coefficient C1 (Linear)</label>
-                <input 
+                <input
                   className="input" type="number" step="1"
-                  value={pendingSettings.c1 || 100} 
+                  value={pendingSettings.c1 || 100}
                   onChange={(e) => updateSetting('c1', e.target.value)}
                 />
               </div>
               <div className="form-group">
                 <label className="label">Rounding (Step)</label>
-                <input 
+                <input
                   className="input" type="number"
-                  value={pendingSettings.rounding || 100} 
+                  value={pendingSettings.rounding || 100}
                   onChange={(e) => updateSetting('rounding', e.target.value)}
                 />
               </div>
@@ -468,26 +470,26 @@ function App() {
               <div className="grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
                 <div className="form-group">
                   <label className="label">Min XP per message</label>
-                  <input 
+                  <input
                     className="input" type="number"
-                    value={pendingSettings.xp_min || 15} 
+                    value={pendingSettings.xp_min || 15}
                     onChange={(e) => updateSetting('xp_min', e.target.value)}
                   />
                 </div>
                 <div className="form-group">
                   <label className="label">Max XP per message</label>
-                  <input 
+                  <input
                     className="input" type="number"
-                    value={pendingSettings.xp_max || 25} 
+                    value={pendingSettings.xp_max || 25}
                     onChange={(e) => updateSetting('xp_max', e.target.value)}
                   />
                 </div>
               </div>
               <div className="form-group">
                 <label className="label">Cooldown (seconds)</label>
-                <input 
+                <input
                   className="input" type="number"
-                  value={pendingSettings.cooldown || 60} 
+                  value={pendingSettings.cooldown || 60}
                   onChange={(e) => updateSetting('cooldown', e.target.value)}
                 />
               </div>
@@ -499,7 +501,7 @@ function App() {
                 {CURVE_PRESETS.map(p => {
                   const isActive = activePreset?.name === p.name;
                   return (
-                    <button 
+                    <button
                       key={p.name}
                       className="btn"
                       style={{
@@ -533,13 +535,13 @@ function App() {
             <div className="card">
               <h2 style={{ marginBottom: '0.5rem' }}>Level up message</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Send an automatic message in the chat when a member levels up. How fun!</p>
-              
+
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.75rem' }}>
                 <div>
                   <h4 style={{ margin: 0 }}>Enable message</h4>
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>When enabled, a message or DM will be sent whenever anyone levels up.</p>
                 </div>
-                <div 
+                <div
                   className={`toggle ${pendingSettings.lvl_msg_enabled === '1' ? 'active' : ''}`}
                   onClick={() => updateSetting('lvl_msg_enabled', pendingSettings.lvl_msg_enabled === '1' ? '0' : '1')}
                 >
@@ -551,9 +553,9 @@ function App() {
             <div className="card">
               <h2 style={{ marginBottom: '0.5rem' }}>Message</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>The message to send upon levelling up.</p>
-              
-              <textarea 
-                className="input" 
+
+              <textarea
+                className="input"
                 style={{ width: '100%', minHeight: '120px', fontFamily: 'monospace', fontSize: '0.9rem', padding: '1rem', marginBottom: '1.5rem' }}
                 value={pendingSettings.lvl_msg_template || ''}
                 onChange={(e) => setPendingSettings({ ...pendingSettings, lvl_msg_template: e.target.value })}
@@ -573,8 +575,8 @@ function App() {
                 <div>
                   <label className="label">Channel</label>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Which channel should the message be sent in?</p>
-                  <select 
-                    className="input" 
+                  <select
+                    className="input"
                     value={pendingSettings.lvl_msg_channel || 'dm'}
                     onChange={(e) => updateSetting('lvl_msg_channel', e.target.value)}
                   >
@@ -594,7 +596,7 @@ function App() {
                   <h4 style={{ margin: 0 }}>Embed mode</h4>
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>Send a fancy embed instead of a normal message (advanced!)</p>
                 </div>
-                <div 
+                <div
                   className={`toggle ${pendingSettings.lvl_msg_embed === '1' ? 'active' : ''}`}
                   onClick={() => updateSetting('lvl_msg_embed', pendingSettings.lvl_msg_embed === '1' ? '0' : '1')}
                 >
@@ -613,7 +615,7 @@ function App() {
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Level up messages will only send when reaching a multiple of this number</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <span>Every</span>
-                    <input 
+                    <input
                       className="input" type="number" style={{ width: '80px' }}
                       value={pendingSettings.lvl_msg_interval || 1}
                       onChange={(e) => updateSetting('lvl_msg_interval', e.target.value)}
@@ -626,7 +628,7 @@ function App() {
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Once a member reaches this level, the multiple is no longer used (set to 0 to disable)</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <span>Level</span>
-                    <input 
+                    <input
                       className="input" type="number" style={{ width: '80px' }}
                       value={pendingSettings.lvl_msg_interval_stop || 0}
                       onChange={(e) => updateSetting('lvl_msg_interval_stop', e.target.value)}
@@ -640,7 +642,7 @@ function App() {
                   <h4 style={{ margin: 0 }}>Reward roles only</h4>
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>Only send the level up message when obtaining a new reward role</p>
                 </div>
-                <div 
+                <div
                   className={`toggle ${pendingSettings.lvl_msg_reward_only === '1' ? 'active' : ''}`}
                   onClick={() => updateSetting('lvl_msg_reward_only', pendingSettings.lvl_msg_reward_only === '1' ? '0' : '1')}
                 >
@@ -657,7 +659,7 @@ function App() {
               <h2 style={{ marginBottom: '0.25rem' }}>Reward Roles</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Automatically give roles to members when they reach certain levels. For free.</p>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '1.5rem', fontStyle: 'italic' }}>Imagine if I tried to capitalize off a couple extra lines of code, haha that would be absolutely crazy</p>
-              
+
               <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.25rem' }}>
                 <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Add role</h4>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -752,7 +754,7 @@ function App() {
             <div className="card">
               <h2 style={{ marginBottom: '0.25rem' }}>Reward Syncing</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>By default, the bot will automatically sync level roles by adding missing ones and removing incorrect ones. Feel free to tweak this behaviour a little.</p>
-              
+
               <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
                 <div>
                   <h4 style={{ marginBottom: '0.25rem' }}>Automatic syncing</h4>
@@ -921,8 +923,8 @@ function App() {
                       </td>
                       <td><span className="badge badge-success">{m.multiplier}x</span></td>
                       <td>
-                        <button 
-                          className="btn" 
+                        <button
+                          className="btn"
                           style={{ color: 'var(--danger)', background: 'transparent' }}
                           onClick={() => deleteMultiplier(m.target_id)}
                         >
@@ -934,14 +936,14 @@ function App() {
                 })}
                 <tr>
                   <td>
-                    <input 
-                      className="input" placeholder="Role or Channel ID" 
+                    <input
+                      className="input" placeholder="Role or Channel ID"
                       value={newMultiplier.target_id}
                       onChange={(e) => setNewMultiplier({ ...newMultiplier, target_id: e.target.value })}
                     />
                   </td>
                   <td>
-                    <input 
+                    <input
                       className="input" placeholder="1.5" style={{ width: '100px' }}
                       value={newMultiplier.multiplier}
                       onChange={(e) => setNewMultiplier({ ...newMultiplier, multiplier: e.target.value })}
@@ -1127,27 +1129,27 @@ function App() {
             <div className="card">
               <h2 style={{ marginBottom: '0.25rem' }}>Quote Drops</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>The bot randomly drops user-submitted quotes in #forum when chat is active. These are added via <code>=quote</code> (reply to a message) in Discord.</p>
-              
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
                 {!confirmSendRandom && sendSuccess !== 'random' && (
-                  <button 
-                    className="btn btn-primary" 
+                  <button
+                    className="btn btn-primary"
                     onClick={() => setConfirmSendRandom(true)}
                   >
                     <Send size={16} style={{ marginRight: '0.5rem' }} /> Send Random Quote
                   </button>
                 )}
                 {confirmSendRandom && (
-                  <button 
-                    className="btn" 
+                  <button
+                    className="btn"
                     style={{ background: '#f59e0b', color: '#fff', fontWeight: 'bold' }}
                     onClick={async () => {
                       setConfirmSendRandom(false);
                       try {
                         const res = await axios.post(`${API_BASE}/quote-drops/send`, {});
                         setSendSuccess('random');
-                      } catch (err) { 
-                        alert('Failed to send quote: ' + (err.response?.data?.detail || err.message)); 
+                      } catch (err) {
+                        alert('Failed to send quote: ' + (err.response?.data?.detail || err.message));
                       }
                     }}
                   >
@@ -1160,10 +1162,59 @@ function App() {
                   </div>
                 )}
               </div>
-
-              <div style={{ padding: '0.75rem 1rem', background: 'rgba(99,102,241,0.08)', borderRadius: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              <div style={{ padding: '0.75rem 1rem', background: 'rgba(99,102,241,0.08)', borderRadius: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
                 <Info size={14} style={{ marginRight: '0.4rem', verticalAlign: '-2px' }} />
-                Quotes are added when someone replies to a message with <code>=quote</code>. Text-only Hall of Fame entries (\u226425 chars) are auto-added. Pinging the bot has a 40% chance of triggering a random quote. Links and emojis are stripped.
+                Quotes are added when someone replies to a message with <code>=quote</code>. Text-only Hall of Fame entries (≤25 chars) are auto-added. Pinging the bot has a 40% chance of triggering a random quote. Links and emojis are stripped.
+              </div>
+
+              {/* Automated Drops Settings */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <h4 style={{ margin: 0 }}>Automated Quote Drops</h4>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Automatically send a quote from the bank at regular intervals.</p>
+                  </div>
+                  <div
+                    className={`toggle ${quoteDropsEnabled ? 'active' : ''}`}
+                    onClick={async () => {
+                      const newState = !quoteDropsEnabled;
+                      setQuoteDropsEnabled(newState);
+                      try {
+                        await axios.post(`${API_BASE}/quote-drops/settings`, {
+                          quote_drops_enabled: newState,
+                          quote_drops_interval_hours: quoteDropsInterval
+                        });
+                      } catch (err) { alert('Failed to save settings'); setQuoteDropsEnabled(!newState); }
+                    }}
+                  >
+                    <div className="toggle-handle"></div>
+                  </div>
+                </div>
+
+                {quoteDropsEnabled && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: '0.85rem' }}>Hours between turns:</p>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>If no chat activity in the last 30 minutes, the turn is skipped.</p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="number" className="input" style={{ width: '70px', textAlign: 'center' }}
+                        value={quoteDropsInterval}
+                        onChange={(e) => setQuoteDropsInterval(parseInt(e.target.value) || 1)}
+                        onBlur={async () => {
+                          try {
+                            await axios.post(`${API_BASE}/quote-drops/settings`, {
+                              quote_drops_enabled: quoteDropsEnabled,
+                              quote_drops_interval_hours: quoteDropsInterval
+                            });
+                          } catch (err) { alert('Failed to save settings'); }
+                        }}
+                      />
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Hours</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -218,5 +218,28 @@ async def get_recent_active_users(limit=10):
     return sorted_users[:limit]
 
 
+async def has_recent_activity(minutes: int = 30) -> bool:
+    """
+    Checks if any user has chatted within the last X minutes.
+    Checks both the in-memory buffer and the database.
+    """
+    # 1. Check in-memory buffer first (very recent activity)
+    if any(activity_buffer["users"].values()):
+        return True
+
+    # 2. Check DB for activity since 'now - minutes'
+    try:
+        async with get_db() as conn:
+            # last_updated is CURRENT_TIMESTAMP (UTC)
+            async with conn.execute(
+                "SELECT 1 FROM activity_users WHERE last_updated > datetime('now', ?)",
+                (f"-{minutes} minutes",)
+            ) as cursor:
+                return await cursor.fetchone() is not None
+    except Exception as e:
+        logger.error(f"Error checking recent activity: {e}")
+        return False
+
+
 # Set init_activity_tables as the function to call on startup
 # You must call this from your main bot file or Cog setup.

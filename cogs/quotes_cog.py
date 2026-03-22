@@ -482,6 +482,25 @@ class QuotesCog(commands.Cog):
     # Quote drops are now manually triggered via the dashboard API
     # (or via the 40% chance on bot pings handled above).
 
+    @commands.command(name="quotedrops")
+    @commands.has_permissions(administrator=True)
+    async def quotedrops_status(self, ctx):
+        """[Admin] Show the status of the automated quote drop cycle"""
+        from database import get_setting
+        from tasks import QUOTE_DROPS_ENABLED_KEY, QUOTE_DROPS_INTERVAL_KEY
+
+        enabled = await get_setting(QUOTE_DROPS_ENABLED_KEY, "0") == "1"
+        interval = await get_setting(QUOTE_DROPS_INTERVAL_KEY, "8")
+
+        status_str = "✅ **ENABLED**" if enabled else "❌ **DISABLED**"
+
+        embed = discord.Embed(
+            title="🚀 Automated Quote Drops",
+            description=f"Status: {status_str}\nInterval: **{interval} hours**\n\n*Only drops if someone has chatted in the last 30 minutes. If skipped due to inactivity, it waits for the next full interval.*",
+            color=discord.Color.green() if enabled else discord.Color.red()
+        )
+        await ctx.send(embed=embed)
+
 
 async def setup(bot):
     await bot.add_cog(QuotesCog(bot))
