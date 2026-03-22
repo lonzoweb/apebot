@@ -1457,7 +1457,7 @@ function App() {
               <div className="card">
                 <h2 style={{ marginBottom: '0.25rem' }}>🔑 .key Command</h2>
                 <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-                  Manage the image gallery for <code>.key</code> and how many times it sends per use.
+                  Manage the image gallery for <code>.key</code> and how many times it sends per use. You can now use <strong>Discord Sticker IDs</strong> as well as image URLs.
                 </p>
 
                 {/* Gallery */}
