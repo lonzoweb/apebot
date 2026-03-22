@@ -735,8 +735,21 @@ class UtilityCog(commands.Cog):
         await ctx.send(f"{ctx.author.display_name} ʰᵃˢ ᵖᵃᶦᵈ ᵗʳᶦᵇᵘᵗᵉ")
 
         count = key_cfg["send_count_admin"] if (is_admin or is_capo) else key_cfg["send_count_user"]
+
+        # Auto-detect: if stored value is purely numeric → it's a Discord sticker ID
+        is_sticker = image_url.strip().isdigit()
+
         for _ in range(count):
-            await ctx.send(image_url)
+            if is_sticker:
+                sticker_id = int(image_url.strip())
+                try:
+                    await ctx.send(stickers=[discord.Object(id=sticker_id)])
+                except discord.HTTPException as e:
+                    logger.warning(f".key sticker send failed (id={sticker_id}): {e}")
+                    await ctx.send(f"⚠️ Sticker `{sticker_id}` could not be sent.")
+                    break
+            else:
+                await ctx.send(image_url)
 
         await update_balance(ctx.author.id, REWARD_AMOUNT)
 

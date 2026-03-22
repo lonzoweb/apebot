@@ -1461,7 +1461,7 @@ function App() {
                 </p>
 
                 {/* Gallery */}
-                <h4 style={{ marginBottom: '0.75rem' }}>Image Gallery (click to activate, up to 10)</h4>
+                <h4 style={{ marginBottom: '0.75rem' }}>Images & Stickers (click to activate, up to 10)</h4>
                 {keySettings.images.length === 0 ? (
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>No images saved yet. Add one below.</p>
                 ) : (
@@ -1475,16 +1475,29 @@ function App() {
                         cursor: 'pointer',
                         background: '#111',
                       }}>
-                        <img
-                          src={img.url} alt={img.label || 'key image'}
+                        {/* Click the whole card to activate */}
+                        <div
                           onClick={async () => {
                             await axios.post(`${API_BASE}/key-settings/images/${img.id}/activate`);
                             const ks = (await axios.get(`${API_BASE}/key-settings`)).data;
                             setKeySettings(ks);
                           }}
-                          style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }}
-                          onError={e => { e.target.style.display='none'; }}
-                        />
+                          style={{ display: 'block', width: '100%', minHeight: '100px' }}
+                        >
+                          {/^\d+$/.test(img.url.trim()) ? (
+                            /* Sticker entry — show badge instead of broken img */
+                            <div style={{ width: '100%', height: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.1)', gap: '0.4rem' }}>
+                              <span style={{ fontSize: '1.8rem' }}>🎭</span>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>ID: {img.url.trim()}</span>
+                            </div>
+                          ) : (
+                            <img
+                              src={img.url} alt={img.label || 'key image'}
+                              style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }}
+                              onError={e => { e.target.style.display='none'; }}
+                            />
+                          )}
+                        </div>
                         {img.is_active && (
                           <div style={{ position: 'absolute', top: 4, left: 4, background: 'var(--accent)', borderRadius: '0.3rem', padding: '2px 6px', fontSize: '0.65rem', fontWeight: 'bold' }}>ACTIVE</div>
                         )}
@@ -1503,12 +1516,12 @@ function App() {
                   </div>
                 )}
 
-                {/* Add Image */}
-                <h4 style={{ marginBottom: '0.5rem' }}>Add Image</h4>
+                {/* Add Image / Sticker */}
+                <h4 style={{ marginBottom: '0.5rem' }}>Add Image or Sticker</h4>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
                   <input
                     className="input"
-                    placeholder="Image URL (https://...)"
+                    placeholder="Image URL (https://...) or Sticker ID (numeric)"
                     value={keyImageInput}
                     onChange={e => setKeyImageInput(e.target.value)}
                     style={{ flex: '2 1 200px' }}
