@@ -276,7 +276,7 @@ function App() {
     { id: 'rewards', icon: Gift, label: 'Reward Roles' },
     { id: 'rank', icon: CreditCard, label: 'Rank Card' },
     { id: 'multipliers', icon: Layers, label: 'Multipliers' },
-    { id: 'quotes', icon: BookOpen, label: 'Quotes' },
+    { id: 'quotes', icon: BookOpen, label: 'QUOTES DROP' },
     { id: 'daily_quotes', icon: MessageCircle, label: 'Daily Quotes' },
     { id: 'misc', icon: Settings, label: 'Misc' },
     { id: 'admin', icon: Users, label: 'Admin' },
@@ -1127,8 +1127,62 @@ function App() {
         {activeTab === 'quotes' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="card">
-              <h2 style={{ marginBottom: '0.25rem' }}>Quote Drops</h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>The bot randomly drops user-submitted quotes in #forum when chat is active. These are added via <code>=quote</code> (reply to a message) in Discord.</p>
+              <h2 style={{ marginBottom: '0.25rem' }}>Automated Quote Drops</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Automatically send a quote from the bank at regular intervals when chat is active.</p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <h4 style={{ margin: 0 }}>Enable Automated Cycle</h4>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Send a random quote from the bank every X hours.</p>
+                  </div>
+                  <div
+                    className={`toggle ${quoteDropsEnabled ? 'active' : ''}`}
+                    onClick={async () => {
+                      const newState = !quoteDropsEnabled;
+                      setQuoteDropsEnabled(newState);
+                      try {
+                        await axios.post(`${API_BASE}/quote-drops/settings`, { 
+                          quote_drops_enabled: newState,
+                          quote_drops_interval_hours: quoteDropsInterval
+                        });
+                      } catch (err) { alert('Failed to save settings'); setQuoteDropsEnabled(!newState); }
+                    }}
+                  >
+                    <div className="toggle-handle"></div>
+                  </div>
+                </div>
+
+                {quoteDropsEnabled && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: '0.85rem' }}>Hours between turns:</p>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>If no chat activity in the last 30 minutes, the turn is skipped.</p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input 
+                        type="number" className="input" style={{ width: '70px', textAlign: 'center' }}
+                        value={quoteDropsInterval}
+                        onChange={(e) => setQuoteDropsInterval(parseInt(e.target.value) || 1)}
+                        onBlur={async () => {
+                          try {
+                            await axios.post(`${API_BASE}/quote-drops/settings`, { 
+                              quote_drops_enabled: quoteDropsEnabled,
+                              quote_drops_interval_hours: quoteDropsInterval
+                            });
+                          } catch (err) { alert('Failed to save settings'); }
+                        }}
+                      />
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Hours</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ height: '1px', background: 'rgba(255,255,255,0.07)', margin: '1.5rem 0' }} />
+
+              <h3 style={{ marginBottom: '0.5rem' }}>Manual Quote Drop</h3>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Manually trigger a random drop or send a specific quote from the bank.</p>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
                 {!confirmSendRandom && sendSuccess !== 'random' && (
@@ -1165,56 +1219,6 @@ function App() {
               <div style={{ padding: '0.75rem 1rem', background: 'rgba(99,102,241,0.08)', borderRadius: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
                 <Info size={14} style={{ marginRight: '0.4rem', verticalAlign: '-2px' }} />
                 Quotes are added when someone replies to a message with <code>=quote</code>. Text-only Hall of Fame entries (≤25 chars) are auto-added. Pinging the bot has a 40% chance of triggering a random quote. Links and emojis are stripped.
-              </div>
-
-              {/* Automated Drops Settings */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div>
-                    <h4 style={{ margin: 0 }}>Automated Quote Drops</h4>
-                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Automatically send a quote from the bank at regular intervals.</p>
-                  </div>
-                  <div
-                    className={`toggle ${quoteDropsEnabled ? 'active' : ''}`}
-                    onClick={async () => {
-                      const newState = !quoteDropsEnabled;
-                      setQuoteDropsEnabled(newState);
-                      try {
-                        await axios.post(`${API_BASE}/quote-drops/settings`, {
-                          quote_drops_enabled: newState,
-                          quote_drops_interval_hours: quoteDropsInterval
-                        });
-                      } catch (err) { alert('Failed to save settings'); setQuoteDropsEnabled(!newState); }
-                    }}
-                  >
-                    <div className="toggle-handle"></div>
-                  </div>
-                </div>
-
-                {quoteDropsEnabled && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: '0.85rem' }}>Hours between turns:</p>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>If no chat activity in the last 30 minutes, the turn is skipped.</p>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <input
-                        type="number" className="input" style={{ width: '70px', textAlign: 'center' }}
-                        value={quoteDropsInterval}
-                        onChange={(e) => setQuoteDropsInterval(parseInt(e.target.value) || 1)}
-                        onBlur={async () => {
-                          try {
-                            await axios.post(`${API_BASE}/quote-drops/settings`, {
-                              quote_drops_enabled: quoteDropsEnabled,
-                              quote_drops_interval_hours: quoteDropsInterval
-                            });
-                          } catch (err) { alert('Failed to save settings'); }
-                        }}
-                      />
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Hours</span>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
