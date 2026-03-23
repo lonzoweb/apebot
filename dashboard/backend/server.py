@@ -521,21 +521,35 @@ async def api_get_commands():
     import re
     cmds = set()
     cogs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "cogs")
+    
+    # Improved scanner: Matches command decorators specifically
+    decorator_pattern = re.compile(r'@(?:commands|app_commands)\.(?:command|group)\s*(?:\((.*?)\))?', re.DOTALL)
+    
     if os.path.isdir(cogs_dir):
         for fname in os.listdir(cogs_dir):
             if fname.endswith(".py"):
                 try:
                     with open(os.path.join(cogs_dir, fname), "r") as f:
                         content = f.read()
-                    # Match name="..."
-                    for m in re.finditer(r'name=["\']([^"\']+)["\']', content):
-                        cmds.add(m.group(1))
-                    # Match aliases=["...", "..."]
-                    for m in re.finditer(r'aliases=\[([^\]]+)\]', content):
-                        aliases_str = m.group(1)
-                        # Extract individual aliases between quotes
-                        for alias_match in re.finditer(r'["\']([^"\']+)["\']', aliases_str):
-                            cmds.add(alias_match.group(1))
+                    
+                    for match in decorator_pattern.finditer(content):
+                        args = match.group(1) or ""
+                        # Find the associated function name by looking ahead
+                        rem = content[match.end():]
+                        fn_match = re.search(r'async def\s+([a-zA-Z0-9_]+)', rem)
+                        
+                        if fn_match:
+                            fn_name = fn_match.group(1)
+                            # Extract name="xxx" or use function name
+                            name_match = re.search(r'name=["\']([^"\']+)["\']', args)
+                            cmd_name = name_match.group(1) if name_match else fn_name
+                            cmds.add(cmd_name)
+                            
+                            # Extract aliases=["...", "..."]
+                            alias_match = re.search(r'aliases=\[([^\]]+)\]', args)
+                            if alias_match:
+                                for a in re.finditer(r'["\']([^"\']+)["\']', alias_match.group(1)):
+                                    cmds.add(a.group(1))
                 except Exception:
                     pass
     return sorted(list(cmds))
