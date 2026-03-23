@@ -132,12 +132,25 @@ def _extract_image(message: discord.Message) -> str | None:
 
 
 def _extract_voice(message: discord.Message) -> str | None:
-    """Return the URL of the first audio/video attachment (covers Discord voice notes)."""
+    """Return the URL of the first audio/video attachment."""
     for att in message.attachments:
         ct = att.content_type or ""
         if ct.startswith("audio/") or ct.startswith("video/"):
             return att.url
     return None
+
+
+def _get_media_label(url: str | None) -> tuple[str, str]:
+    """Return (emoji, label) for a media URL based on its extension."""
+    if not url:
+        return "", ""
+    # Discord URLs often have the filename before query params
+    # e.g. https://cdn.discordapp.com/.../voice-message.ogg?ex=...
+    path = url.split("?")[0].lower()
+    video_exts = (".mp4", ".mov", ".webm", ".mkv", ".avi", ".flv", ".ogv")
+    if any(path.endswith(ext) for ext in video_exts):
+        return "🎬", "Video"
+    return "🎙️", "Voice Note"
 
 
 def _count_by_emoji_from_reactions(message: discord.Message, tracked: list) -> dict:
@@ -179,9 +192,10 @@ async def _build_hof_data(
             # If we can't find it (deleted etc), just skip context
             pass
 
-    # 3. Voice note line (Discord voice messages are audio attachments)
+    # 3. Media line (Voice Notes, Videos)
     voice_url = _extract_voice(message)
-    voice_line = f"\n\n🎙️ [Voice Note]({voice_url})" if voice_url else ""
+    emoji, label = _get_media_label(voice_url)
+    voice_line = f"\n\n{emoji} [{label}]({voice_url})" if voice_url else ""
 
     # 4. Embed Box - Always Gold
     base_text = f"{reply_text}{message.content[:3800]}" if (message.content or reply_text) else ""
@@ -500,7 +514,8 @@ class HofCog(commands.Cog):
             author_id, hof_msg_id, star_count, content, image_url, jump_url, voice_url = row
             author = ctx.guild.get_member(int(author_id)) or await self.bot.fetch_user(int(author_id))
 
-            voice_line = f"\n\n🎙️ [Voice Note]({voice_url})" if voice_url else ""
+            emoji, label = _get_media_label(voice_url)
+            voice_line = f"\n\n{emoji} [{label}]({voice_url})" if voice_url else ""
             description = (content[:4090] if content else "") + voice_line
             embed = discord.Embed(
                 description=description.strip() or "*[no text]*",
@@ -749,7 +764,7 @@ class HofCog(commands.Cog):
     async def slash_lost(self, interaction: discord.Interaction):
         async with get_db() as conn:
             async with conn.execute(
-                "SELECT author_id, star_count, content, image_url, jump_url "
+                "SELECT author_id, star_count, content, image_url, jump_url, voice_url "
                 "FROM hof_entries "
                 "WHERE hof_message_id IS NULL AND star_count >= 2 "
                 "ORDER BY RANDOM() LIMIT 1"
@@ -764,7 +779,7 @@ class HofCog(commands.Cog):
         s = await _get_settings(interaction.guild_id)
         emoji = s["emojis"][0] if s["emojis"] else "⭐"
 
-        author_id, star_count, content, image_url, jump_url = row
+        author_id, star_count, content, image_url, jump_url, voice_url = row
         member = interaction.guild.get_member(int(author_id))
         if member is None:
             try:
@@ -782,6 +797,11 @@ class HofCog(commands.Cog):
             embed.set_image(url=image_url)
         embed.set_footer(text=f"{emoji} {star_count} — no cigar")
 
+        # Handle media line in slash_lost
+        emoji_m, label_m = _get_media_label(voice_url)
+        if voice_url:
+            embed.description = (embed.description or "") + f"\n\n{emoji_m} [{label_m}]({voice_url})"
+
         view = _jump_view(jump_url) if jump_url else None
         await interaction.response.send_message(embed=embed, view=view)
 
@@ -798,7 +818,8 @@ class HofCog(commands.Cog):
             except Exception:
                 member = None
 
-        voice_line = f"\n\n🎙️ [Voice Note]({voice_url})" if voice_url else ""
+        emoji, label = _get_media_label(voice_url)
+        voice_line = f"\n\n{emoji} [{label}]({voice_url})" if voice_url else ""
         description = (content[:4090] if content else "") + voice_line
         embed = discord.Embed(
             description=description.strip() or "*[no text]*",
