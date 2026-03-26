@@ -37,14 +37,7 @@ DEFAULT_NUMBER_DESCS = {
     6:  "6 is the number of family and home, and services.",
     7:  "7 is the number of intelligence, knowledge, of the loner, but also injuries, and the unlucky number, of the gambler. Avoid working out today to avoid injuries. Spend some time alone to reflect, and learn. Don't get married or gamble on a 7 day.",
     8:  "8 is the number of power, money and karma. Work on making money in priority on that day.",
-    9:  (
-        "9 is the number of completion and endings — when 9 enters a situation, everything either becomes a better version of itself or is brought to its conclusion. "
-        "9 is also the ultimate number of manifestation: it is the number of reality and illusion, and keeping 9 energy close amplifies your ability to attract what you want. "
-        "9 is one of the smarter numbers — a good leader and a good follower (the Vice President to 1's President). "
-        "9 represents the end of the separation between master numbers (11, 22, 33) and non-master numbers (1–8), making it secretly the most masterful of all. "
-        "9 is strongly linked to 2 (Femi-NINE). It is adaptable and quick on its feet. "
-        "Warning: Do not marry or start a relationship on 9 days or dates."
-    ),
+    9:  "9 is the number of completion and endings. When 9 enters a situation, everything either becomes a better version of itself or is brought to conclusion. 9 is also the ultimate number of manifestation — the number of reality and illusion. Good leader and good follower. Warning: Do not marry or start a relationship on 9 days or dates.",
     11: "11 is a master number, the number of the guide/visionary. It is a good day to start or release something that you want to be influential. It is also a number of emotionality, people could be more emotional today. It is often a day chosen for important events that shock people, so beware (of how you perceive events, if you go out, ...). Avoid flying on 11 days — technology may not work as reliably.",
     22: "22 is the number of the master builder, or destroyer.",
     33: "33 is the number of the master teacher. It is a very influential number.",
