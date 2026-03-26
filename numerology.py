@@ -282,21 +282,21 @@ async def get_embed(d: date, db_module, label: str = "") -> "discord.Embed":
 
     # Primary number block
     embed.add_field(
-        name=f"🔢 Universal Day: **{p_full}**",
-        value=f"```\n{chain_p}\n{p_full}\n```\n{_truncate(p_desc, 800)}",
+        name=f"Universal Day: **{p_full}**",
+        value=f"```\n{chain_p}\n```{_truncate(p_desc, 800)}\n\u200b",
         inline=False,
     )
 
     # Secondary number block
     embed.add_field(
-        name=f"🔢 Secondary: **{s_full}**",
-        value=f"```\n{chain_s}\n{s_full}\n```\n{_truncate(s_desc, 800)}",
+        name=f"Secondary: **{s_full}**",
+        value=f"```\n{chain_s}\n```{_truncate(s_desc, 800)}\n\u200b",
         inline=False,
     )
 
     # Combination
     embed.add_field(
-        name="✨ Combination",
+        name="Combination",
         value=_truncate(combo_desc, 1024),
         inline=False,
     )
@@ -331,17 +331,17 @@ async def get_reading(d: date, db_module) -> str:
         combo_desc = DEFAULT_COMBOS.get((p, s), f"*(No combination reading set for {p}+{s} yet)*")
 
     return "\n".join([
-        f"📅 **{date_str}**",
+        f"**{date_str}**",
         "",
-        f"🔢 Universal Day: **{p_full}**",
+        f"Universal Day: **{p_full}**",
         f"```\n{chain_p}\n{p_full}\n```",
         p_desc,
         "",
-        f"🔢 Secondary: **{s_full}**",
+        f"Secondary: **{s_full}**",
         f"```\n{chain_s}\n{s_full}\n```",
         s_desc,
         "",
-        "✨ **Combination:**",
+        "**Combination:**",
         combo_desc,
     ])
 
