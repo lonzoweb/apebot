@@ -230,21 +230,8 @@ def build_digit_chain_secondary(d: date) -> str:
     return "\n".join(lines)
 
 
-# Color palette per reduced primary number (Discord embed color as int)
-NUMBER_COLORS = {
-    1:  0xE74C3C,  # red — leader/fire
-    2:  0x9B59B6,  # purple — feminine/moon
-    3:  0xF39C12,  # amber — social/communication
-    4:  0x2ECC71,  # green — hard work/earth
-    5:  0x3498DB,  # blue — freedom/travel
-    6:  0xE91E63,  # pink — family/home/love
-    7:  0x1ABC9C,  # teal — intelligence/mystery
-    8:  0xFFD700,  # gold — power/money
-    9:  0x8E44AD,  # deep purple — completion/manifestation
-    11: 0xECF0F1,  # silver/white — master visionary
-    22: 0xE67E22,  # burnt orange — master builder
-    33: 0xF1C40F,  # radiant yellow — master teacher
-}
+# Single brand color for all numerology embeds — red/orange blend
+NUMEROLOGY_COLOR = 0xE8490F
 
 
 def _truncate(text: str, limit: int = 1024) -> str:
@@ -283,11 +270,13 @@ async def get_embed(d: date, db_module, label: str = "") -> "discord.Embed":
     if not combo_desc:
         combo_desc = DEFAULT_COMBOS.get((p, s), "*(No combination reading yet — add it in the dashboard)*")
 
-    color = NUMBER_COLORS.get(p, 0x7289DA)
+    color = NUMEROLOGY_COLOR
+
+    is_tomorrow = "tomorrow" in label.lower() if label else False
+    title_prefix = "TOMORROW" if is_tomorrow else "TODAY"
 
     embed = _discord.Embed(
-        title=label or "🔮 Numerology Reading",
-        description=f"📅 **{date_str}**",
+        title=f"{title_prefix}: {date_str}",
         color=color,
     )
 
@@ -312,7 +301,7 @@ async def get_embed(d: date, db_module, label: str = "") -> "discord.Embed":
         inline=False,
     )
 
-    embed.set_footer(text="Numerology Reading • ApeBot")
+    embed.set_footer(text="Apeiron")
     return embed
 
 
