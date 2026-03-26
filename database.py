@@ -439,6 +439,28 @@ async def init_db():
             except Exception:
                 pass # Already exists
 
+            # 🔢 NUMEROLOGY — Number Descriptions (1-9, 11, 22, 33)
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS numerology_number_desc (
+                    num INTEGER PRIMARY KEY,
+                    description TEXT DEFAULT ''
+                )
+                """
+            )
+
+            # 🔢 NUMEROLOGY — Combination Readings (primary × secondary)
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS numerology_combos (
+                    primary_num INTEGER NOT NULL,
+                    secondary_num INTEGER NOT NULL,
+                    combo_desc TEXT DEFAULT '',
+                    PRIMARY KEY (primary_num, secondary_num)
+                )
+                """
+            )
+
             await conn.commit()
 
         # ── ONE-TIME BACKFILL: HoF → quote_drops (REMOVE AFTER FIRST DEPLOY) ──
@@ -591,6 +613,70 @@ async def set_setting(key: str, value: str):
             "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES (?, ?)",
             (key, value),
         )
+
+# ============================================================
+# NUMEROLOGY CONTENT
+# ============================================================
+
+
+async def get_numerology_number_desc(num: int) -> str:
+    """Get the description for a numerology number (primary or secondary)."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT description FROM numerology_number_desc WHERE num = ?", (num,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else ""
+
+
+async def set_numerology_number_desc(num: int, description: str):
+    """Set the description for a numerology number."""
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO numerology_number_desc (num, description) VALUES (?, ?)",
+            (num, description)
+        )
+        await conn.commit()
+
+
+async def get_numerology_combo(primary_num: int, secondary_num: int) -> str:
+    """Get the combination reading for a primary+secondary pair."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT combo_desc FROM numerology_combos WHERE primary_num = ? AND secondary_num = ?",
+            (primary_num, secondary_num)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else ""
+
+
+async def set_numerology_combo(primary_num: int, secondary_num: int, combo_desc: str):
+    """Set the combination reading for a primary+secondary pair."""
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO numerology_combos (primary_num, secondary_num, combo_desc) VALUES (?, ?, ?)",
+            (primary_num, secondary_num, combo_desc)
+        )
+        await conn.commit()
+
+
+async def get_all_numerology_number_descs() -> dict:
+    """Get all number descriptions as a dict {num: description}."""
+    async with get_db() as conn:
+        async with conn.execute("SELECT num, description FROM numerology_number_desc ORDER BY num") as cursor:
+            rows = await cursor.fetchall()
+            return {row[0]: row[1] for row in rows}
+
+
+async def get_all_numerology_combos() -> list:
+    """Get all combo entries as list of {primary_num, secondary_num, combo_desc}."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT primary_num, secondary_num, combo_desc FROM numerology_combos ORDER BY primary_num, secondary_num"
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [{"primary_num": r[0], "secondary_num": r[1], "combo_desc": r[2]} for r in rows]
+
 
 # ============================================================
 # CHANNEL CONFIG & COMMAND RESTRICTIONS

@@ -742,6 +742,134 @@ async def api_set_admin_config(data: AdminConfigUpdate):
 
     return {"status": "ok"}
 
+# ============================================================
+# QUOTE SCHEDULE (configurable post times)
+# ============================================================
+
+class QuoteScheduleUpdate(BaseModel):
+    morning_hour: int  # 0-23
+    evening_hour: int  # 0-23
+
+@app.get("/quote-schedule")
+async def api_get_quote_schedule():
+    """Get configured daily quote post hours."""
+    morning = await database.get_setting("quote_morning_hour", "10")
+    evening = await database.get_setting("quote_evening_hour", "18")
+    return {"morning_hour": int(morning), "evening_hour": int(evening)}
+
+@app.post("/quote-schedule")
+async def api_set_quote_schedule(data: QuoteScheduleUpdate):
+    """Save daily quote post hours (0-23)."""
+    if not (0 <= data.morning_hour <= 23 and 0 <= data.evening_hour <= 23):
+        raise HTTPException(status_code=400, detail="Hours must be 0-23")
+    await database.set_setting("quote_morning_hour", str(data.morning_hour))
+    await database.set_setting("quote_evening_hour", str(data.evening_hour))
+    return {"status": "ok"}
+
+
+# ============================================================
+# NUMEROLOGY
+# ============================================================
+
+class NumerologySettingsUpdate(BaseModel):
+    morning_hour: Optional[int] = None   # 7am default
+    evening_hour: Optional[int] = None   # 22 (10pm) default
+    channel_id: Optional[str] = None
+
+class NumerologyNumberDesc(BaseModel):
+    num: int
+    description: str
+
+class NumerologyCombo(BaseModel):
+    primary_num: int
+    secondary_num: int
+    combo_desc: str
+
+@app.get("/numerology/settings")
+async def api_get_numerology_settings():
+    """Get numerology post schedule and channel config."""
+    morning = await database.get_setting("numerology_morning_hour", "7")
+    evening = await database.get_setting("numerology_evening_hour", "22")
+    channel = await database.get_setting("numerology_channel_id", "")
+    return {
+        "morning_hour": int(morning),
+        "evening_hour": int(evening),
+        "channel_id": channel or "",
+    }
+
+@app.post("/numerology/settings")
+async def api_set_numerology_settings(data: NumerologySettingsUpdate):
+    """Save numerology schedule settings."""
+    if data.morning_hour is not None:
+        if not (0 <= data.morning_hour <= 23):
+            raise HTTPException(status_code=400, detail="morning_hour must be 0-23")
+        await database.set_setting("numerology_morning_hour", str(data.morning_hour))
+    if data.evening_hour is not None:
+        if not (0 <= data.evening_hour <= 23):
+            raise HTTPException(status_code=400, detail="evening_hour must be 0-23")
+        await database.set_setting("numerology_evening_hour", str(data.evening_hour))
+    if data.channel_id is not None:
+        await database.set_setting("numerology_channel_id", data.channel_id)
+    return {"status": "ok"}
+
+@app.get("/numerology/numbers")
+async def api_get_numerology_numbers():
+    """Get all number descriptions."""
+    return await database.get_all_numerology_number_descs()
+
+@app.post("/numerology/numbers")
+async def api_set_numerology_number(data: NumerologyNumberDesc):
+    """Set description for a numerology number."""
+    valid = {1,2,3,4,5,6,7,8,9,11,22,33}
+    if data.num not in valid:
+        raise HTTPException(status_code=400, detail=f"num must be one of {sorted(valid)}")
+    await database.set_numerology_number_desc(data.num, data.description)
+    return {"status": "ok"}
+
+@app.get("/numerology/combos")
+async def api_get_numerology_combos():
+    """Get all combination readings."""
+    return await database.get_all_numerology_combos()
+
+@app.post("/numerology/combos")
+async def api_set_numerology_combo(data: NumerologyCombo):
+    """Set combination reading for a primary+secondary pair."""
+    await database.set_numerology_combo(data.primary_num, data.secondary_num, data.combo_desc)
+    return {"status": "ok"}
+
+@app.get("/numerology/preview")
+async def api_numerology_preview(date: Optional[str] = None):
+    """
+    Preview the numerology reading for a given date (YYYY-MM-DD).
+    Defaults to today (LA timezone).
+    """
+    import sys, os as _os
+    sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))))
+    import numerology as num_engine
+    from datetime import date as _date
+    from zoneinfo import ZoneInfo
+
+    if date:
+        try:
+            target = _date.fromisoformat(date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+    else:
+        from datetime import datetime
+        target = datetime.now(ZoneInfo("America/Los_Angeles")).date()
+
+    nums = num_engine.calculate_numerology(target)
+    reading = await num_engine.get_reading(target, database)
+    return {
+        "date": target.isoformat(),
+        "primary": nums["primary"],
+        "secondary": nums["secondary"],
+        "primary_label": num_engine.format_primary_label(nums["primary"]),
+        "secondary_label": num_engine.format_secondary_label(nums["secondary"]),
+        "reading": reading,
+    }
+
+
 # --- Serve Frontend ---
 
 # Search for frontend/dist relative to project root

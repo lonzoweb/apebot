@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   Home, Sparkles, Gift, Layers, Database, 
-  Settings, TrendingUp, Users, Trophy, Trash2, Plus, Save, Download, RefreshCw, Bell, Info, Mail, CreditCard, BookOpen, MessageCircle, Send
+  Settings, TrendingUp, Users, Trophy, Trash2, Plus, Save, Download, RefreshCw, Bell, Info, Mail, CreditCard, BookOpen, MessageCircle, Send, Hash
 } from 'lucide-react';
 
 const API_BASE = window.location.origin;
@@ -59,6 +59,21 @@ function App() {
   const [confirmSendId, setConfirmSendId] = useState(null);
   const [sendSuccess, setSendSuccess] = useState(null); // 'random' or id
 
+  // Numerology state
+  const [numerologySettings, setNumerologySettings] = useState({ morning_hour: 7, evening_hour: 22, channel_id: '' });
+  const [numerologyNumbers, setNumerologyNumbers] = useState({}); // {num: description}
+  const [numerologyCombos, setNumerologyCombos] = useState([]); // [{primary_num, secondary_num, combo_desc}]
+  const [numerologyPreview, setNumerologyPreview] = useState(null);
+  const [numerologyPreviewLoading, setNumerologyPreviewLoading] = useState(false);
+  const [numerologySaveMsg, setNumerologySaveMsg] = useState('');
+  const [numerologyEditNum, setNumerologyEditNum] = useState(null); // which number is being edited
+  const [numerologyEditCombo, setNumerologyEditCombo] = useState(null); // {primary_num, secondary_num}
+  const [numerologyEditText, setNumerologyEditText] = useState('');
+
+  // Quote schedule state
+  const [quoteSchedule, setQuoteSchedule] = useState({ morning_hour: 10, evening_hour: 18 });
+  const [quoteScheduleSaveMsg, setQuoteScheduleSaveMsg] = useState('');
+
   // Form states for new entries
   const [newReward, setNewReward] = useState({ level: '', role_id: '', stack_role: true });
   const [newMultiplier, setNewMultiplier] = useState({ target_id: '', multiplier: '1.5' });
@@ -103,6 +118,20 @@ function App() {
       axios.get(`${API_BASE}/quotes`).then(res => {
         setDailyQuotes(res.data);
       }).catch(err => console.error('Failed to fetch daily quotes:', err));
+      axios.get(`${API_BASE}/quote-schedule`).then(res => {
+        setQuoteSchedule(res.data);
+      }).catch(err => console.error('Failed to fetch quote schedule:', err));
+    }
+    if (activeTab === 'numerology') {
+      Promise.all([
+        axios.get(`${API_BASE}/numerology/settings`),
+        axios.get(`${API_BASE}/numerology/numbers`),
+        axios.get(`${API_BASE}/numerology/combos`),
+      ]).then(([sRes, nRes, cRes]) => {
+        setNumerologySettings(sRes.data);
+        setNumerologyNumbers(nRes.data);
+        setNumerologyCombos(cRes.data);
+      }).catch(err => console.error('Failed to fetch numerology data:', err));
     }
   }, [activeTab]);
 
@@ -278,6 +307,7 @@ function App() {
     { id: 'multipliers', icon: Layers, label: 'Multipliers' },
     { id: 'quotes', icon: BookOpen, label: 'QUOTES DROP' },
     { id: 'daily_quotes', icon: MessageCircle, label: 'Daily Quotes' },
+    { id: 'numerology', icon: Hash, label: 'Numerology' },
     { id: 'misc', icon: Settings, label: 'Misc' },
     { id: 'admin', icon: Users, label: 'Admin' },
     { id: 'data', icon: Database, label: 'Data Management' },
@@ -367,6 +397,7 @@ function App() {
             multipliers: "Boost XP rates for specific roles or channels.",
             quotes: "Manage the quote drop bank and frequency.",
             daily_quotes: "Manage quotes for the .quote command and daily posts.",
+            numerology: "Configure daily numerology readings and content.",
             misc: "Configure global channel boundaries and command whitelists.",
             admin: "Tarot deck, economy toggle, and yap level.",
             data: "Export, import, reset, and prune server data.",
@@ -1335,6 +1366,50 @@ function App() {
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>These are the quotes used by the <code>.quote</code> command and the daily scheduled quote posts. This is a separate pool from the Quote Drops system.</p>
             </div>
 
+            {/* Schedule settings */}
+            <div className="card">
+              <h3 style={{ marginBottom: '1rem' }}>📅 Post Schedule (LA Time)</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div className="form-group">
+                  <label className="label">Morning Post (hour, 0-23)</label>
+                  <input
+                    className="input" type="number" min="0" max="23"
+                    value={quoteSchedule.morning_hour}
+                    onChange={e => setQuoteSchedule(prev => ({ ...prev, morning_hour: parseInt(e.target.value) || 0 }))}
+                  />
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                    Currently: {quoteSchedule.morning_hour}:00 LA ({quoteSchedule.morning_hour < 12 ? `${quoteSchedule.morning_hour || 12}am` : quoteSchedule.morning_hour === 12 ? '12pm' : `${quoteSchedule.morning_hour - 12}pm`})
+                  </p>
+                </div>
+                <div className="form-group">
+                  <label className="label">Evening Post (hour, 0-23)</label>
+                  <input
+                    className="input" type="number" min="0" max="23"
+                    value={quoteSchedule.evening_hour}
+                    onChange={e => setQuoteSchedule(prev => ({ ...prev, evening_hour: parseInt(e.target.value) || 0 }))}
+                  />
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                    Currently: {quoteSchedule.evening_hour}:00 LA ({quoteSchedule.evening_hour < 12 ? `${quoteSchedule.evening_hour || 12}am` : quoteSchedule.evening_hour === 12 ? '12pm' : `${quoteSchedule.evening_hour - 12}pm`})
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    try {
+                      await axios.post(`${API_BASE}/quote-schedule`, quoteSchedule);
+                      setQuoteScheduleSaveMsg('✅ Saved!');
+                      setTimeout(() => setQuoteScheduleSaveMsg(''), 2500);
+                    } catch { setQuoteScheduleSaveMsg('❌ Failed'); }
+                  }}
+                >
+                  <Save size={14} style={{ marginRight: '0.3rem' }} /> Save Schedule
+                </button>
+                {quoteScheduleSaveMsg && <span style={{ fontSize: '0.85rem', color: quoteScheduleSaveMsg.startsWith('✅') ? 'var(--success)' : 'var(--danger)' }}>{quoteScheduleSaveMsg}</span>}
+              </div>
+            </div>
+
             <div className="card">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
                 <h3 style={{ margin: 0 }}>All Daily Quotes ({dailyQuotes.length})</h3>
@@ -1403,6 +1478,223 @@ function App() {
             </div>
           </div>
         )}
+
+        {activeTab === 'numerology' && (() => {
+          const NUM_LABELS = {1:'1',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',11:'11 (Master)',22:'22 (Master)',33:'33 (Master)'};
+          const ALL_NUMS = [1,2,3,4,5,6,7,8,9,11,22,33];
+
+          const saveNumDesc = async (num, text) => {
+            try {
+              await axios.post(`${API_BASE}/numerology/numbers`, { num, description: text });
+              setNumerologyNumbers(prev => ({ ...prev, [num]: text }));
+              setNumerologyEditNum(null);
+              setNumerologySaveMsg('✅ Saved!');
+              setTimeout(() => setNumerologySaveMsg(''), 2000);
+            } catch { setNumerologySaveMsg('❌ Failed'); }
+          };
+
+          const saveCombo = async (primary_num, secondary_num, text) => {
+            try {
+              await axios.post(`${API_BASE}/numerology/combos`, { primary_num, secondary_num, combo_desc: text });
+              setNumerologyCombos(prev => {
+                const filtered = prev.filter(c => !(c.primary_num === primary_num && c.secondary_num === secondary_num));
+                return [...filtered, { primary_num, secondary_num, combo_desc: text }];
+              });
+              setNumerologyEditCombo(null);
+              setNumerologySaveMsg('✅ Saved!');
+              setTimeout(() => setNumerologySaveMsg(''), 2000);
+            } catch { setNumerologySaveMsg('❌ Failed'); }
+          };
+
+          const getCombo = (p, s) => {
+            const entry = numerologyCombos.find(c => c.primary_num === p && c.secondary_num === s);
+            return entry ? entry.combo_desc : '';
+          };
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+              {/* Settings Card */}
+              <div className="card">
+                <h3 style={{ marginBottom: '1rem' }}>⚙️ Schedule & Channel</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div className="form-group">
+                    <label className="label">Morning Hour (LA, 0-23)</label>
+                    <input className="input" type="number" min="0" max="23"
+                      value={numerologySettings.morning_hour}
+                      onChange={e => setNumerologySettings(p => ({ ...p, morning_hour: parseInt(e.target.value) || 0 }))}
+                    />
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Posts today's reading (default 7 = 7am)</p>
+                  </div>
+                  <div className="form-group">
+                    <label className="label">Evening Hour (LA, 0-23)</label>
+                    <input className="input" type="number" min="0" max="23"
+                      value={numerologySettings.evening_hour}
+                      onChange={e => setNumerologySettings(p => ({ ...p, evening_hour: parseInt(e.target.value) || 0 }))}
+                    />
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Posts tomorrow's preview (default 22 = 10pm)</p>
+                  </div>
+                  <div className="form-group">
+                    <label className="label">Channel ID</label>
+                    <select className="input"
+                      value={numerologySettings.channel_id}
+                      onChange={e => setNumerologySettings(p => ({ ...p, channel_id: e.target.value }))}
+                    >
+                      <option value="">(fallback: #forum)</option>
+                      {Object.keys(channels).map(id => (
+                        <option key={id} value={id}>#{channels[id].name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <button className="btn btn-primary" onClick={async () => {
+                    try {
+                      await axios.post(`${API_BASE}/numerology/settings`, numerologySettings);
+                      setNumerologySaveMsg('✅ Saved!');
+                      setTimeout(() => setNumerologySaveMsg(''), 2000);
+                    } catch { setNumerologySaveMsg('❌ Failed'); }
+                  }}>
+                    <Save size={14} style={{ marginRight: '0.3rem' }} /> Save Settings
+                  </button>
+                  {numerologySaveMsg && <span style={{ color: numerologySaveMsg.startsWith('✅') ? 'var(--success)' : 'var(--danger)', fontSize: '0.85rem' }}>{numerologySaveMsg}</span>}
+                </div>
+              </div>
+
+              {/* Preview Card */}
+              <div className="card">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                  <h3 style={{ margin: 0 }}>🔮 Live Preview (Today)</h3>
+                  <button className="btn btn-primary" style={{ fontSize: '0.85rem' }}
+                    disabled={numerologyPreviewLoading}
+                    onClick={async () => {
+                      setNumerologyPreviewLoading(true);
+                      try {
+                        const res = await axios.get(`${API_BASE}/numerology/preview`);
+                        setNumerologyPreview(res.data);
+                      } catch { alert('Preview failed'); }
+                      setNumerologyPreviewLoading(false);
+                    }}
+                  >
+                    {numerologyPreviewLoading ? '⏳ Loading...' : '▶ Generate Preview'}
+                  </button>
+                </div>
+                {numerologyPreview && (
+                  <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '0.75rem', padding: '1rem' }}>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                      📅 {numerologyPreview.date} — Primary: <strong>{numerologyPreview.primary_label}</strong> · Secondary: <strong>{numerologyPreview.secondary_label}</strong>
+                    </p>
+                    <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.82rem', color: 'var(--text-primary)', margin: 0, fontFamily: 'monospace' }}>{numerologyPreview.reading}</pre>
+                  </div>
+                )}
+              </div>
+
+              {/* Number Descriptions */}
+              <div className="card">
+                <h3 style={{ marginBottom: '0.5rem' }}>🔢 Number Descriptions</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>Set the forecast text for each numerology number. Click a row to edit.</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {ALL_NUMS.map(num => (
+                    <div key={num} style={{ border: '1px solid rgba(255,255,255,0.07)', borderRadius: '0.5rem', overflow: 'hidden' }}>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1rem', cursor: 'pointer', background: numerologyEditNum === num ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.02)' }}
+                        onClick={() => {
+                          if (numerologyEditNum === num) { setNumerologyEditNum(null); }
+                          else { setNumerologyEditNum(num); setNumerologyEditText(numerologyNumbers[num] || ''); }
+                        }}
+                      >
+                        <span style={{ fontWeight: '700', color: 'var(--accent)', minWidth: '80px' }}>{NUM_LABELS[num]}</span>
+                        <span style={{ flex: 1, fontSize: '0.85rem', color: numerologyNumbers[num] ? 'var(--text-primary)' : 'var(--text-secondary)', fontStyle: numerologyNumbers[num] ? 'normal' : 'italic' }}>
+                          {numerologyNumbers[num] ? numerologyNumbers[num].slice(0, 120) + (numerologyNumbers[num].length > 120 ? '…' : '') : '(no description yet — click to add)'}
+                        </span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{numerologyEditNum === num ? '▲ close' : '▼ edit'}</span>
+                      </div>
+                      {numerologyEditNum === num && (
+                        <div style={{ padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.2)' }}>
+                          <textarea
+                            className="input"
+                            style={{ width: '100%', minHeight: '100px', fontFamily: 'monospace', fontSize: '0.85rem' }}
+                            value={numerologyEditText}
+                            onChange={e => setNumerologyEditText(e.target.value)}
+                            placeholder={`Full forecast text for number ${num}...`}
+                          />
+                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                            <button className="btn btn-primary" style={{ fontSize: '0.8rem' }}
+                              onClick={() => saveNumDesc(num, numerologyEditText)}>
+                              <Save size={12} style={{ marginRight: '0.25rem' }} /> Save
+                            </button>
+                            <button className="btn" style={{ fontSize: '0.8rem' }}
+                              onClick={() => setNumerologyEditNum(null)}>Cancel</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Combination Readings */}
+              <div className="card">
+                <h3 style={{ marginBottom: '0.5rem' }}>✨ Combination Readings</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>Set the combined advice for each primary + secondary number pair. Click a cell to edit.</p>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ padding: '0.5rem', background: 'rgba(99,102,241,0.15)', textAlign: 'center', color: 'var(--text-secondary)' }}>P \ S→</th>
+                        {ALL_NUMS.map(s => (
+                          <th key={s} style={{ padding: '0.5rem', background: 'rgba(99,102,241,0.1)', textAlign: 'center', minWidth: '60px' }}>{s}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ALL_NUMS.map(p => (
+                        <tr key={p}>
+                          <td style={{ padding: '0.5rem', background: 'rgba(99,102,241,0.1)', fontWeight: '700', textAlign: 'center', color: 'var(--accent)' }}>{p}</td>
+                          {ALL_NUMS.map(s => {
+                            const combo = getCombo(p, s);
+                            const isEditing = numerologyEditCombo && numerologyEditCombo.primary_num === p && numerologyEditCombo.secondary_num === s;
+                            return (
+                              <td key={s} style={{ padding: '0.25rem', verticalAlign: 'top', background: isEditing ? 'rgba(99,102,241,0.15)' : combo ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
+                                {isEditing ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: '200px' }}>
+                                    <textarea
+                                      className="input"
+                                      style={{ width: '100%', minHeight: '80px', fontSize: '0.75rem', fontFamily: 'monospace' }}
+                                      value={numerologyEditText}
+                                      onChange={e => setNumerologyEditText(e.target.value)}
+                                      autoFocus
+                                    />
+                                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                      <button className="btn btn-primary" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                                        onClick={() => saveCombo(p, s, numerologyEditText)}>✓ Save</button>
+                                      <button className="btn" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                                        onClick={() => setNumerologyEditCombo(null)}>✗</button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div
+                                    onClick={() => { setNumerologyEditCombo({ primary_num: p, secondary_num: s }); setNumerologyEditText(combo); }}
+                                    style={{ cursor: 'pointer', minHeight: '32px', padding: '0.25rem', borderRadius: '0.25rem', color: combo ? 'var(--text-primary)' : 'rgba(255,255,255,0.2)', fontSize: '0.72rem', lineHeight: 1.3 }}
+                                    title={combo || 'Click to add'}
+                                  >
+                                    {combo ? combo.slice(0, 40) + (combo.length > 40 ? '…' : '') : '+'}
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.75rem' }}>P = Primary (universal day), S = Secondary (day digits). Click any cell to add/edit.</p>
+              </div>
+
+            </div>
+          );
+        })()}
 
         {activeTab === 'admin' && (() => {
           const saveAdmin = async (patch) => {

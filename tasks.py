@@ -38,6 +38,19 @@ QUOTE_DROPS_ENABLED_KEY = "quote_drops_enabled"
 QUOTE_DROPS_INTERVAL_KEY = "quote_drops_interval_hours"
 LAST_QUOTE_DROP_TIME_KEY = "last_quote_drop_time"
 
+# Daily Quote schedule keys (configurable from dashboard)
+QUOTE_MORNING_HOUR_KEY = "quote_morning_hour"    # default 10
+QUOTE_EVENING_HOUR_KEY = "quote_evening_hour"    # default 18
+
+# Numerology keys
+NUMEROLOGY_MORNING_HOUR_KEY  = "numerology_morning_hour"   # default 7 (7am)
+NUMEROLOGY_MORNING_MIN_KEY   = "numerology_morning_min"    # default 0
+NUMEROLOGY_EVENING_HOUR_KEY  = "numerology_evening_hour"   # default 22 (10pm)
+NUMEROLOGY_EVENING_MIN_KEY   = "numerology_evening_min"    # default 0
+NUMEROLOGY_CHANNEL_KEY       = "numerology_channel_id"
+NUMEROLOGY_TODAY_DATE_KEY    = "numerology_today_date"     # ISO date of last morning post
+NUMEROLOGY_TOMORROW_DATE_KEY = "numerology_tomorrow_date"  # ISO date of last evening preview
+
 
 async def _get_today_str() -> str:
     return datetime.now(ZoneInfo("America/Los_Angeles")).date().isoformat()
@@ -283,14 +296,18 @@ def setup_tasks(bot, guild_id: int):
             quote_text, quote_date = await _load_quote_state()
             today_quote_exists = (quote_date == today_str and quote_text)
 
-            # ── 10:00 AM — morning quote ──────────────────────────────
-            if hour == 10 and minute == 0 and not today_quote_exists:
+            # Read configurable hours (defaults: 10am morning, 6pm evening)
+            q_morning = int(await database.get_setting(QUOTE_MORNING_HOUR_KEY, "10"))
+            q_evening = int(await database.get_setting(QUOTE_EVENING_HOUR_KEY, "18"))
+
+            # ── Morning quote ──────────────────────────────────────────
+            if hour == q_morning and minute == 0 and not today_quote_exists:
                 quote = await _send_morning_quote(bot, guild, target_channels)
                 _cached_quote = quote
 
-            # ── 6:00 PM — evening repost + candidates ─────────────────
-            elif hour == 18 and minute == 0:
-                # Re-fetch in case we rebooted between 10am and 6pm
+            # ── Evening repost + candidates ────────────────────────────
+            elif hour == q_evening and minute == 0:
+                # Re-fetch in case we rebooted between morning and evening
                 quote_text, quote_date = await _load_quote_state()
                 if quote_text and quote_date == today_str:
                     await _send_evening_quote(
@@ -374,6 +391,112 @@ def setup_tasks(bot, guild_id: int):
         logger.info("⏳ Daily quote task started (every minute, exact-time triggers)")
 
     daily_quote.start()
+
+    # --- Numerology Task ---
+    async def _send_numerology_reading(bot, guild, target_date, label: str):
+        """Send the numerology reading for target_date to the configured channel."""
+        import numerology as num_engine
+
+        channel_id_str = await database.get_setting(NUMEROLOGY_CHANNEL_KEY, "")
+        if not channel_id_str:
+            channel = discord.utils.get(guild.text_channels, name="forum")
+            if not channel:
+                logger.warning("Numerology: no channel configured and no #forum found, skipping.")
+                return
+        else:
+            channel = guild.get_channel(int(channel_id_str))
+            if not channel:
+                logger.warning(f"Numerology: channel {channel_id_str} not found, skipping.")
+                return
+
+        try:
+            embed = await num_engine.get_embed(target_date, database, label=label)
+            await channel.send(embed=embed)
+            logger.info(f"✅ Numerology embed sent for {target_date} ({label})")
+        except Exception as e:
+            logger.error(f"Error sending numerology reading: {e}", exc_info=True)
+
+    @tasks.loop(minutes=1)
+    async def daily_numerology():
+        """
+        Runs every minute. Fires numerology posts at configurable times.
+        Schedule (America/Los_Angeles):
+          [morning_hour]:00  — post today's reading
+          [evening_hour]:00  — post tomorrow's preview
+        """
+        try:
+            now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
+            today_str = now_pt.date().isoformat()
+            hour, minute = now_pt.hour, now_pt.minute
+
+            guild = bot.get_guild(guild_id)
+            if not guild:
+                return
+
+            morning_hour = int(await database.get_setting(NUMEROLOGY_MORNING_HOUR_KEY, "7"))
+            evening_hour = int(await database.get_setting(NUMEROLOGY_EVENING_HOUR_KEY, "22"))
+
+            # ── Morning: today's reading ────────────────────────────────────
+            if hour == morning_hour and minute == 0:
+                already_sent = await database.get_setting(NUMEROLOGY_TODAY_DATE_KEY, "")
+                if already_sent != today_str:
+                    from datetime import date as _date
+                    await _send_numerology_reading(bot, guild, now_pt.date(), "Daily Numerology Reading 🌅")
+                    await database.set_setting(NUMEROLOGY_TODAY_DATE_KEY, today_str)
+
+            # ── Evening: tomorrow's preview ─────────────────────────────────
+            elif hour == evening_hour and minute == 0:
+                already_sent = await database.get_setting(NUMEROLOGY_TOMORROW_DATE_KEY, "")
+                if already_sent != today_str:
+                    from datetime import date as _date, timedelta as _td
+                    tomorrow = now_pt.date() + _td(days=1)
+                    await _send_numerology_reading(bot, guild, tomorrow, "Tomorrow's Numerology Preview 🌙")
+                    await database.set_setting(NUMEROLOGY_TOMORROW_DATE_KEY, today_str)
+
+        except Exception as e:
+            logger.error(f"Error in daily_numerology task: {e}", exc_info=True)
+
+    @daily_numerology.before_loop
+    async def before_daily_numerology():
+        await bot.wait_until_ready()
+
+        # ── STARTUP CATCH-UP ─────────────────────────────────────────
+        try:
+            import numerology as num_engine
+            now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
+            today_str = now_pt.date().isoformat()
+            hour = now_pt.hour
+
+            guild = bot.get_guild(guild_id)
+            if not guild:
+                return
+
+            morning_hour = int(await database.get_setting(NUMEROLOGY_MORNING_HOUR_KEY, "7"))
+            evening_hour = int(await database.get_setting(NUMEROLOGY_EVENING_HOUR_KEY, "22"))
+
+            already_today = await database.get_setting(NUMEROLOGY_TODAY_DATE_KEY, "")
+            already_tomorrow = await database.get_setting(NUMEROLOGY_TOMORROW_DATE_KEY, "")
+
+            # Rebooted between morning and evening: check if morning was missed
+            if morning_hour <= hour < evening_hour and already_today != today_str:
+                logger.info("Numerology catch-up: missed morning reading, sending now.")
+                await _send_numerology_reading(bot, guild, now_pt.date(), "Daily Numerology Reading 🌅")
+                await database.set_setting(NUMEROLOGY_TODAY_DATE_KEY, today_str)
+
+            # Rebooted after evening: check if evening preview was missed
+            elif hour >= evening_hour and already_tomorrow != today_str:
+                from datetime import timedelta as _td
+                tomorrow = now_pt.date() + _td(days=1)
+                logger.info("Numerology catch-up: missed evening preview, sending now.")
+                await _send_numerology_reading(bot, guild, tomorrow, "Tomorrow's Numerology Preview 🌙")
+                await database.set_setting(NUMEROLOGY_TOMORROW_DATE_KEY, today_str)
+
+        except Exception as e:
+            logger.error(f"Numerology startup catch-up error: {e}", exc_info=True)
+
+        logger.info("⏳ Daily numerology task started (every minute, exact-time triggers)")
+
+    daily_numerology.start()
 
     MUZZLE_EFFECTS = {"muzzle", "uwu"}
 
