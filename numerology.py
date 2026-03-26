@@ -301,7 +301,6 @@ async def get_embed(d: date, db_module, label: str = "") -> "discord.Embed":
         inline=False,
     )
 
-    embed.set_footer(text="Apeiron")
     return embed
 
 

@@ -369,5 +369,30 @@ class AdminCog(commands.Cog):
             await interaction.followup.send("🌑 No recent bot messages found to purge.")
 
 
+    @commands.command(name="num")
+    @commands.has_permissions(administrator=True)
+    async def numerology_today(self, ctx):
+        """[ADMIN] Post today's numerology reading embed."""
+        import numerology as num_engine
+        import database
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
+        embed = await num_engine.get_embed(today, database, label="Daily Numerology Reading 🌅")
+        await ctx.send(embed=embed)
+
+    @commands.command(name="num2")
+    @commands.has_permissions(administrator=True)
+    async def numerology_tomorrow(self, ctx):
+        """[ADMIN] Post tomorrow's numerology reading embed (preview)."""
+        import numerology as num_engine
+        import database
+        from datetime import datetime, timedelta
+        from zoneinfo import ZoneInfo
+        tomorrow = datetime.now(ZoneInfo("America/Los_Angeles")).date() + timedelta(days=1)
+        embed = await num_engine.get_embed(tomorrow, database, label="Tomorrow's Numerology Preview 🌙")
+        await ctx.send(embed=embed)
+
+
 async def setup(bot):
     await bot.add_cog(AdminCog(bot))
