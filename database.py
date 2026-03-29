@@ -461,6 +461,16 @@ async def init_db():
                 """
             )
 
+            # 🛒 SHOP — Item Price Overrides
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS item_prices (
+                    item_key TEXT PRIMARY KEY,
+                    price INTEGER NOT NULL
+                )
+                """
+            )
+
             await conn.commit()
 
         # ── ONE-TIME BACKFILL: HoF → quote_drops (REMOVE AFTER FIRST DEPLOY) ──
@@ -676,6 +686,66 @@ async def get_all_numerology_combos() -> list:
         ) as cursor:
             rows = await cursor.fetchall()
             return [{"primary_num": r[0], "secondary_num": r[1], "combo_desc": r[2]} for r in rows]
+
+
+async def seed_numerology_defaults():
+    """Seed the database with default numerology descriptions and combos if empty."""
+    import numerology as num_engine
+    
+    async with get_db() as conn:
+        # 1. Number Descs
+        async with conn.execute("SELECT COUNT(*) FROM numerology_number_desc") as cur:
+            count = (await cur.fetchone())[0]
+            if count == 0:
+                for num, desc in num_engine.DEFAULT_NUMBER_DESCS.items():
+                    await conn.execute(
+                        "INSERT OR IGNORE INTO numerology_number_desc (num, description) VALUES (?, ?)",
+                        (num, desc)
+                    )
+        
+        # 2. Combos
+        async with conn.execute("SELECT COUNT(*) FROM numerology_combos") as cur:
+            count = (await cur.fetchone())[0]
+            if count == 0:
+                for (p, s), desc in num_engine.DEFAULT_COMBOS.items():
+                    await conn.execute(
+                        "INSERT OR IGNORE INTO numerology_combos (primary_num, secondary_num, combo_desc) VALUES (?, ?, ?)",
+                        (p, s, desc)
+                    )
+        await conn.commit()
+
+
+# ============================================================
+# SHOP PRICING
+# ============================================================
+
+async def get_item_price(item_key: str) -> int:
+    """Get item price from DB override, fallback to ITEM_REGISTRY."""
+    from items import ITEM_REGISTRY
+    async with get_db() as conn:
+        async with conn.execute("SELECT price FROM item_prices WHERE item_key = ?", (item_key,)) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return row[0]
+            
+            # Fallback
+            return ITEM_REGISTRY.get(item_key, {}).get("cost", 999999)
+
+async def set_item_price(item_key: str, price: int):
+    """Override an item's price in the database."""
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO item_prices (item_key, price) VALUES (?, ?)",
+            (item_key, price)
+        )
+        await conn.commit()
+
+async def get_all_item_prices() -> dict:
+    """Returns all price overrides as {item_key: price}."""
+    async with get_db() as conn:
+        async with conn.execute("SELECT item_key, price FROM item_prices") as cursor:
+            rows = await cursor.fetchall()
+            return {r[0]: r[1] for r in rows}
 
 
 # ============================================================

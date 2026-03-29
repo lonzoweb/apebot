@@ -78,6 +78,10 @@ function App() {
   const [newReward, setNewReward] = useState({ level: '', role_id: '', stack_role: true });
   const [newMultiplier, setNewMultiplier] = useState({ target_id: '', multiplier: '1.5' });
 
+  // Shop state
+  const [shopItems, setShopItems] = useState([]);
+  const [shopSaveMsg, setShopSaveMsg] = useState('');
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -132,6 +136,11 @@ function App() {
         setNumerologyNumbers(nRes.data);
         setNumerologyCombos(cRes.data);
       }).catch(err => console.error('Failed to fetch numerology data:', err));
+    }
+    if (activeTab === 'shop') {
+      axios.get(`${API_BASE}/shop/items`).then(res => {
+        setShopItems(res.data);
+      }).catch(err => console.error('Failed to fetch shop items:', err));
     }
   }, [activeTab]);
 
@@ -308,6 +317,7 @@ function App() {
     { id: 'quotes', icon: BookOpen, label: 'QUOTES DROP' },
     { id: 'daily_quotes', icon: MessageCircle, label: 'Daily Quotes' },
     { id: 'numerology', icon: Hash, label: 'Numerology' },
+    { id: 'shop', icon: CreditCard, label: 'Shop' },
     { id: 'misc', icon: Settings, label: 'Misc' },
     { id: 'admin', icon: Users, label: 'Admin' },
     { id: 'data', icon: Database, label: 'Data Management' },
@@ -1516,7 +1526,31 @@ function App() {
 
               {/* Settings Card */}
               <div className="card">
-                <h3 style={{ marginBottom: '1rem' }}>⚙️ Schedule & Channel</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ margin: 0 }}>⚙️ Schedule & Channel</h3>
+                  <button 
+                    className="button" 
+                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                    onClick={async () => {
+                      if (window.confirm("Seed default numerology meanings into the database? This won't overwrite existing entries.")) {
+                        try {
+                          await axios.post(`${API_BASE}/numerology/seed`);
+                          setNumerologySaveMsg('✅ Seeded!');
+                          // Refresh data
+                          const [nRes, cRes] = await Promise.all([
+                            axios.get(`${API_BASE}/numerology/numbers`),
+                            axios.get(`${API_BASE}/numerology/combos`),
+                          ]);
+                          setNumerologyNumbers(nRes.data);
+                          setNumerologyCombos(cRes.data);
+                          setTimeout(() => setNumerologySaveMsg(''), 2000);
+                        } catch { setNumerologySaveMsg('❌ Seed Failed'); }
+                      }
+                    }}
+                  >
+                    🌱 Seed Defaults
+                  </button>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div className="form-group">
                     <label className="label">Morning Hour (LA, 0-23)</label>
@@ -1909,6 +1943,67 @@ function App() {
                 {keySaveMsg && <span style={{ marginLeft: '1rem', color: 'var(--success)', fontWeight: 'bold', fontSize: '0.9rem' }}>{keySaveMsg}</span>}
               </div>
 
+            </div>
+          );
+        })()}
+
+        {activeTab === 'shop' && (() => {
+          const savePrice = async (item_key, price) => {
+            try {
+              await axios.post(`${API_BASE}/shop/items`, { item_key, price: parseInt(price) });
+              setShopItems(prev => prev.map(item => item.key === item_key ? { ...item, current_price: parseInt(price) } : item));
+              setShopSaveMsg('✅ Saved!');
+              setTimeout(() => setShopSaveMsg(''), 2000);
+            } catch { setShopSaveMsg('❌ Error'); }
+          };
+
+          return (
+            <div className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h2 style={{ margin: 0 }}>🛒 Shop Pricing</h2>
+                {shopSaveMsg && <span style={{ color: 'var(--accent-color)', fontWeight: 'bold' }}>{shopSaveMsg}</span>}
+              </div>
+              
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left' }}>Item</th>
+                      <th style={{ textAlign: 'left' }}>Description</th>
+                      <th style={{ textAlign: 'center', width: '120px' }}>Base Price</th>
+                      <th style={{ textAlign: 'center', width: '150px' }}>Current Price</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shopItems.map(item => (
+                      <tr key={item.key}>
+                        <td style={{ fontWeight: '600', color: 'var(--accent-color)' }}>{item.name}</td>
+                        <td style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{item.description}</td>
+                        <td style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>{item.base_price}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+                            <input 
+                              className="input"
+                              type="number"
+                              style={{ width: '100px', textAlign: 'center' }}
+                              defaultValue={item.current_price}
+                              onBlur={(e) => {
+                                if (parseInt(e.target.value) !== item.current_price) {
+                                  savePrice(item.key, e.target.value);
+                                }
+                              }}
+                            />
+                            <span style={{ color: 'var(--accent-color)' }}>💎</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                * Prices are auto-saved when you click out of the field.
+              </p>
             </div>
           );
         })()}

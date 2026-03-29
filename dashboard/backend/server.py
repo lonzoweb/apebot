@@ -785,6 +785,10 @@ class NumerologyCombo(BaseModel):
     secondary_num: int
     combo_desc: str
 
+class ShopItemUpdate(BaseModel):
+    item_key: str
+    price: int
+
 @app.get("/numerology/settings")
 async def api_get_numerology_settings():
     """Get numerology post schedule and channel config."""
@@ -835,6 +839,35 @@ async def api_get_numerology_combos():
 async def api_set_numerology_combo(data: NumerologyCombo):
     """Set combination reading for a primary+secondary pair."""
     await database.set_numerology_combo(data.primary_num, data.secondary_num, data.combo_desc)
+    return {"status": "ok"}
+
+@app.post("/numerology/seed")
+async def api_seed_numerology():
+    """Manual trigger to seed numerology defaults into DB."""
+    await database.seed_numerology_defaults()
+    return {"status": "ok"}
+
+@app.get("/shop/items")
+async def api_get_shop_items():
+    """List all items from registry + current DB prices."""
+    from items import ITEM_REGISTRY
+    overrides = await database.get_all_item_prices()
+    
+    items = []
+    for key, data in ITEM_REGISTRY.items():
+        items.append({
+            "key": key,
+            "name": key.replace('_', ' ').title(),
+            "description": data.get("shop_desc", ""),
+            "base_price": data.get("cost", 0),
+            "current_price": overrides.get(key, data.get("cost", 0))
+        })
+    return items
+
+@app.post("/shop/items")
+async def api_set_item_price(data: ShopItemUpdate):
+    """Update price override for an item."""
+    await database.set_item_price(data.item_key, data.price)
     return {"status": "ok"}
 
 @app.get("/numerology/preview")

@@ -335,7 +335,8 @@ class EconomyCog(commands.Cog):
                 if data.get('hidden'):
                     continue
                     
-                price = f"{data['cost']} 💎"
+                actual_cost = await database.get_item_price(item)
+                price = f"{actual_cost} 💎"
                 max_uses = data.get('max_uses')
                 if max_uses and max_uses > 1:
                     price += f" ({max_uses} charges)"
@@ -352,7 +353,8 @@ class EconomyCog(commands.Cog):
                 if hidden_items:
                     embed.add_field(name="──────────────", value="**🌑 THE HIDDEN EXCHANGE**", inline=False)
                     for item, data in hidden_items:
-                        price = f"{data['cost']} 💎"
+                        actual_cost = await database.get_item_price(item)
+                        price = f"{actual_cost} 💎"
                         max_uses = data.get('max_uses')
                         if max_uses and max_uses > 1:
                             price += f" ({max_uses} charges)"
@@ -401,7 +403,7 @@ class EconomyCog(commands.Cog):
             )
 
         item_data = ITEM_REGISTRY[official_name]
-        cost = item_data["cost"]
+        cost = await database.get_item_price(official_name)
 
         # Special handling for wards - limit to one in inventory
         if item_data.get("type") == "defense":

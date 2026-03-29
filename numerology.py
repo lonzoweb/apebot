@@ -47,10 +47,13 @@ DEFAULT_COMBOS = {
     # (primary, secondary): combo_desc
     (3, 8):   "Work on making money (8) through communication (3).\nNetwork and socialize (3) to build wealth (8).",
     (5, 1):   "Start (1) planning a travel (5).\nTravel (5) and beware of road rage tendencies (1).\nAthletic (1) sex (5).\nStart (1) health (5) programs.",
+    (6, 1):   "Start (1) planning something for your family (6).\nSports (1) with your family (6).\nA 6 day or date could be good to marry. The other main number of the date confers properties to the relationship (11+6: more emotional, 5+6: more sensual, 1+6: more competitive/active, etc.).",
     (6, 2):   "Seek harmony (2) with your family (6) — a good moment to make up.\nA 6 day or date could be good to marry. The other main number of the date confers properties to the relationship (11+6: more emotional, 5+6: more sensual, etc.).",
+    (6, 11):  "Take an action related to family (6) that you want influential (11).\nThe 11 could emphasize the characteristics of the 6.\nA 6 day or date could be good to marry — 11+6 makes the relationship more emotional.\nWarning: Avoid flying on 11 days — technology may not work as reliably.",
     (7, 3):   "Learn (7) how to improve your communication (3).\nCommunicate (3) on knowledge and intelligence (7).\nTeach (7) to a group of people (3).\nWarning: Do not marry or start a relationship on 7 or 9 days or dates.\nWarning: Avoid intense exercise on 7 days.",
     (8, 4):   "Work hard (4) to make money (8).\nPay (8) your bills or fees (4).\nWarning: Avoid breaking the law, especially on 4 days — higher chances of it backfiring.",
     (11, 7):  "Take an action related to knowledge or intelligence or teaching (7) that you want to be influential (11).\nThe 11 could emphasize the characteristics of the 7.\nWarning: Do not marry or start a relationship on 7 or 9 days or dates.\nWarning: Avoid intense exercise on 7 days.\nWarning: Avoid flying on 11 days — technology may not work as reliably.",
+    (22, 8):  "Build (22) something related to the idea of money (8).\nBuild (22) the ways for you to make money (8).\nThe 22 could emphasize the characteristics of the 8.",
     (22, 9):  "Warning: Do not marry or start a relationship on 7 or 9 days or dates.",
     (33, 22): "Both master numbers — this is perhaps the most powerful combination possible.\nBuild (22) a pioneering project (33).",
 }
