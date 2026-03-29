@@ -15,6 +15,9 @@ from typing import Dict, Any, Optional
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from config import DB_FILE, GUILD_ID
 from database import calculate_level_for_xp, get_cached_roles, init_db, get_cached_channels
+from database import get_all_item_prices, set_item_price
+import database
+from items import ITEM_REGISTRY
 
 import logging
 logger = logging.getLogger(__name__)
@@ -850,24 +853,27 @@ async def api_seed_numerology():
 @app.get("/shop/items")
 async def api_get_shop_items():
     """List all items from registry + current DB prices."""
-    from items import ITEM_REGISTRY
-    overrides = await database.get_all_item_prices()
-    
-    items = []
-    for key, data in ITEM_REGISTRY.items():
-        items.append({
-            "key": key,
-            "name": key.replace('_', ' ').title(),
-            "description": data.get("shop_desc", ""),
-            "base_price": data.get("cost", 0),
-            "current_price": overrides.get(key, data.get("cost", 0))
-        })
-    return items
+    try:
+        overrides = await get_all_item_prices()
+        items = []
+        for key, data in ITEM_REGISTRY.items():
+            items.append({
+                "key": key,
+                "name": key.replace('_', ' ').title(),
+                "description": data.get("shop_desc", ""),
+                "base_price": data.get("cost", 0),
+                "current_price": overrides.get(key, data.get("cost", 0))
+            })
+        logger.info(f"GET /shop/items -> {len(items)} items")
+        return items
+    except Exception as e:
+        logger.exception(f"Error in /shop/items: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/shop/items")
 async def api_set_item_price(data: ShopItemUpdate):
     """Update price override for an item."""
-    await database.set_item_price(data.item_key, data.price)
+    await set_item_price(data.item_key, data.price)
     return {"status": "ok"}
 
 @app.get("/numerology/preview")
