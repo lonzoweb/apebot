@@ -891,7 +891,7 @@ class UtilityCog(commands.Cog):
         dm_message = f"**Deposit Address**\n{deposit_info}\nUpdated: {today}, provide mod with your transaction ID after sending."
         try:
             await ctx.author.send(dm_message)
-            await ctx.reply(f"📬 Check your DMs, {ctx.author.mention}.", mention_author=False)
+            await ctx.reply(f"Check DMs {ctx.author.mention}.", mention_author=False)
         except discord.Forbidden:
             await ctx.reply("❌ Couldn't DM you — your DMs may be closed.", mention_author=False)
 
