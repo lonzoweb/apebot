@@ -133,12 +133,12 @@ THEMES: dict[str, dict] = {
 THEME_NAMES = list(THEMES.keys())
 
 # ── Card dimensions ───────────────────────────────────────────────────────────
-W, H         = 900, 300
-AVATAR_SIZE  = 200
+W, H         = 900, 280   # 280 prevents Discord's embed preview from clipping the bottom
+AVATAR_SIZE  = 180        # slightly smaller to stay proportional
 AVATAR_X     = 25
 AVATAR_Y     = (H - AVATAR_SIZE) // 2   # vertically centered
 STATS_X      = AVATAR_X + AVATAR_SIZE + 28   # left edge of text area
-COL2_X       = STATS_X + 330                 # second column of 2x2 grid — slightly widened from 300
+COL2_X       = STATS_X + 330                 # second column of 2x2 grid
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
