@@ -878,6 +878,23 @@ class UtilityCog(commands.Cog):
         target = user or interaction.user
         await _send_avatar(interaction, target)
 
+    @commands.command(name="deposit")
+    async def deposit_command(self, ctx):
+        """DMs the user the current deposit address. Works in any channel."""
+        from database import get_setting
+        deposit_info = await get_setting("deposit_info", "")
+        if not deposit_info.strip():
+            return await ctx.reply(
+                "⚠️ No deposit address configured yet.", mention_author=False
+            )
+        today = datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%B %d, %Y")
+        dm_message = f"**Deposit Address**\n{deposit_info}\nUpdated: {today}, provide mod with your transaction ID after sending."
+        try:
+            await ctx.author.send(dm_message)
+            await ctx.reply(f"📬 Check your DMs, {ctx.author.mention}.", mention_author=False)
+        except discord.Forbidden:
+            await ctx.reply("❌ Couldn't DM you — your DMs may be closed.", mention_author=False)
+
 
 async def _send_avatar(interaction: discord.Interaction, target: discord.Member | discord.User):
     avatar = target.display_avatar.with_size(1024)

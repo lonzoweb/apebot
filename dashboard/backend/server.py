@@ -876,6 +876,19 @@ async def api_set_item_price(data: ShopItemUpdate):
     await set_item_price(data.item_key, data.price)
     return {"status": "ok"}
 
+@app.get("/deposit-info")
+async def api_get_deposit_info():
+    """Get the current deposit address/info."""
+    value = await database.get_setting("deposit_info", "")
+    return {"deposit_info": value}
+
+@app.post("/deposit-info")
+async def api_set_deposit_info(data: dict):
+    """Save the deposit address/info."""
+    value = data.get("deposit_info", "")
+    await database.set_setting("deposit_info", value)
+    return {"status": "ok"}
+
 @app.get("/numerology/preview")
 async def api_numerology_preview(date: Optional[str] = None):
     """

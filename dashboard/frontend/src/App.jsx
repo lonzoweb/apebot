@@ -80,7 +80,9 @@ function App() {
 
   // Shop state
   const [shopItems, setShopItems] = useState([]);
-  const [shopSaveMsg, setShopSaveMsg] = useState('');
+  const [shopSaveMsg, setShopSaveMsg] = useState(null);
+  const [depositInfo, setDepositInfo] = useState("");
+  const [depositSaveMsg, setDepositSaveMsg] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -141,6 +143,11 @@ function App() {
       axios.get(`${API_BASE}/shop/items`).then(res => {
         setShopItems(res.data);
       }).catch(err => console.error('Failed to fetch shop items:', err));
+    }
+    if (activeTab === 'misc') {
+      axios.get(`${API_BASE}/deposit-info`).then(res => {
+        setDepositInfo(res.data.deposit_info);
+      }).catch(err => console.error('Failed to fetch deposit info:', err));
     }
   }, [activeTab]);
 
@@ -305,6 +312,16 @@ function App() {
       fetchData();
     } catch (err) { alert("Recalculate failed"); }
     setSyncing(false);
+  };
+
+  const saveDepositInfo = async () => {
+    try {
+      await axios.post(`${API_BASE}/deposit-info`, { deposit_info: depositInfo });
+      setDepositSaveMsg('✅ Saved!');
+      setTimeout(() => setDepositSaveMsg(null), 2000);
+    } catch (err) {
+      setDepositSaveMsg('❌ Failed');
+    }
   };
 
   const navItems = [
@@ -2010,6 +2027,34 @@ function App() {
 
         {activeTab === 'misc' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="card animate-in" style={{ borderColor: 'var(--accent)', borderStyle: 'dashed' }}>
+              <h2 style={{ marginBottom: '0.25rem' }}>🏦 Deposit Settings</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>Configure the address and instructions users receive via DM when they type <code>.deposit</code> in Discord.</p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <textarea
+                  className="input"
+                  style={{ minHeight: '100px', fontFamily: 'monospace', fontSize: '0.9rem' }}
+                  placeholder="e.g. BTC: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa ..."
+                  value={depositInfo}
+                  onChange={(e) => setDepositInfo(e.target.value)}
+                  onBlur={saveDepositInfo}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Auto-saves on blur</span>
+                  {depositSaveMsg && (
+                    <span style={{ 
+                      color: depositSaveMsg.includes('✅') ? '#22c55e' : '#ef4444',
+                      fontSize: '0.85rem',
+                      fontWeight: 'bold'
+                    }}>
+                      {depositSaveMsg}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="card">
               <h2 style={{ marginBottom: '0.25rem' }}>Channel Configuration</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Specify specific channels for roles like Main, Spam, Admin, and Error log routes.</p>
