@@ -766,12 +766,24 @@ def setup_tasks(bot, guild_id: int):
                         channel = guild.get_channel(int(bulletin_id))
                         if channel:
                             import tarot
+                            import rws
+                            import manara
                             from database import get_admin_config
                             config = await get_admin_config()
-                            deck_name = config.get("tarot_deck", "thoth")
-                            card = tarot.draw_card(deck_name)
-                            await channel.send("🎴 **Daily Tarot Drawing**")
-                            await tarot.send_card_embed(channel, card)
+                            deck_name = config.get("tarot_deck", "thoth").lower().strip()
+                            
+                            dev_mode = False # Placeholder or get from config
+                            if deck_name == "rws":
+                                deck_module = rws
+                            elif deck_name == "manara":
+                                deck_module = manara
+                            else:
+                                deck_module = tarot
+
+                            card_key = deck_module.draw_card()
+                            date_str = now_pt.strftime("%m/%d/%y")
+                            await channel.send(f"🎴 **Pull for {date_str}**")
+                            await deck_module.send_tarot_card(channel, card_key=card_key)
                             await database.set_setting(DAILY_TC_DATE_KEY, today_str)
                             logger.info(f"🎴 Daily TC sent for {today_str}")
 
@@ -794,16 +806,26 @@ def setup_tasks(bot, guild_id: int):
                 return
 
             now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
-            # Sunday is weekday 6
-            if now_pt.weekday() == 6 and now_pt.hour == 23:
+            purge_interval = await database.get_setting("bulletin_purge_interval", "weekly")
+            
+            # Condition for purge: 
+            # - Daily: midnight (hour 0)
+            # - Weekly: Sunday (weekday 6) at 11:59 PM (hour 23)
+            do_purge = False
+            if purge_interval == "daily" and now_pt.hour == 0:
+                do_purge = True
+            elif purge_interval == "weekly" and now_pt.weekday() == 6 and now_pt.hour == 23:
+                do_purge = True
+
+            if do_purge:
                 bulletin_id = await database.get_setting(BULLETIN_CHANNEL_KEY, "")
                 if bulletin_id:
                     guild = bot.get_guild(guild_id)
                     channel = guild.get_channel(int(bulletin_id))
                     if channel:
-                        logger.info("🧹 Starting weekly bulletin purge...")
-                        await channel.purge(limit=1000, reason="Weekly scheduled purge")
-                        await channel.send("🧹 **Weekly Purge Complete**. Channel cleared for the new week.")
+                        logger.info(f"🧹 Starting {purge_interval} bulletin purge...")
+                        await channel.purge(limit=1000, reason=f"{purge_interval.capitalize()} scheduled purge")
+                        await channel.send(f"🧹 **{purge_interval.capitalize()} Purge Complete**. Channel cleared.")
 
         except Exception as e:
             logger.error(f"Error in bulletin purge: {e}", exc_info=True)

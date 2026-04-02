@@ -2105,14 +2105,24 @@ function App() {
                   />
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1.5rem' }}>
-                  <input
-                    type="checkbox"
-                    id="weeklyPurge"
-                    checked={bulletinSettings.weekly_purge_enabled === 1}
-                    onChange={(e) => setBulletinSettings({ ...bulletinSettings, weekly_purge_enabled: e.target.checked ? 1 : 0 })}
-                  />
-                  <label htmlFor="weeklyPurge" style={{ cursor: 'pointer', fontSize: '0.9rem' }}>Enable Weekly Purge (Sun 11:59PM)</label>
+                <div>
+                  <label className="label">Purge Schedule</label>
+                  <select
+                    className="input"
+                    value={bulletinSettings.weekly_purge_enabled === 0 ? 'disabled' : (bulletinSettings.purge_interval || 'weekly')}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'disabled') {
+                        setBulletinSettings({ ...bulletinSettings, weekly_purge_enabled: 0 });
+                      } else {
+                        setBulletinSettings({ ...bulletinSettings, weekly_purge_enabled: 1, purge_interval: val });
+                      }
+                    }}
+                  >
+                    <option value="disabled">-- Disabled --</option>
+                    <option value="daily">Daily (Midnight PT)</option>
+                    <option value="weekly">Weekly (Sun 11:59PM PT)</option>
+                  </select>
                 </div>
               </div>
 

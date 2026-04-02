@@ -279,7 +279,7 @@ async def _post_or_update_hof(
             bulletin_ch = guild.get_channel(int(bulletin_id))
             if bulletin_ch:
                 # Use a fresh context header for bulletin if needed, or same content
-                await bulletin_ch.send("🏆 **First Hall of Fame Entry of the Day**")
+                await bulletin_ch.send("🏆 **First HOF**")
                 await bulletin_ch.send(content=content, embed=embed)
                 await set_setting("last_bulletin_hof_date", today_str)
                 logger.info(f"🏆 Posted first HOF of the day ({today_str}) to Bulletin.")
