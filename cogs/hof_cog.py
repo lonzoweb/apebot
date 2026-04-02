@@ -273,9 +273,15 @@ async def _post_or_update_hof(
     # ── BULLETIN: Post the first HOF entry of the day ──
     bulletin_id = await get_setting("bulletin_channel_id", "")
     if bulletin_id:
-        today_str = datetime.now(ZoneInfo("America/Los_Angeles")).date().isoformat()
+        now_la = datetime.now(ZoneInfo("America/Los_Angeles"))
+        today_str = now_la.date().isoformat()
         last_hof_date = await get_setting("last_bulletin_hof_date", "")
-        if last_hof_date != today_str:
+        
+        # Check if message was created today (LA time)
+        msg_created_la = message.created_at.astimezone(ZoneInfo("America/Los_Angeles"))
+        is_today = msg_created_la.date() == now_la.date()
+
+        if last_hof_date != today_str and is_today:
             bulletin_ch = guild.get_channel(int(bulletin_id))
             if bulletin_ch:
                 # Use a fresh context header for bulletin if needed, or same content

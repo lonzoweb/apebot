@@ -345,6 +345,20 @@ function App() {
     setSaving(false);
   };
 
+  const handleTriggerTarot = async () => {
+    setSaving(true);
+    try {
+      await axios.post(`${API_BASE}/bulletin/trigger-tarot`);
+      setBulletinSaveMsg('🎴 Tarot Draw Triggered!');
+      setTimeout(() => setBulletinSaveMsg(null), 3000);
+    } catch (err) {
+      console.error('Failed to trigger tarot:', err);
+      setBulletinSaveMsg('❌ Error triggering tarot.');
+      setTimeout(() => setBulletinSaveMsg(null), 3000);
+    }
+    setSaving(false);
+  };
+
   const navItems = [
     { id: 'home', icon: Home, label: 'Overview' },
     { id: 'xp', icon: Sparkles, label: 'XP Gain' },
@@ -2096,13 +2110,15 @@ function App() {
                 </div>
 
                 <div>
-                  <label className="label">Daily TC / Numerology Time</label>
-                  <input
-                    type="time"
-                    className="input"
-                    value={bulletinSettings.daily_tc_time}
-                    onChange={(e) => setBulletinSettings({ ...bulletinSettings, daily_tc_time: e.target.value })}
-                  />
+                  <label className="label">Manual Action</label>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={handleTriggerTarot} 
+                    disabled={saving}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                  >
+                    <Wind size={16} /> Draw Daily Tarot
+                  </button>
                 </div>
 
                 <div>

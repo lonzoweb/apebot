@@ -744,48 +744,50 @@ def setup_tasks(bot, guild_id: int):
     quote_drop_loop.start()
 
     # --- 7. Daily Tarot Task (Daily TC) ---
-    @tasks.loop(minutes=1)
+    @tasks.loop(seconds=10)
     async def daily_tc_task():
         try:
+            trigger_now = await database.get_setting("trigger_daily_tc", "0") == "1"
+            if not trigger_now:
+                return
+
             now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
             today_str = now_pt.date().isoformat()
-            hour, minute = now_pt.hour, now_pt.minute
 
             guild = bot.get_guild(guild_id)
             if not guild:
                 return
 
-            tc_time = await database.get_setting(DAILY_TC_TIME_KEY, "08:00")
-            thour, tmin = map(int, tc_time.split(':'))
+            if trigger_now:
+                bulletin_id = await database.get_setting(BULLETIN_CHANNEL_KEY, "")
+                if bulletin_id:
+                    channel = guild.get_channel(int(bulletin_id))
+                    if channel:
+                        import tarot
+                        import rws
+                        import manara
+                        from database import get_admin_config
+                        config = await get_admin_config()
+                        deck_name = config.get("tarot_deck", "thoth").lower().strip()
+                        
+                        dev_mode = False # Placeholder or get from config
+                        if deck_name == "rws":
+                            deck_module = rws
+                        elif deck_name == "manara":
+                            deck_module = manara
+                        else:
+                            deck_module = tarot
 
-            if hour == thour and minute == tmin:
-                last_tc_date = await database.get_setting(DAILY_TC_DATE_KEY, "")
-                if last_tc_date != today_str:
-                    bulletin_id = await database.get_setting(BULLETIN_CHANNEL_KEY, "")
-                    if bulletin_id:
-                        channel = guild.get_channel(int(bulletin_id))
-                        if channel:
-                            import tarot
-                            import rws
-                            import manara
-                            from database import get_admin_config
-                            config = await get_admin_config()
-                            deck_name = config.get("tarot_deck", "thoth").lower().strip()
-                            
-                            dev_mode = False # Placeholder or get from config
-                            if deck_name == "rws":
-                                deck_module = rws
-                            elif deck_name == "manara":
-                                deck_module = manara
-                            else:
-                                deck_module = tarot
-
-                            card_key = deck_module.draw_card()
-                            date_str = now_pt.strftime("%m/%d/%y")
-                            await channel.send(f"🎴 **Pull for {date_str}**")
-                            await deck_module.send_tarot_card(channel, card_key=card_key)
-                            await database.set_setting(DAILY_TC_DATE_KEY, today_str)
-                            logger.info(f"🎴 Daily TC sent for {today_str}")
+                        card_key = deck_module.draw_card()
+                        date_str = now_pt.strftime("%m/%d/%y")
+                        await channel.send(f"🎴 **Pull for {date_str}**")
+                        await deck_module.send_tarot_card(channel, card_key=card_key)
+                        await database.set_setting(DAILY_TC_DATE_KEY, today_str)
+                        await database.set_setting("trigger_daily_tc", "0")
+                        logger.info(f"🎴 Manual Daily TC triggered and sent for {today_str}")
+                else:
+                    # If flag was set but bulletin not configured, reset it anyway to avoid loop
+                    await database.set_setting("trigger_daily_tc", "0")
 
         except Exception as e:
             logger.error(f"Error in daily_tc_task: {e}", exc_info=True)
@@ -825,7 +827,6 @@ def setup_tasks(bot, guild_id: int):
                     if channel:
                         logger.info(f"🧹 Starting {purge_interval} bulletin purge...")
                         await channel.purge(limit=1000, reason=f"{purge_interval.capitalize()} scheduled purge")
-                        await channel.send(f"🧹 **{purge_interval.capitalize()} Purge Complete**. Channel cleared.")
 
         except Exception as e:
             logger.error(f"Error in bulletin purge: {e}", exc_info=True)

@@ -895,12 +895,10 @@ async def api_get_bulletin_settings():
     channel_id = await database.get_setting("bulletin_channel_id", "")
     purge_enabled = await database.get_setting("weekly_purge_enabled", "0")
     purge_interval = await database.get_setting("bulletin_purge_interval", "weekly")
-    tc_time = await database.get_setting("daily_tc_time", "08:00")
     return {
         "channel_id": channel_id,
         "weekly_purge_enabled": int(purge_enabled),
-        "purge_interval": purge_interval,
-        "daily_tc_time": tc_time
+        "purge_interval": purge_interval
     }
 
 @app.post("/bulletin/settings")
@@ -912,8 +910,12 @@ async def api_set_bulletin_settings(data: dict):
         await database.set_setting("weekly_purge_enabled", str(int(data["weekly_purge_enabled"])))
     if "purge_interval" in data:
         await database.set_setting("bulletin_purge_interval", str(data["purge_interval"]))
-    if "daily_tc_time" in data:
-        await database.set_setting("daily_tc_time", str(data["daily_tc_time"]))
+    return {"status": "ok"}
+
+@app.post("/bulletin/trigger-tarot")
+async def api_trigger_daily_tarot():
+    """Manually trigger the daily tarot drawing."""
+    await database.set_setting("trigger_daily_tc", "1")
     return {"status": "ok"}
 
 @app.get("/numerology/preview")
