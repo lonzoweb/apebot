@@ -109,6 +109,21 @@ async def init_db():
                 "CREATE TABLE IF NOT EXISTS masochist_roles (user_id TEXT PRIMARY KEY, removal_time REAL NOT NULL)"
             )
 
+            # 🛡️ Trial System
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS trials (
+                    user_id TEXT NOT NULL,
+                    guild_id TEXT NOT NULL,
+                    start_time REAL NOT NULL,
+                    end_time REAL NOT NULL,
+                    message_id TEXT,
+                    status TEXT DEFAULT 'pending',
+                    PRIMARY KEY (user_id, guild_id)
+                )
+                """
+            )
+
             # COMMAND USAGE TRACKING
             await conn.execute(
                 """
@@ -1996,3 +2011,63 @@ async def get_command_usage_stats(limit: int = 15):
         ) as cursor:
             rows = await cursor.fetchall()
         return [{"name": r[0], "count": r[1]} for r in rows]
+
+# ============================================================
+# TRIAL SYSTEM HELPERS
+# ============================================================
+
+async def add_trial(user_id: str, guild_id: str, start_time: float, end_time: float):
+    """Add a new trial to the database."""
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT INTO trials (user_id, guild_id, start_time, end_time, status) VALUES (?, ?, ?, ?, 'pending') "
+            "ON CONFLICT(user_id, guild_id) DO UPDATE SET start_time = excluded.start_time, end_time = excluded.end_time, status = 'pending', message_id = NULL",
+            (user_id, guild_id, start_time, end_time)
+        )
+        await conn.commit()
+
+async def get_active_trials():
+    """Get all trials that are still pending."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT user_id, guild_id, start_time, end_time, message_id FROM trials WHERE status = 'pending'"
+        ) as cursor:
+            rows = await cursor.fetchall()
+        return rows
+
+async def update_trial_message(user_id: str, guild_id: str, message_id: str):
+    """Update the message ID of the trial decision embed."""
+    async with get_db() as conn:
+        await conn.execute(
+            "UPDATE trials SET message_id = ? WHERE user_id = ? AND guild_id = ?",
+            (message_id, user_id, guild_id)
+        )
+        await conn.commit()
+
+async def update_trial_status(user_id: str, guild_id: str, status: str):
+    """Update the status of a trial (e.g., 'graduated', 'extended', 'kicked')."""
+    async with get_db() as conn:
+        await conn.execute(
+            "UPDATE trials SET status = ? WHERE user_id = ? AND guild_id = ?",
+            (status, user_id, guild_id)
+        )
+        await conn.commit()
+
+async def get_trial(user_id: str, guild_id: str):
+    """Get a specific trial entry."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT start_time, end_time, message_id, status FROM trials WHERE user_id = ? AND guild_id = ?",
+            (user_id, guild_id)
+        ) as cursor:
+            return await cursor.fetchone()
+
+async def update_trial_end_time(user_id: str, guild_id: str, end_time: float):
+    """Extend or update the trial end time."""
+    async with get_db() as conn:
+        await conn.execute(
+            "UPDATE trials SET end_time = ?, message_id = NULL WHERE user_id = ? AND guild_id = ?",
+            (end_time, user_id, guild_id)
+        )
+        await conn.commit()
+

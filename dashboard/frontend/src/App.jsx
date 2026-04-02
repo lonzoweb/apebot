@@ -83,6 +83,9 @@ function App() {
   const [shopSaveMsg, setShopSaveMsg] = useState(null);
   const [depositInfo, setDepositInfo] = useState("");
   const [depositSaveMsg, setDepositSaveMsg] = useState(null);
+  const [bulletinSettings, setBulletinSettings] = useState({ channel_id: '', weekly_purge_enabled: 0, daily_tc_time: '08:00' });
+  const [bulletinSaveMsg, setBulletinSaveMsg] = useState(null);
+
 
   useEffect(() => {
     fetchData();
@@ -145,9 +148,13 @@ function App() {
       }).catch(err => console.error('Failed to fetch shop items:', err));
     }
     if (activeTab === 'misc') {
-      axios.get(`${API_BASE}/deposit-info`).then(res => {
-        setDepositInfo(res.data.deposit_info);
-      }).catch(err => console.error('Failed to fetch deposit info:', err));
+      Promise.all([
+        axios.get(`${API_BASE}/deposit-info`),
+        axios.get(`${API_BASE}/bulletin/settings`)
+      ]).then(([dRes, bRes]) => {
+        setDepositInfo(dRes.data.deposit_info);
+        setBulletinSettings(bRes.data);
+      }).catch(err => console.error('Failed to fetch misc data:', err));
     }
   }, [activeTab]);
 
@@ -322,6 +329,20 @@ function App() {
     } catch (err) {
       setDepositSaveMsg('❌ Failed');
     }
+  };
+
+  const handleSaveBulletinSettings = async () => {
+    setSaving(true);
+    try {
+      await axios.post(`${API_BASE}/bulletin/settings`, bulletinSettings);
+      setBulletinSaveMsg('✅ Bulletin settings saved!');
+      setTimeout(() => setBulletinSaveMsg(null), 3000);
+    } catch (err) {
+      console.error('Failed to save bulletin settings:', err);
+      setBulletinSaveMsg('❌ Error saving settings.');
+      setTimeout(() => setBulletinSaveMsg(null), 3000);
+    }
+    setSaving(false);
   };
 
   const navItems = [
@@ -2052,6 +2073,58 @@ function App() {
                     </span>
                   )}
                 </div>
+              </div>
+            </div>
+
+            <div className="card animate-in" style={{ borderColor: 'var(--accent)', borderStyle: 'solid' }}>
+              <h2 style={{ marginBottom: '0.25rem' }}>📢 Bulletin Configuration</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>Configure the automated daily channel and maintenance tasks.</p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                <div>
+                  <label className="label">Bulletin Channel</label>
+                  <select
+                    className="input"
+                    value={bulletinSettings.channel_id || ''}
+                    onChange={(e) => setBulletinSettings({ ...bulletinSettings, channel_id: e.target.value })}
+                  >
+                    <option value="">-- Disabled --</option>
+                    {Object.entries(channels).map(([id, ch]) => (
+                      <option key={id} value={id}>#{ch.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="label">Daily TC / Numerology Time</label>
+                  <input
+                    type="time"
+                    className="input"
+                    value={bulletinSettings.daily_tc_time}
+                    onChange={(e) => setBulletinSettings({ ...bulletinSettings, daily_tc_time: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1.5rem' }}>
+                  <input
+                    type="checkbox"
+                    id="weeklyPurge"
+                    checked={bulletinSettings.weekly_purge_enabled === 1}
+                    onChange={(e) => setBulletinSettings({ ...bulletinSettings, weekly_purge_enabled: e.target.checked ? 1 : 0 })}
+                  />
+                  <label htmlFor="weeklyPurge" style={{ cursor: 'pointer', fontSize: '0.9rem' }}>Enable Weekly Purge (Sun 11:59PM)</label>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem' }}>
+                {bulletinSaveMsg && (
+                  <span style={{ color: bulletinSaveMsg.includes('Error') ? '#ef4444' : '#22c55e', fontSize: '0.85rem' }}>
+                    {bulletinSaveMsg}
+                  </span>
+                )}
+                <button className="btn btn-primary" onClick={handleSaveBulletinSettings} disabled={saving}>
+                  <Save size={16} /> Save Bulletin Settings
+                </button>
               </div>
             </div>
 

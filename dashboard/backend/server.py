@@ -889,6 +889,29 @@ async def api_set_deposit_info(data: dict):
     await database.set_setting("deposit_info", value)
     return {"status": "ok"}
 
+@app.get("/bulletin/settings")
+async def api_get_bulletin_settings():
+    """Get the current bulletin channel settings."""
+    channel_id = await database.get_setting("bulletin_channel_id", "")
+    purge_enabled = await database.get_setting("weekly_purge_enabled", "0")
+    tc_time = await database.get_setting("daily_tc_time", "08:00")
+    return {
+        "channel_id": channel_id,
+        "weekly_purge_enabled": int(purge_enabled),
+        "daily_tc_time": tc_time
+    }
+
+@app.post("/bulletin/settings")
+async def api_set_bulletin_settings(data: dict):
+    """Save the bulletin channel settings."""
+    if "channel_id" in data:
+        await database.set_setting("bulletin_channel_id", str(data["channel_id"]))
+    if "weekly_purge_enabled" in data:
+        await database.set_setting("weekly_purge_enabled", str(int(data["weekly_purge_enabled"])))
+    if "daily_tc_time" in data:
+        await database.set_setting("daily_tc_time", str(data["daily_tc_time"]))
+    return {"status": "ok"}
+
 @app.get("/numerology/preview")
 async def api_numerology_preview(date: Optional[str] = None):
     """

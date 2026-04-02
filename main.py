@@ -162,6 +162,7 @@ async def on_ready():
         "cogs.twitter_cog",
         "cogs.hof_cog",
         "cogs.leveling_cog",
+        "cogs.trial_cog",
         "activitycog",
     ]
 
@@ -305,6 +306,21 @@ async def on_message(message):
     if message.author.bot:
         await bot.process_commands(message)
         return
+
+    # BULLETIN CHANNEL RESTRICTIONS
+    from database import get_setting
+    bulletin_channel_id = await get_setting("bulletin_channel_id")
+    if bulletin_channel_id and str(message.channel.id) == bulletin_channel_id:
+        # Check if user is Admin, Dealer, or dc
+        is_admin = message.author.guild_permissions.administrator
+        has_dealer = any(r.name.lower() in ["dealer", "dc"] for r in message.author.roles)
+        
+        if not (is_admin or has_dealer or message.author.id == bot.user.id):
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            return
 
     # Check for active Muzzle or UwU effects
     effects = await get_all_active_effects(message.author.id)

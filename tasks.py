@@ -51,6 +51,13 @@ NUMEROLOGY_CHANNEL_KEY       = "numerology_channel_id"
 NUMEROLOGY_TODAY_DATE_KEY    = "numerology_today_date"     # ISO date of last morning post
 NUMEROLOGY_TOMORROW_DATE_KEY = "numerology_tomorrow_date"  # ISO date of last evening preview
 
+# Bulletin & Trial keys
+BULLETIN_CHANNEL_KEY = "bulletin_channel_id"
+WEEKLY_PURGE_ENABLED_KEY = "weekly_purge_enabled"
+DAILY_TC_TIME_KEY = "daily_tc_time"
+DAILY_TC_DATE_KEY = "daily_tc_last_date"
+from config import MOD_CHANNEL_ID
+
 
 async def _get_today_str() -> str:
     return datetime.now(ZoneInfo("America/Los_Angeles")).date().isoformat()
@@ -157,6 +164,13 @@ async def _send_morning_quote(bot, guild, target_channels):
         color=discord.Color.gold(),
     )
     embed.set_footer(text="🕊️ Quote")
+    # Post to bulletin if configured
+    bulletin_id = await database.get_setting(BULLETIN_CHANNEL_KEY, "")
+    if bulletin_id:
+        bulletin_ch = guild.get_channel(int(bulletin_id))
+        if bulletin_ch:
+            await bulletin_ch.send(embed=embed)
+
     for ch in target_channels:
         await ch.send(embed=embed)
 
@@ -177,6 +191,15 @@ async def _send_evening_quote(bot, guild, target_channels, emperor_channel, quot
         color=discord.Color.dark_gold(),
     )
     embed.set_footer(text="🌇 Quote")
+    # Post to bulletin if configured
+    bulletin_id = await database.get_setting(BULLETIN_CHANNEL_KEY, "")
+    if bulletin_id:
+        bulletin_ch = guild.get_channel(int(bulletin_id))
+        if bulletin_ch:
+            _embed = discord.Embed(description=f"📜 {quote}", color=discord.Color.dark_gold())
+            _embed.set_footer(text="🌇 Evening Quote")
+            await bulletin_ch.send(embed=_embed)
+
     for ch in target_channels:
         await ch.send(embed=embed)
 
@@ -286,9 +309,18 @@ def setup_tasks(bot, guild_id: int):
             if not guild:
                 return
 
+            from database import get_channel_assigns
+            assigns = await database.get_channel_assigns()
+            main_ch_id = assigns.get("main")
+            
             forum_channel    = discord.utils.get(guild.text_channels, name="forum")
             emperor_channel  = discord.utils.get(guild.text_channels, name="emperor")
             target_channels  = [ch for ch in [forum_channel, emperor_channel] if ch]
+            
+            if main_ch_id:
+                main_ch = guild.get_channel(int(main_ch_id))
+                if main_ch and main_ch not in target_channels:
+                    target_channels.append(main_ch)
 
             if not target_channels:
                 return
@@ -343,9 +375,18 @@ def setup_tasks(bot, guild_id: int):
             if not guild:
                 return
 
+            from database import get_channel_assigns
+            assigns = await database.get_channel_assigns()
+            main_ch_id = assigns.get("main")
+            
             forum_channel   = discord.utils.get(guild.text_channels, name="forum")
             emperor_channel = discord.utils.get(guild.text_channels, name="emperor")
             target_channels = [ch for ch in [forum_channel, emperor_channel] if ch]
+            
+            if main_ch_id:
+                main_ch = guild.get_channel(int(main_ch_id))
+                if main_ch and main_ch not in target_channels:
+                    target_channels.append(main_ch)
 
             quote_text, quote_date = await _load_quote_state()
             today_quote_exists = (quote_date == today_str and quote_text)
@@ -412,6 +453,23 @@ def setup_tasks(bot, guild_id: int):
         try:
             embed = await num_engine.get_embed(target_date, database, label=label)
             await channel.send(embed=embed)
+            
+            # Also post to "main" if different from "channel"
+            from database import get_channel_assigns
+            assigns = await database.get_channel_assigns()
+            main_ch_id = assigns.get("main")
+            if main_ch_id and int(main_ch_id) != channel.id:
+                main_ch = guild.get_channel(int(main_ch_id))
+                if main_ch:
+                    await main_ch.send(embed=embed)
+            
+            # Post to bulletin if configured
+            bulletin_id = await database.get_setting(BULLETIN_CHANNEL_KEY, "")
+            if bulletin_id:
+                bulletin_ch = guild.get_channel(int(bulletin_id))
+                if bulletin_ch:
+                    await bulletin_ch.send(embed=embed)
+            
             logger.info(f"✅ Numerology embed sent for {target_date} ({label})")
         except Exception as e:
             logger.error(f"Error sending numerology reading: {e}", exc_info=True)
@@ -542,6 +600,40 @@ def setup_tasks(bot, guild_id: int):
         except Exception as e:
             logger.error(f"Error in role removal: {e}")
 
+    async def handle_trial_expirations(guild):
+        try:
+            active_trials = await database.get_active_trials()
+            now = time.time()
+            admin_log_ch = guild.get_channel(int(MOD_CHANNEL_ID))
+            if not admin_log_ch:
+                return
+
+            for user_id, guild_id, start_time, end_time, message_id in active_trials:
+                if now >= end_time and not message_id:
+                    # Trial expired, send decision embed to admin log
+                    target_member = guild.get_member(int(user_id))
+                    mention = target_member.mention if target_member else f"User `{user_id}`"
+                    
+                    embed = discord.Embed(
+                        title="⚖️ Trial Expiration: Decision Required",
+                        description=f"The 4-day trial for {mention} has expired.\n\nPlease select an action below:",
+                        color=discord.Color.orange(),
+                        timestamp=datetime.now()
+                    )
+                    embed.add_field(name="Start Time", value=f"<t:{int(start_time)}:F>", inline=True)
+                    embed.add_field(name="End Time", value=f"<t:{int(end_time)}:F>", inline=True)
+                    embed.set_footer(text="🎓 Graduate | ⏳ Extend (4d) | 🥾 Kick")
+                    
+                    msg = await admin_log_ch.send(embed=embed)
+                    await msg.add_reaction("🎓")
+                    await msg.add_reaction("⏳")
+                    await msg.add_reaction("🥾")
+                    
+                    await database.update_trial_message(user_id, guild_id, str(msg.id))
+                    logger.info(f"⚖️ Trial expired for {user_id}, sent decision embed.")
+        except Exception as e:
+            logger.error(f"Error in trial cleanup: {e}", exc_info=True)
+
     # --- 4. Unified Expiration Task (Roles & Item Curses) ---
     @tasks.loop(minutes=5.0)
     async def unified_cleanup_loop():
@@ -550,6 +642,7 @@ def setup_tasks(bot, guild_id: int):
             return
         await handle_curse_expirations()
         await handle_role_expirations(guild)
+        await handle_trial_expirations(guild)
 
     @unified_cleanup_loop.before_loop
     async def before_unified_cleanup_loop():
@@ -649,3 +742,74 @@ def setup_tasks(bot, guild_id: int):
         await bot.wait_until_ready()
 
     quote_drop_loop.start()
+
+    # --- 7. Daily Tarot Task (Daily TC) ---
+    @tasks.loop(minutes=1)
+    async def daily_tc_task():
+        try:
+            now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
+            today_str = now_pt.date().isoformat()
+            hour, minute = now_pt.hour, now_pt.minute
+
+            guild = bot.get_guild(guild_id)
+            if not guild:
+                return
+
+            tc_time = await database.get_setting(DAILY_TC_TIME_KEY, "08:00")
+            thour, tmin = map(int, tc_time.split(':'))
+
+            if hour == thour and minute == tmin:
+                last_tc_date = await database.get_setting(DAILY_TC_DATE_KEY, "")
+                if last_tc_date != today_str:
+                    bulletin_id = await database.get_setting(BULLETIN_CHANNEL_KEY, "")
+                    if bulletin_id:
+                        channel = guild.get_channel(int(bulletin_id))
+                        if channel:
+                            import tarot
+                            from database import get_admin_config
+                            config = await get_admin_config()
+                            deck_name = config.get("tarot_deck", "thoth")
+                            card = tarot.draw_card(deck_name)
+                            await channel.send("🎴 **Daily Tarot Drawing**")
+                            await tarot.send_card_embed(channel, card)
+                            await database.set_setting(DAILY_TC_DATE_KEY, today_str)
+                            logger.info(f"🎴 Daily TC sent for {today_str}")
+
+        except Exception as e:
+            logger.error(f"Error in daily_tc_task: {e}", exc_info=True)
+
+    @daily_tc_task.before_loop
+    async def before_daily_tc():
+        await bot.wait_until_ready()
+
+    daily_tc_task.start()
+
+    # --- 8. Weekly Bulletin Purge ---
+    @tasks.loop(hours=1)
+    async def weekly_bulletin_purge():
+        """Sunday at 11:59 PM (23:59)"""
+        try:
+            enabled = await database.get_setting(WEEKLY_PURGE_ENABLED_KEY, "0") == "1"
+            if not enabled:
+                return
+
+            now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
+            # Sunday is weekday 6
+            if now_pt.weekday() == 6 and now_pt.hour == 23:
+                bulletin_id = await database.get_setting(BULLETIN_CHANNEL_KEY, "")
+                if bulletin_id:
+                    guild = bot.get_guild(guild_id)
+                    channel = guild.get_channel(int(bulletin_id))
+                    if channel:
+                        logger.info("🧹 Starting weekly bulletin purge...")
+                        await channel.purge(limit=1000, reason="Weekly scheduled purge")
+                        await channel.send("🧹 **Weekly Purge Complete**. Channel cleared for the new week.")
+
+        except Exception as e:
+            logger.error(f"Error in bulletin purge: {e}", exc_info=True)
+
+    @weekly_bulletin_purge.before_loop
+    async def before_weekly_purge():
+        await bot.wait_until_ready()
+
+    weekly_bulletin_purge.start()
