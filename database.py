@@ -624,7 +624,9 @@ async def set_rank_card_prefs(user_id: int, font: str = None, theme: str = None,
 
 async def migrate_to_color_roles(conn):
     """One-time migration from static pink tables to dynamic color_roles."""
-    from config import MASOCHIST_ROLE_ID, VOTE_THRESHOLD
+    from config import ROLE_ALIASES
+    masochist_id = str(ROLE_ALIASES.get("masochist", "1167184822129664113"))
+    vote_threshold = 10  # Historic default
     
     # Check if migration already ran
     async with conn.execute("SELECT COUNT(*) FROM color_roles") as cur:
@@ -635,7 +637,7 @@ async def migrate_to_color_roles(conn):
     # Seed initial roles
     await conn.execute(
         "INSERT OR IGNORE INTO color_roles (color_name, role_id, vote_threshold, duration_days) VALUES (?, ?, ?, ?)",
-        ('pink', str(MASOCHIST_ROLE_ID), VOTE_THRESHOLD, 2.0)
+        ('pink', masochist_id, vote_threshold, 2.0)
     )
     await conn.execute(
         "INSERT OR IGNORE INTO color_roles (color_name, role_id, vote_threshold, duration_days) VALUES (?, ?, ?, ?)",
@@ -656,7 +658,7 @@ async def migrate_to_color_roles(conn):
         await conn.execute(
             "INSERT OR IGNORE INTO color_role_expirations (user_id, role_id, color_name, removal_time) "
             "SELECT user_id, ?, 'pink', removal_time FROM masochist_roles",
-            (str(MASOCHIST_ROLE_ID),)
+            (masochist_id,)
         )
     except Exception as e:
         logger.debug(f"Migration: masochist_roles table not found or already empty: {e}")
