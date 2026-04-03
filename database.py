@@ -812,6 +812,19 @@ async def set_setting(key: str, value: str):
             del _settings_cache[key]
 
 
+async def get_admin_config():
+    """Retrieve all bot-wide admin configuration settings from their specific tables."""
+    from config import GUILD_ID
+    economy = await is_economy_on()
+    yap = await get_yap_level()
+    tarot = await get_guild_tarot_deck(str(GUILD_ID))
+    return {
+        "economy_enabled": economy,
+        "yap_level": yap,
+        "tarot_deck": tarot
+    }
+
+
 async def has_color_voted(color_name: str, voted_id: str, voter_id: str) -> bool:
     """Returns True if voter has already voted for voted_id for this color within the 48h window."""
     async with get_db() as conn:

@@ -706,16 +706,7 @@ class AdminConfigUpdate(BaseModel):
 @app.get("/admin-config")
 async def api_get_admin_config():
     """Return all admin-configurable settings in one call."""
-    from database import is_economy_on, get_yap_level, get_guild_tarot_deck
-    guild_id = str(GUILD_ID)
-    economy = await is_economy_on()
-    yap = await get_yap_level()
-    tarot = await get_guild_tarot_deck(guild_id)
-    return {
-        "economy_enabled": economy,
-        "yap_level": yap,
-        "tarot_deck": tarot,
-    }
+    return await database.get_admin_config()
 
 @app.post("/admin-config")
 async def api_set_admin_config(data: AdminConfigUpdate):
