@@ -780,79 +780,10 @@ def setup_tasks(bot, guild_id: int):
 
     quote_drop_loop.start()
 
-    # --- 7. Daily Tarot Task (Daily TC) ---
-    @tasks.loop(seconds=10)
-    async def daily_tc_task():
-        try:
-            # We skip cache for the trigger flag so it responds instantly to the dashboard
-            trigger_now = await database.get_setting("trigger_daily_tc", "0", use_cache=False) == "1"
-
-            now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
-            today_str = now_pt.date().isoformat()
-            hour, minute = now_pt.hour, now_pt.minute
-
-            # Check scheduled time (these use cache by default)
-            tc_time = await database.get_setting(DAILY_TC_TIME_KEY, "08:00")
-            try:
-                thour, tmin = map(int, tc_time.split(':'))
-            except ValueError:
-                thour, tmin = 8, 0
-
-            last_tc_date = await database.get_setting(DAILY_TC_DATE_KEY, "", use_cache=False)
-            scheduled_trigger = (hour == thour and minute == tmin and last_tc_date != today_str)
-
-            if not trigger_now and not scheduled_trigger:
-                return
-
-            guild = bot.get_guild(guild_id)
-            if not guild:
-                if trigger_now:
-                    await database.set_setting("trigger_daily_tc", "0")
-                return
-
-            bulletin_id = await database.get_setting(BULLETIN_CHANNEL_KEY, "")
-            if bulletin_id:
-                channel = guild.get_channel(int(bulletin_id))
-                if channel:
-                    # Heavy imports moved inside the trigger block to save memory
-                    import tarot
-                    import rws
-                    import manara
-                    from database import get_admin_config
-                    
-                    config = await get_admin_config()
-                    deck_name = config.get("tarot_deck", "thoth").lower().strip()
-
-                    if deck_name == "rws":
-                        deck_module = rws
-                    elif deck_name == "manara":
-                        deck_module = manara
-                    else:
-                        deck_module = tarot
-
-                    card_key = deck_module.draw_card()
-                    date_str = now_pt.strftime("%m/%d/%y")
-                    await channel.send(f"🎴 **Pull for {date_str}**")
-                    await deck_module.send_tarot_card(channel, card_key=card_key)
-                    await database.set_setting(DAILY_TC_DATE_KEY, today_str)
-                    
-                    if trigger_now:
-                        await database.set_setting("trigger_daily_tc", "0")
-                        logger.info(f"🎴 Manual Daily TC triggered and sent for {today_str}")
-                    else:
-                        logger.info(f"🎴 Scheduled Daily TC sent for {today_str} at {tc_time}")
-            # Reset flag even if bulletin_id not configured, to avoid an infinite loop
-            if trigger_now:
-                await database.set_setting("trigger_daily_tc", "0")
-
-        except Exception as e:
-            logger.error(f"Error in daily_tc_task: {e}", exc_info=True)
-
-    @daily_tc_task.before_loop
-    async def before_daily_tc():
-        await bot.wait_until_ready()
-
-    daily_tc_task.start()
+    # --- 7. Daily Tarot Task (Daily TC) - REMOVED per user request ---
+    # @tasks.loop(seconds=10)
+    # async def daily_tc_task():
+    #     ...
 
     # --- 8. Weekly Bulletin Purge ---
     @tasks.loop(hours=1)

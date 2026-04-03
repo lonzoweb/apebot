@@ -629,11 +629,12 @@ async def send_tarot_card(ctx, card_key=None):
     # NOTE: You need to define EXEMPT_ROLE_ID somewhere in your module or config
     EXEMPT_ROLE_ID = None  # Placeholder. Should be loaded from config.
 
-    if not ctx.author.guild_permissions.administrator and not discord.utils.get(
-        ctx.author.roles, id=EXEMPT_ROLE_ID
-    ):
-        # Restored original footer showing command user's name
-        embed.set_footer(text=f"{ctx.author.name}")
+    if hasattr(ctx, "author"):
+        if not ctx.author.guild_permissions.administrator and not discord.utils.get(
+            ctx.author.roles, id=EXEMPT_ROLE_ID
+        ):
+            # Restored original footer showing command user's name
+            embed.set_footer(text=f"{ctx.author.name}")
     # If the user IS an admin/exempt, the footer remains empty/default.
 
     # 1. Load File using Non-Blocking Utility (The critical performance fix)

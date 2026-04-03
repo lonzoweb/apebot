@@ -612,8 +612,9 @@ async def send_tarot_card(ctx, card_key=None):
         embed.set_image(url=f"attachment://{card_key}.jpg")
         
         # User footer
-        if not ctx.author.guild_permissions.administrator:
-            embed.set_footer(text=f"{ctx.author.name}")
+        if hasattr(ctx, "author"):
+            if not ctx.author.guild_permissions.administrator:
+                embed.set_footer(text=f"{ctx.author.name}")
             
         await ctx.send(file=file, embed=embed)
     except FileNotFoundError:

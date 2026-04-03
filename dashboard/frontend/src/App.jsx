@@ -473,20 +473,6 @@ function App() {
     setSaving(false);
   };
 
-  const handleTriggerDailyTC = async () => {
-    setSaving(true);
-    try {
-      await axios.post(`${API_BASE}/bulletin/trigger-daily-tc`);
-      setBulletinSaveMsg('🔮 Daily TC Triggered!');
-      setTimeout(() => setBulletinSaveMsg(null), 3000);
-    } catch (err) {
-      console.error('Failed to trigger daily TC:', err);
-      setBulletinSaveMsg('❌ Error triggering daily TC.');
-      setTimeout(() => setBulletinSaveMsg(null), 3000);
-    }
-    setSaving(false);
-  };
-
   const navItems = [
     { id: 'overview', label: 'Overview', icon: Home, category: 'General' },
     { id: 'progression', label: 'Progression & XP', icon: TrendingUp, category: 'Community' },
@@ -1172,7 +1158,7 @@ function App() {
             <div className="grid" style={{ gridTemplateColumns: '1.5fr 1fr', gap: '2rem' }}>
               <div className="card">
                 <h2 style={{ marginBottom: '0.25rem' }}>📢 Bulletins</h2>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Daily automated TC posts and purge schedules.</p>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Daily automated posts and purge schedules.</p>
                 
                 <div className="form-group">
                   <label className="label">Bulletin Channel</label>
@@ -1189,14 +1175,6 @@ function App() {
                 </div>
 
                 <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                  <div className="form-group">
-                    <label className="label">Daily TC Post Time (LA Time)</label>
-                    <input
-                      className="input" type="time"
-                      value={bulletinSettings.daily_tc_time || '08:00'}
-                      onChange={(e) => setBulletinSettings({ ...bulletinSettings, daily_tc_time: e.target.value })}
-                    />
-                  </div>
                   <div className="form-group">
                     <label className="label">Purge Schedule</label>
                     <select
@@ -1220,9 +1198,6 @@ function App() {
 
                 <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                   <button className="btn btn-primary" onClick={saveBulletinSettings}>Save Bulletin</button>
-                  <button className="btn" style={{ background: 'rgba(255,255,255,0.05)' }} onClick={handleTriggerDailyTC}>
-                    <Sparkles size={16} /> Trigger Daily TC
-                  </button>
                   <button className="btn" style={{ background: 'rgba(255,255,255,0.05)' }} onClick={handleTriggerTarot}>
                     <Wind size={16} /> Draw Tarot
                   </button>

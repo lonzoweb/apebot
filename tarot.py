@@ -667,10 +667,11 @@ async def send_tarot_card(ctx, card_key=None):
 
     # 3. Add username in smallest text (skip for admins or specific role) (Original Logic Restored)
     EXEMPT_ROLE_ID = None  # Replace with your role ID / load from config
-    if not ctx.author.guild_permissions.administrator and not discord.utils.get(
-        ctx.author.roles, id=EXEMPT_ROLE_ID
-    ):
-        embed.set_footer(text=f"{ctx.author.name}")  # Set original footer
+    if hasattr(ctx, "author"):
+        if not ctx.author.guild_permissions.administrator and not discord.utils.get(
+            ctx.author.roles, id=EXEMPT_ROLE_ID
+        ):
+            embed.set_footer(text=f"{ctx.author.name}")  # Set original footer
 
     # Send to Discord
     await ctx.send(file=file, embed=embed)
