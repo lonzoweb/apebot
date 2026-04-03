@@ -1438,8 +1438,8 @@ function App() {
             </div>
           </div>
         )}
-
-        {activeTab === 'moderation' && (
+ 
+        {activeTab === 'roles' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -1447,28 +1447,33 @@ function App() {
                   <h2 style={{ marginBottom: '0.25rem' }}>🎨 Color Roles</h2>
                   <p style={{ color: 'var(--text-secondary)' }}>Server-funded vanity roles that members can vote to assign.</p>
                 </div>
-                <button
-                  className="btn"
-                  style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent)', height: 'fit-content' }}
-                  onClick={async () => {
-                    try {
-                      await axios.post(`${API_BASE}/bulletin/refresh-colors`);
-                      alert('✅ Bot commands refresh triggered! The bot will sync in a few seconds.');
-                    } catch {
-                      alert('❌ Failed to trigger refresh.');
-                    }
-                  }}
-                >
-                  <RefreshCw size={16} style={{ marginRight: '0.5rem' }} /> Refresh Bot Commands
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button className="btn" style={{ background: 'rgba(255,255,255,0.05)' }} onClick={fetchColorRoles} title="Refresh Roles">
+                        <RefreshCw size={16} />
+                    </button>
+                    <button
+                        className="btn"
+                        style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent)', height: 'fit-content' }}
+                        onClick={async () => {
+                            try {
+                            await axios.post(`${API_BASE}/bulletin/refresh-colors`);
+                            alert('✅ Bot commands refresh triggered! The bot will sync in a few seconds.');
+                            } catch {
+                            alert('❌ Failed to trigger refresh.');
+                            }
+                        }}
+                    >
+                    <Settings size={16} style={{ marginRight: '0.5rem' }} /> Refresh Bot Commands
+                    </button>
+                </div>
               </div>
-
+ 
               <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.85rem', textTransform: 'uppercase' }}>Register New Color Role</h4>
                 <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                   <div className="form-group">
                     <label className="label">Name (e.g. Pink)</label>
-                    <input className="input" placeholder=".pink" value={newColorRole.name} onChange={e => setNewColorRole({...newColorRole, name: e.target.value})} />
+                    <input className="input" placeholder="e.g. pink" value={newColorRole.name} onChange={e => setNewColorRole({...newColorRole, name: e.target.value})} />
                   </div>
                   <div className="form-group">
                     <label className="label">Discord Role ID</label>
@@ -1487,21 +1492,20 @@ function App() {
                   try {
                     await axios.post(`${API_BASE}/bulletin/color-roles`, newColorRole);
                     setNewColorRole({ name: '', role_id: '', vote_threshold: 7, duration_days: 2 });
-                    const res = await axios.get(`${API_BASE}/bulletin/color-roles`);
-                    setColorRoles(res.data);
+                    fetchColorRoles();
                   } catch { alert('Failed to add color role'); }
                 }}>Add System Role</button>
               </div>
-
+ 
               <div className="table-container">
                 <table>
                   <thead>
                     <tr>
                       <th>Prefix</th>
-                      <th>Role</th>
+                      <th>Role ID</th>
                       <th>Threshold</th>
                       <th>Expiry</th>
-                      <th>Delete</th>
+                      <th style={{ width: '60px' }}></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1517,12 +1521,12 @@ function App() {
                           <td style={{ fontWeight: 'bold', color: 'var(--accent)' }}>.{cr?.name?.replace(/^\./, '') || 'unknown'}</td>
                           <td><code style={{ fontSize: '0.8rem' }}>{cr?.role_id || '???'}</code></td>
                           <td>{cr?.vote_threshold || 7} votes</td>
-                          <td>{cr?.duration_days || 2} days</td>
-                          <td><button className="btn" style={{ color: 'var(--danger)' }} onClick={async () => {
+                          <td>{cr?.duration_days ?? 2} days</td>
+                          <td><button className="btn" style={{ color: 'var(--danger)', padding: '0.4rem' }} onClick={async () => {
                             if (!cr?.name) return;
+                            if(!confirm(`Delete .${cr.name}?`)) return;
                             await axios.delete(`${API_BASE}/bulletin/color-roles/${cr.name}`);
-                            const res = await axios.get(`${API_BASE}/bulletin/color-roles`);
-                            setColorRoles(res.data);
+                            fetchColorRoles();
                           }}><Trash2 size={16}/></button></td>
                         </tr>
                       ))
@@ -1531,7 +1535,11 @@ function App() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
 
+        {activeTab === 'moderation' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div className="grid" style={{ gridTemplateColumns: '1.2fr 1fr', gap: '2rem' }}>
               <div className="card">
                 <h2 style={{ marginBottom: '0.5rem' }}>⭐ Hall of Fame</h2>

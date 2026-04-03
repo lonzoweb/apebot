@@ -353,101 +353,8 @@ async def export_txt():
         headers={"Content-Disposition": "attachment; filename=apeiron_export.txt"})
 
 # ============================================================
-# DAILY QUOTES MANAGEMENT (existing .quote system)
+# QUOTE DROPS (Manual and Bank management)
 # ============================================================
-
-class QuoteAdd(BaseModel):
-    quote: str
-
-@app.get("/quotes")
-async def get_quotes():
-    """Return all daily quotes."""
-    async with database.get_db() as db:
-        async with db.execute("SELECT id, quote FROM quotes ORDER BY id DESC") as cursor:
-            rows = await cursor.fetchall()
-            return [{"id": row[0], "quote": row[1]} for row in rows]
-
-@app.post("/quotes")
-async def add_quote(data: QuoteAdd):
-    """Add a new daily quote."""
-    if not data.quote.strip():
-        raise HTTPException(status_code=400, detail="Quote cannot be empty.")
-    async with database.get_db() as db:
-        await db.execute("INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (data.quote.strip(),))
-    return {"status": "ok"}
-
-@app.delete("/quotes/{quote_id}")
-async def delete_quote(quote_id: int):
-    """Delete a daily quote by ID."""
-    async with database.get_db() as db:
-        await db.execute("DELETE FROM quotes WHERE id = ?", (quote_id,))
-    return {"status": "ok"}
-
-# ============================================================
-# QUOTE DROPS (new =quote / random drop system)
-# ============================================================
-
-class QuoteDropAdd(BaseModel):
-    quote: str
-
-class QuoteDropSetting(BaseModel):
-    quote_drops_per_day: int
-
-@app.get("/quote-drops")
-async def get_quote_drops():
-    """Return all quote drops."""
-    async with database.get_db() as db:
-        async with db.execute("SELECT id, quote, added_by, added_at FROM quote_drops ORDER BY id DESC") as cursor:
-            rows = await cursor.fetchall()
-            return [{"id": row[0], "quote": row[1], "added_by": row[2], "added_at": row[3]} for row in rows]
-
-@app.post("/quote-drops")
-async def add_quote_drop_endpoint(data: QuoteDropAdd):
-    """Add a new quote drop."""
-    if not data.quote.strip():
-        raise HTTPException(status_code=400, detail="Quote cannot be empty.")
-    async with database.get_db() as db:
-        await db.execute(
-            "INSERT OR IGNORE INTO quote_drops (quote, added_by, added_at) VALUES (?, ?, ?)",
-            (data.quote.strip(), "dashboard", time.time())
-        )
-    return {"status": "ok"}
-
-@app.delete("/quote-drops/{drop_id}")
-async def delete_quote_drop_endpoint(drop_id: int):
-    """Delete a quote drop by ID."""
-    async with database.get_db() as db:
-        await db.execute("DELETE FROM quote_drops WHERE id = ?", (drop_id,))
-    return {"status": "ok"}
-
-@app.get("/quote-drops/settings")
-async def get_quote_drop_settings():
-    """Get quote drop automated cycle settings."""
-    async with database.get_db() as db:
-        async with db.execute(
-            "SELECT setting_key, setting_value FROM global_settings WHERE setting_key IN ('quote_drops_enabled', 'quote_drops_interval_hours')"
-        ) as cursor:
-            rows = await cursor.fetchall()
-            settings = {row[0]: row[1] for row in rows}
-            
-            return {
-                "quote_drops_enabled": settings.get("quote_drops_enabled") == "1",
-                "quote_drops_interval_hours": int(settings.get("quote_drops_interval_hours", "8"))
-            }
-
-@app.post("/quote-drops/settings")
-async def update_quote_drop_settings(data: QuoteDropSettings):
-    """Update quote drop automated cycle settings."""
-    async with database.get_db() as db:
-        await db.execute(
-            "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('quote_drops_enabled', ?)",
-            ('1' if data.quote_drops_enabled else '0',)
-        )
-        await db.execute(
-            "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('quote_drops_interval_hours', ?)",
-            (str(data.quote_drops_interval_hours),)
-        )
-    return {"status": "ok"}
 
 class QuoteDropSendReq(BaseModel):
     drop_id: Optional[int] = None
@@ -729,29 +636,7 @@ async def api_set_admin_config(data: AdminConfigUpdate):
 
     return {"status": "ok"}
 
-# ============================================================
-# QUOTE SCHEDULE (configurable post times)
-# ============================================================
-
-class QuoteScheduleUpdate(BaseModel):
-    morning_hour: int  # 0-23
-    evening_hour: int  # 0-23
-
-@app.get("/quote-schedule")
-async def api_get_quote_schedule():
-    """Get configured daily quote post hours."""
-    morning = await database.get_setting("quote_morning_hour", "10")
-    evening = await database.get_setting("quote_evening_hour", "18")
-    return {"morning_hour": int(morning), "evening_hour": int(evening)}
-
-@app.post("/quote-schedule")
-async def api_set_quote_schedule(data: QuoteScheduleUpdate):
-    """Save daily quote post hours (0-23)."""
-    if not (0 <= data.morning_hour <= 23 and 0 <= data.evening_hour <= 23):
-        raise HTTPException(status_code=400, detail="Hours must be 0-23")
-    await database.set_setting("quote_morning_hour", str(data.morning_hour))
-    await database.set_setting("quote_evening_hour", str(data.evening_hour))
-    return {"status": "ok"}
+# (Redundant Quote Post Hours logic removed, consolidated at bottom)
 
 
 # ============================================================
