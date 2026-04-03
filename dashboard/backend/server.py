@@ -53,15 +53,23 @@ class RewardUpdate(BaseModel):
     stack_role: int = 1
 
 class QuoteDropSettings(BaseModel):
-    quote_drops_enabled: bool
-    quote_drops_interval_hours: float
+    enabled: bool
+    interval_hours: float
 
-class QuoteDropSendReq(BaseModel):
-    drop_id: Optional[int] = None
+class QuoteDropAddReq(BaseModel):
+    quote: str
+    added_by: Optional[str] = "Dashboard"
+
+class QuoteAddReq(BaseModel):
+    quote: str
+
+class QuoteScheduleUpdate(BaseModel):
+    morning_hour: int
+    evening_hour: int
 
 @app.get("/stats")
 async def get_stats():
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         async with db.execute("SELECT COUNT(*) FROM users_xp") as cursor:
             count = await cursor.fetchone()
         async with db.execute("SELECT SUM(xp) FROM users_xp") as cursor:
@@ -73,61 +81,56 @@ async def get_stats():
 
 @app.get("/settings")
 async def get_settings():
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         async with db.execute("SELECT key, value FROM level_settings") as cursor:
             rows = await cursor.fetchall()
             return {row[0]: row[1] for row in rows}
 
 @app.post("/settings")
 async def update_setting(update: SettingUpdate):
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         await db.execute("INSERT OR REPLACE INTO level_settings (key, value) VALUES (?, ?)", (update.key, update.value))
-        await db.commit()
     return {"status": "ok"}
 
 @app.get("/multipliers")
 async def get_multipliers():
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         async with db.execute("SELECT target_id, multiplier FROM level_multipliers") as cursor:
             rows = await cursor.fetchall()
             return [{"target_id": row[0], "multiplier": row[1]} for row in rows]
 
 @app.post("/multipliers")
 async def update_multiplier(update: MultiplierUpdate):
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         await db.execute("INSERT OR REPLACE INTO level_multipliers (target_id, multiplier) VALUES (?, ?)", (update.target_id, update.multiplier))
-        await db.commit()
     return {"status": "ok"}
 
 @app.delete("/multipliers/{target_id}")
 async def delete_multiplier(target_id: str):
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         await db.execute("DELETE FROM level_multipliers WHERE target_id = ?", (target_id,))
-        await db.commit()
     return {"status": "ok"}
 
 @app.get("/rewards")
 async def get_rewards():
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         async with db.execute("SELECT level, role_id, stack_role FROM reward_roles") as cursor:
             rows = await cursor.fetchall()
             return [{"level": row[0], "role_id": row[1], "stack_role": bool(row[2])} for row in rows]
 
 @app.post("/rewards")
 async def update_reward(update: RewardUpdate):
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         await db.execute(
             "INSERT OR REPLACE INTO reward_roles (level, role_id, stack_role) VALUES (?, ?, ?)", 
             (update.level, update.role_id, update.stack_role)
         )
-        await db.commit()
     return {"status": "ok"}
 
 @app.delete("/rewards/{level}")
 async def delete_reward(level: int):
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         await db.execute("DELETE FROM reward_roles WHERE level = ?", (level,))
-        await db.commit()
     return {"status": "ok"}
 
 @app.get("/leaderboard")
@@ -301,19 +304,17 @@ async def batch_update_settings(update: BatchSettingsUpdate):
 @app.post("/clear-xp")
 async def clear_all_xp():
     """Reset all users' XP and level to 0."""
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         await db.execute("UPDATE users_xp SET xp = 0, level = 0")
-        await db.commit()
     return {"status": "ok"}
 
 @app.post("/reset-settings")
 async def reset_settings():
     """Delete all level settings so the bot reinitializes defaults."""
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         await db.execute("DELETE FROM level_settings")
         await db.execute("DELETE FROM level_multipliers")
         await db.execute("DELETE FROM reward_roles")
-        await db.commit()
     return {"status": "ok"}
 
 class PruneRequest(BaseModel):
@@ -322,19 +323,18 @@ class PruneRequest(BaseModel):
 @app.post("/prune")
 async def prune_members(req: PruneRequest):
     """Delete users with XP below the threshold."""
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         async with db.execute("SELECT COUNT(*) FROM users_xp WHERE xp < ?", (req.threshold,)) as cursor:
             row = await cursor.fetchone()
             count = row[0] if row else 0
         await db.execute("DELETE FROM users_xp WHERE xp < ?", (req.threshold,))
-        await db.commit()
     return {"status": "ok", "deleted": count}
 
 @app.get("/export/csv")
 async def export_csv():
     """Export user XP as CSV."""
     from fastapi.responses import PlainTextResponse
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         async with db.execute("SELECT user_id, xp, level FROM users_xp ORDER BY level DESC, xp DESC") as cursor:
             rows = await cursor.fetchall()
     lines = ["user_id,xp,level"] + [f"{r[0]},{r[1]},{r[2]}" for r in rows]
@@ -345,7 +345,7 @@ async def export_csv():
 async def export_txt():
     """Export user XP as plain text."""
     from fastapi.responses import PlainTextResponse
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         async with db.execute("SELECT user_id, xp, level FROM users_xp ORDER BY level DESC, xp DESC") as cursor:
             rows = await cursor.fetchall()
     lines = [f"UserID: {r[0]} | XP: {r[1]} | Level: {r[2]}" for r in rows]
@@ -362,7 +362,7 @@ class QuoteAdd(BaseModel):
 @app.get("/quotes")
 async def get_quotes():
     """Return all daily quotes."""
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         async with db.execute("SELECT id, quote FROM quotes ORDER BY id DESC") as cursor:
             rows = await cursor.fetchall()
             return [{"id": row[0], "quote": row[1]} for row in rows]
@@ -372,17 +372,15 @@ async def add_quote(data: QuoteAdd):
     """Add a new daily quote."""
     if not data.quote.strip():
         raise HTTPException(status_code=400, detail="Quote cannot be empty.")
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         await db.execute("INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (data.quote.strip(),))
-        await db.commit()
     return {"status": "ok"}
 
 @app.delete("/quotes/{quote_id}")
 async def delete_quote(quote_id: int):
     """Delete a daily quote by ID."""
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         await db.execute("DELETE FROM quotes WHERE id = ?", (quote_id,))
-        await db.commit()
     return {"status": "ok"}
 
 # ============================================================
@@ -398,7 +396,7 @@ class QuoteDropSetting(BaseModel):
 @app.get("/quote-drops")
 async def get_quote_drops():
     """Return all quote drops."""
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         async with db.execute("SELECT id, quote, added_by, added_at FROM quote_drops ORDER BY id DESC") as cursor:
             rows = await cursor.fetchall()
             return [{"id": row[0], "quote": row[1], "added_by": row[2], "added_at": row[3]} for row in rows]
@@ -408,27 +406,24 @@ async def add_quote_drop_endpoint(data: QuoteDropAdd):
     """Add a new quote drop."""
     if not data.quote.strip():
         raise HTTPException(status_code=400, detail="Quote cannot be empty.")
-    import time
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         await db.execute(
             "INSERT OR IGNORE INTO quote_drops (quote, added_by, added_at) VALUES (?, ?, ?)",
             (data.quote.strip(), "dashboard", time.time())
         )
-        await db.commit()
     return {"status": "ok"}
 
 @app.delete("/quote-drops/{drop_id}")
 async def delete_quote_drop_endpoint(drop_id: int):
     """Delete a quote drop by ID."""
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         await db.execute("DELETE FROM quote_drops WHERE id = ?", (drop_id,))
-        await db.commit()
     return {"status": "ok"}
 
 @app.get("/quote-drops/settings")
 async def get_quote_drop_settings():
     """Get quote drop automated cycle settings."""
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         async with db.execute(
             "SELECT setting_key, setting_value FROM global_settings WHERE setting_key IN ('quote_drops_enabled', 'quote_drops_interval_hours')"
         ) as cursor:
@@ -443,7 +438,7 @@ async def get_quote_drop_settings():
 @app.post("/quote-drops/settings")
 async def update_quote_drop_settings(data: QuoteDropSettings):
     """Update quote drop automated cycle settings."""
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         await db.execute(
             "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('quote_drops_enabled', ?)",
             ('1' if data.quote_drops_enabled else '0',)
@@ -452,7 +447,6 @@ async def update_quote_drop_settings(data: QuoteDropSettings):
             "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('quote_drops_interval_hours', ?)",
             (str(data.quote_drops_interval_hours),)
         )
-        await db.commit()
     return {"status": "ok"}
 
 class QuoteDropSendReq(BaseModel):
@@ -472,7 +466,7 @@ async def send_quote_drop(req: QuoteDropSendReq):
     
     # Pick the quote
     quote_text = None
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         if req.drop_id is not None:
             async with db.execute("SELECT quote FROM quote_drops WHERE id = ?", (req.drop_id,)) as cursor:
                 row = await cursor.fetchone()
@@ -634,7 +628,7 @@ async def api_set_hof_settings(data: HofSettingsUpdate):
     ignored_channels = data.ignored_channels if data.ignored_channels is not None else current["ignored_channels"]
     blacklisted_users = data.blacklisted_users if data.blacklisted_users is not None else current["blacklisted_users"]
     
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with database.get_db() as db:
         await db.execute(
             """
             INSERT INTO hof_settings
@@ -652,7 +646,6 @@ async def api_set_hof_settings(data: HofSettingsUpdate):
              json.dumps(emojis),
              json.dumps(ignored_channels), json.dumps(blacklisted_users)),
         )
-        await db.commit()
     return {"status": "ok"}
 
 
@@ -891,40 +884,39 @@ async def api_set_deposit_info(data: dict):
 
 @app.get("/bulletin/settings")
 async def api_get_bulletin_settings():
-    """Get the current bulletin channel settings."""
     channel_id = await database.get_setting("bulletin_channel_id", "")
     purge_enabled = await database.get_setting("weekly_purge_enabled", "0")
     purge_interval = await database.get_setting("bulletin_purge_interval", "weekly")
+    tc_time = await database.get_setting("daily_tc_time", "08:00")
     return {
         "channel_id": channel_id,
         "weekly_purge_enabled": int(purge_enabled),
-        "purge_interval": purge_interval
+        "purge_interval": purge_interval,
+        "daily_tc_time": tc_time
     }
 
 @app.post("/bulletin/settings")
 async def api_set_bulletin_settings(data: dict):
-    """Save the bulletin channel settings."""
     if "channel_id" in data:
         await database.set_setting("bulletin_channel_id", str(data["channel_id"]))
     if "weekly_purge_enabled" in data:
         await database.set_setting("weekly_purge_enabled", str(int(data["weekly_purge_enabled"])))
     if "purge_interval" in data:
         await database.set_setting("bulletin_purge_interval", str(data["purge_interval"]))
+    if "daily_tc_time" in data:
+        await database.set_setting("daily_tc_time", str(data["daily_tc_time"]))
     return {"status": "ok"}
 
 @app.post("/bulletin/trigger-tarot")
 async def api_trigger_tarot():
-    """Manually trigger the Tarot draw for today."""
-    from tasks import draw_tarot_task
-    # We call it without the loop context
-    await draw_tarot_task(app.state.bot)
+    """Manually trigger the Tarot draw by setting a flag the background task checks every 10s."""
+    await database.set_setting("trigger_daily_tc", "1")
     return {"status": "ok"}
 
 @app.post("/bulletin/trigger-daily-tc")
 async def api_trigger_daily_tc():
-    """Manually trigger the Daily TC (numerology/quotes) for today."""
-    from tasks import daily_tc_task
-    await daily_tc_task(app.state.bot)
+    """Manually trigger the Daily TC by setting a flag the background task checks every 10s."""
+    await database.set_setting("trigger_daily_tc", "1")
     return {"status": "ok"}
 
 @app.get("/bulletin/color-roles")
@@ -947,10 +939,13 @@ async def api_set_color_role(data: dict):
     await database.set_color_role_config(name.lower().strip(), str(role_id), int(threshold), float(duration))
     return {"status": "ok"}
 
-@app.delete("/bulletin/color-roles/{name}")
-async def api_delete_color_role(name: str):
-    """Delete a color role configuration."""
     await database.delete_color_role_config(name.lower().strip())
+    return {"status": "ok"}
+
+@app.post("/bulletin/refresh-colors")
+async def api_refresh_colors():
+    """Flag for the bot to sync its dynamic color command list (added/removed roles)."""
+    await database.set_setting("trigger_refresh_colors", "1")
     return {"status": "ok"}
 
 @app.get("/numerology/preview")
@@ -984,6 +979,156 @@ async def api_numerology_preview(date: Optional[str] = None):
         "secondary_label": num_engine.format_secondary_label(nums["secondary"]),
         "reading": reading,
     }
+
+
+# --- Quote Drops ---
+
+@app.get("/quote-drops")
+async def api_get_quote_drops():
+    """List all quotes in the drop bank."""
+    async with database.get_db() as db:
+        async with db.execute("SELECT id, quote, added_by FROM quote_drops ORDER BY id DESC") as cursor:
+            rows = await cursor.fetchall()
+            return [{"id": r[0], "quote": r[1], "added_by": r[2]} for r in rows]
+
+@app.post("/quote-drops")
+async def api_add_quote_drop(req: QuoteDropAddReq):
+    """Add a new quote to the drop bank."""
+    async with database.get_db() as db:
+        await db.execute("INSERT INTO quote_drops (quote, added_by, added_at) VALUES (?, ?, ?)", 
+                         (req.quote.strip(), req.added_by, time.time()))
+    return {"status": "ok"}
+
+@app.delete("/quote-drops/{drop_id}")
+async def api_delete_quote_drop(drop_id: int):
+    """Delete a quote from the bank by ID."""
+    async with database.get_db() as db:
+        await db.execute("DELETE FROM quote_drops WHERE id = ?", (drop_id,))
+    return {"status": "ok"}
+
+@app.get("/quote-drops/settings")
+async def api_get_quote_drop_settings():
+    """Get the drop interval and enabled status."""
+    enabled = await database.get_setting("quote_drops_enabled", "0")
+    interval = await database.get_setting("quote_drops_interval_hours", "8")
+    return {
+        "enabled": enabled == "1",
+        "interval_hours": float(interval)
+    }
+
+@app.post("/quote-drops/config")
+async def api_set_quote_drop_config(data: dict):
+    """Save the drop settings."""
+    if "enabled" in data:
+        await database.set_setting("quote_drops_enabled", "1" if data["enabled"] else "0")
+    if "interval_hours" in data:
+        await database.set_setting("quote_drops_interval_hours", str(data["interval_hours"]))
+    return {"status": "ok"}
+
+@app.post("/quote-drops/trigger")
+async def api_trigger_quote_drop():
+    """Manually flag for a quote drop in the next background loop turn."""
+    await database.set_setting("trigger_quote_drop", "1")
+    return {"status": "ok"}
+
+# --- Master Quotes (Daily Quotes) ---
+
+@app.get("/quotes")
+async def api_get_quotes():
+    """List all quotes in the master pool (from the 'quotes' table)."""
+    async with database.get_db() as db:
+        async with db.execute("SELECT id, quote FROM quotes ORDER BY id DESC") as cursor:
+            rows = await cursor.fetchall()
+            return [{"id": r[0], "quote": r[1]} for r in rows]
+
+@app.post("/quotes")
+async def api_add_quote(req: QuoteAddReq):
+    """Add a new master quote."""
+    async with database.get_db() as db:
+        await db.execute("INSERT OR IGNORE INTO quotes (quote) VALUES (?)", (req.quote.strip(),))
+    return {"status": "ok"}
+
+@app.delete("/quotes/{quote_id}")
+async def api_delete_quote(quote_id: int):
+    """Delete a master quote by ID."""
+    async with database.get_db() as db:
+        await db.execute("DELETE FROM quotes WHERE id = ?", (quote_id,))
+    return {"status": "ok"}
+
+@app.get("/quotes/schedule")
+async def api_get_quote_schedule():
+    """Get the daily quote posting hours."""
+    morning = await database.get_setting("quote_morning_hour", "10")
+    evening = await database.get_setting("quote_evening_hour", "18")
+    return {
+        "morning_hour": int(morning),
+        "evening_hour": int(evening)
+    }
+
+@app.post("/quotes/schedule")
+async def api_set_quote_schedule(data: QuoteScheduleUpdate):
+    """Save the daily quote posting hours."""
+    await database.set_setting("quote_morning_hour", str(data.morning_hour))
+    await database.set_setting("quote_evening_hour", str(data.evening_hour))
+    return {"status": "ok"}
+
+
+@app.get("/numerology/settings")
+async def api_get_numerology_settings():
+    """Get morning/evening hours and channel for numerology."""
+    m_hour = await database.get_setting("numerology_morning_hour", "7")
+    e_hour = await database.get_setting("numerology_evening_hour", "22")
+    channel = await database.get_setting("numerology_channel_id", "")
+    return {
+        "morning_hour": int(m_hour),
+        "evening_hour": int(e_hour),
+        "channel_id": channel
+    }
+
+@app.post("/numerology/settings")
+async def api_set_numerology_settings(data: dict):
+    if "morning_hour" in data:
+        await database.set_setting("numerology_morning_hour", str(data["morning_hour"]))
+    if "evening_hour" in data:
+        await database.set_setting("numerology_evening_hour", str(data["evening_hour"]))
+    if "channel_id" in data:
+        await database.set_setting("numerology_channel_id", str(data["channel_id"]))
+    return {"status": "ok"}
+
+@app.get("/numerology/numbers")
+async def api_get_num_descs():
+    """Get all number descriptions."""
+    async with database.get_db() as db:
+        async with db.execute("SELECT num, description FROM numerology_number_desc") as cursor:
+            rows = await cursor.fetchall()
+            return {r[0]: r[1] for r in rows}
+
+@app.post("/numerology/numbers")
+async def api_set_num_desc(data: dict):
+    """Upsert a number description."""
+    num = data.get("num")
+    desc = data.get("description", "")
+    async with database.get_db() as db:
+        await db.execute("INSERT OR REPLACE INTO numerology_number_desc (num, description) VALUES (?, ?)", (num, desc))
+    return {"status": "ok"}
+
+@app.get("/numerology/combos")
+async def api_get_combos():
+    """Get all combination readings."""
+    async with database.get_db() as db:
+        async with db.execute("SELECT primary_num, secondary_num, combo_desc FROM numerology_combos") as cursor:
+            rows = await cursor.fetchall()
+            return [{"primary_num": r[0], "secondary_num": r[1], "combo_desc": r[2]} for r in rows]
+
+@app.post("/numerology/combos")
+async def api_set_combo(data: dict):
+    """Upsert a combination reading."""
+    p = data.get("primary_num")
+    s = data.get("secondary_num")
+    desc = data.get("combo_desc", "")
+    async with database.get_db() as db:
+        await db.execute("INSERT OR REPLACE INTO numerology_combos (primary_num, secondary_num, combo_desc) VALUES (?, ?, ?)", (p, s, desc))
+    return {"status": "ok"}
 
 
 # --- Serve Frontend ---

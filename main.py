@@ -33,7 +33,8 @@ from database import (
     get_user_timezone,
     increment_gif_count,
     get_yap_level,
-    has_item
+    has_item,
+    get_setting
 )
 from helpers import extract_gif_url
 import activity
@@ -76,7 +77,7 @@ logging.getLogger("discord").setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# BOT SETUP
+# BOT INITIALIZATION
 # ============================================================
 
 intents = discord.Intents.default()
@@ -308,7 +309,6 @@ async def on_message(message):
         return
 
     # BULLETIN CHANNEL RESTRICTIONS
-    from database import get_setting
     bulletin_channel_id = await get_setting("bulletin_channel_id")
     if bulletin_channel_id and str(message.channel.id) == bulletin_channel_id:
         # Check if user is Admin, Dealer, or dc

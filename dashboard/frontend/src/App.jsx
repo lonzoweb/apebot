@@ -142,15 +142,15 @@ function App() {
         axios.get(`${API_BASE}/quote-drops`),
         axios.get(`${API_BASE}/quote-drops/settings`),
         axios.get(`${API_BASE}/quotes`),
-        axios.get(`${API_BASE}/quote-schedule`),
+        axios.get(`${API_BASE}/quotes/schedule`),
         axios.get(`${API_BASE}/numerology/settings`),
         axios.get(`${API_BASE}/numerology/numbers`),
         axios.get(`${API_BASE}/numerology/combos`),
       ]);
       setBulletinSettings(bRes.data);
       setQuoteDrops(qdRes.data);
-      setQuoteDropsEnabled(qdsRes.data.quote_drops_enabled);
-      setQuoteDropsInterval(qdsRes.data.quote_drops_interval_hours);
+      setQuoteDropsEnabled(qdsRes.data.enabled);
+      setQuoteDropsInterval(qdsRes.data.interval_hours);
       setDailyQuotes(qRes.data);
       setQuoteSchedule(qsRes.data);
       setNumerologySettings(nsRes.data);
@@ -162,10 +162,10 @@ function App() {
   };
 
   useEffect(() => {
-    if (activeTab === 'content') {
+    if (['bulletins', 'quotedrops', 'quotes'].includes(activeTab)) {
       fetchContentData();
     }
-    if (activeTab === 'moderation') {
+    if (activeTab === 'roles') {
       fetchColorRoles();
     }
     if (activeTab === 'economy') {
@@ -291,45 +291,67 @@ function App() {
   const addQuoteDrop = async () => {
     if (!newQuoteDrop.trim()) return;
     try {
-      await axios.post(`${API_BASE}/quote-drops`, { quote: newQuoteDrop });
-      const res = await axios.get(`${API_BASE}/quote-drops`);
-      setQuoteDrops(res.data);
+      await axios.post(`${API_BASE}/quote-drops`, { quote: newQuoteDrop, added_by: 'Dashboard' });
       setNewQuoteDrop('');
+      fetchContentData();
     } catch { alert('Failed to add quote'); }
   };
 
   const deleteQuoteDrop = async (id) => {
     try {
       await axios.delete(`${API_BASE}/quote-drops/${id}`);
-      const res = await axios.get(`${API_BASE}/quote-drops`);
-      setQuoteDrops(res.data);
+      fetchContentData();
     } catch { alert('Delete failed'); }
+  };
+
+  const triggerQuoteDrop = async () => {
+    try {
+      await axios.post(`${API_BASE}/quote-drops/trigger`);
+      setSendSuccess('quote-drop');
+      setTimeout(() => setSendSuccess(null), 3000);
+    } catch { alert('Trigger failed'); }
   };
 
   const addDailyQuote = async () => {
     if (!newDailyQuote.trim()) return;
     try {
       await axios.post(`${API_BASE}/quotes`, { quote: newDailyQuote });
-      const res = await axios.get(`${API_BASE}/quotes`);
-      setDailyQuotes(res.data);
       setNewDailyQuote('');
+      fetchContentData();
     } catch { alert('Failed to add quote'); }
   };
 
   const deleteDailyQuote = async (id) => {
     try {
       await axios.delete(`${API_BASE}/quotes/${id}`);
-      const res = await axios.get(`${API_BASE}/quotes`);
-      setDailyQuotes(res.data);
+      fetchContentData();
     } catch { alert('Delete failed'); }
+  };
+
+  const triggerDailyQuote = async () => {
+    try {
+      await axios.post(`${API_BASE}/quotes/trigger-daily`);
+      setSendSuccess('daily-quote');
+      setTimeout(() => setSendSuccess(null), 3000);
+    } catch { alert('Trigger failed'); }
   };
 
   const saveQuoteSchedule = async () => {
     try {
-      await axios.post(`${API_BASE}/quote-schedule`, quoteSchedule);
+      await axios.post(`${API_BASE}/quotes/schedule`, quoteSchedule);
       setQuoteScheduleSaveMsg('✅ Schedule saved!');
       setTimeout(() => setQuoteScheduleSaveMsg(''), 3000);
     } catch { alert('Failed to save schedule'); }
+  };
+
+  const saveQuoteDropConfig = async () => {
+    try {
+      await axios.post(`${API_BASE}/quote-drops/config`, {
+        enabled: quoteDropsEnabled,
+        interval_hours: quoteDropsInterval
+      });
+      alert('Quote drop configuration saved!');
+    } catch { alert('Failed to save configuration'); }
   };
 
   const saveAdmin = async (updates) => {
@@ -466,13 +488,16 @@ function App() {
   };
 
   const navItems = [
-    { id: 'home', icon: Home, label: 'Overview' },
-    { id: 'progression', icon: TrendingUp, label: 'Progression' },
-    { id: 'social', icon: MessageCircle, label: 'Social & Profiles' },
-    { id: 'content', icon: Sparkles, label: 'Content Systems' },
-    { id: 'moderation', icon: Shield, label: 'Moderation & Access' },
-    { id: 'economy', icon: ShoppingBag, label: 'Economy & Shop' },
-    { id: 'system', icon: Cpu, label: 'System & Technical' }
+    { id: 'overview', label: 'Overview', icon: '📊', category: 'General' },
+    { id: 'progression', label: 'Progression & XP', icon: '📈', category: 'Community' },
+    { id: 'roles', label: 'Colour Roles', icon: '🎨', category: 'Community' },
+    { id: 'social', label: 'Social & HoF', icon: '🌟', category: 'Community' },
+    { id: 'bulletins', label: 'Bulletins & Numerology', icon: '📋', category: 'Content' },
+    { id: 'quotedrops', label: 'Quote Drops', icon: '🚀', category: 'Content' },
+    { id: 'quotes', label: 'Daily Quotes', icon: '🌅', category: 'Content' },
+    { id: 'moderation', label: 'Moderation & Access', icon: '🛡️', category: 'Management' },
+    { id: 'economy', label: 'Economy & Shop', icon: '💰', category: 'Management' },
+    { id: 'system', label: 'System & Technical', icon: '⚙️', category: 'Management' },
   ];
 
   const closeSidebar = () => setSidebarOpen(false);
@@ -1139,13 +1164,12 @@ function App() {
             </div>
           </div>
         )}
-        {activeTab === 'content' && (
+        {activeTab === 'bulletins' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            {/* Bulletin & Tarot Section */}
             <div className="grid" style={{ gridTemplateColumns: '1.5fr 1fr', gap: '2rem' }}>
               <div className="card">
-                <h2 style={{ marginBottom: '0.25rem' }}>📢 Bulletin & Tarot</h2>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Automated daily content and channel routing.</p>
+                <h2 style={{ marginBottom: '0.25rem' }}>📢 Bulletins</h2>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Daily automated TC posts and purge schedules.</p>
                 
                 <div className="form-group">
                   <label className="label">Bulletin Channel</label>
@@ -1194,17 +1218,17 @@ function App() {
                 <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                   <button className="btn btn-primary" onClick={saveBulletinSettings}>Save Bulletin</button>
                   <button className="btn" style={{ background: 'rgba(255,255,255,0.05)' }} onClick={handleTriggerDailyTC}>
-                    <Sparkles size={16} style={{ marginRight: '0.5rem' }} /> Trigger Daily TC
+                    <Sparkles size={16} /> Trigger Daily TC
                   </button>
                   <button className="btn" style={{ background: 'rgba(255,255,255,0.05)' }} onClick={handleTriggerTarot}>
-                    <Wind size={16} style={{ marginRight: '0.5rem' }} /> Draw Daily Tarot
+                    <Wind size={16} /> Draw Tarot
                   </button>
                 </div>
                 {bulletinSaveMsg && <p style={{ marginTop: '0.75rem', color: bulletinSaveMsg.includes('✅') ? 'var(--success)' : 'var(--danger)', fontSize: '0.85rem' }}>{bulletinSaveMsg}</p>}
               </div>
 
               <div className="card">
-                <h3 style={{ marginBottom: '1rem' }}>🃏 Tarot Deck Selection</h3>
+                <h3 style={{ marginBottom: '1rem' }}>🃏 Tarot Deck</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {[
                     { id: 'thoth', label: 'Thoth', sub: 'Crowley', emoji: '🌑' },
@@ -1231,19 +1255,17 @@ function App() {
                         <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{deck.label}</div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{deck.sub}</div>
                       </div>
-                      {adminConfig.tarot_deck === deck.id && <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>✓</span>}
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Numerology Section */}
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                 <div>
                   <h2 style={{ marginBottom: '0.25rem' }}>🔮 Numerology Engine</h2>
-                  <p style={{ color: 'var(--text-secondary)' }}>Daily forecast based on dates and universal resonance.</p>
+                  <p style={{ color: 'var(--text-secondary)' }}>Daily forecast based on dates and resonance.</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                    <button className="btn btn-primary" onClick={async () => {
@@ -1252,7 +1274,7 @@ function App() {
                         setNumerologySaveMsg('✅ Saved!');
                         setTimeout(() => setNumerologySaveMsg(''), 2000);
                       } catch { setNumerologySaveMsg('❌ Error'); }
-                   }}>Save Engine</button>
+                   }}>Save</button>
                    <button className="btn" onClick={async () => {
                       setNumerologyPreviewLoading(true);
                       try {
@@ -1264,13 +1286,13 @@ function App() {
                 </div>
               </div>
 
-              <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '1.5rem' }}>
+              <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
                 <div className="form-group">
-                  <label className="label">Morning Hour (Morning Post)</label>
+                  <label className="label">Morning Hour</label>
                   <input className="input" type="number" min="0" max="23" value={numerologySettings.morning_hour} onChange={e => setNumerologySettings({...numerologySettings, morning_hour: parseInt(e.target.value)})} />
                 </div>
                 <div className="form-group">
-                  <label className="label">Evening Hour (Evening Post)</label>
+                  <label className="label">Evening Hour</label>
                   <input className="input" type="number" min="0" max="23" value={numerologySettings.evening_hour} onChange={e => setNumerologySettings({...numerologySettings, evening_hour: parseInt(e.target.value)})} />
                 </div>
                 <div className="form-group">
@@ -1283,124 +1305,156 @@ function App() {
               </div>
 
               {numerologyPreview && (
-                <div style={{ marginBottom: '2rem', padding: '1rem', background: 'rgba(99,102,241,0.05)', borderRadius: '0.75rem', border: '1px solid rgba(99,102,241,0.2)' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)' }}>Draft for {numerologyPreview.date}</h4>
+                <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(99,102,241,0.05)', borderRadius: '0.75rem', border: '1px solid rgba(99,102,241,0.2)' }}>
                   <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', fontFamily: 'monospace' }}>{numerologyPreview.reading}</pre>
                 </div>
               )}
-
-              <h3 style={{ marginBottom: '1rem' }}>Number Forecasts & Combinations</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '500px', overflowY: 'auto', paddingRight: '0.5rem' }}>
-                  {ALL_NUMS.map(num => (
-                    <div key={num} 
-                      onClick={() => { setNumerologyEditNum(num); setNumerologyEditText(numerologyNumbers[num] || ''); }}
-                      style={{ 
-                        padding: '0.75rem', borderRadius: '0.5rem', cursor: 'pointer',
-                        background: numerologyEditNum === num ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.02)',
-                        border: numerologyEditNum === num ? '1px solid var(--accent)' : '1px solid transparent'
-                      }}
-                    >
-                      <div style={{ fontWeight: 'bold' }}>{NUM_LABELS[num]}</div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {numerologyNumbers[num] || 'Click to set text...'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="card shadow-none" style={{ background: 'rgba(0,0,0,0.1)' }}>
-                  {numerologyEditNum ? (
-                    <>
-                      <h4>Editing {NUM_LABELS[numerologyEditNum]}</h4>
-                      <textarea 
-                        className="input" style={{ width: '100%', minHeight: '200px', margin: '0.75rem 0' }}
-                        value={numerologyEditText}
-                        onChange={e => setNumerologyEditText(e.target.value)}
-                      />
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="btn btn-primary" onClick={() => saveNumDesc(numerologyEditNum, numerologyEditText)}>Save</button>
-                        <button className="btn" onClick={() => setNumerologyEditNum(null)}>Cancel</button>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
-                      Select a number on the left to edit its forecast template.
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
+          </div>
+        )}
 
-            {/* Quotes Section */}
-            <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-              <div className="card">
-                <h2 style={{ marginBottom: '1.5rem' }}>💧 Quote Drops</h2>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-                  <span>Enable Drops</span>
-                  <div className={`toggle ${quoteDropsEnabled ? 'active' : ''}`} onClick={() => {
-                    const next = !quoteDropsEnabled;
-                    setQuoteDropsEnabled(next);
-                    axios.post(`${API_BASE}/quote-drops/config`, { enabled: next, interval_hours: quoteDropsInterval });
-                  }}><div className="toggle-handle"></div></div>
+        {activeTab === 'quotedrops' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <div>
+                  <h2 style={{ marginBottom: '0.25rem' }}>🚀 Quote Drops</h2>
+                  <p style={{ color: 'var(--text-secondary)' }}>Configure automated random quote drops in the main channel.</p>
+                </div>
+                <button 
+                  className={`btn ${sendSuccess === 'quote-drop' ? 'btn-success' : 'btn-primary'}`} 
+                  onClick={triggerQuoteDrop}
+                  disabled={sendSuccess === 'quote-drop'}
+                >
+                  <Zap size={16} style={{ marginRight: '0.5rem' }} /> 
+                  {sendSuccess === 'quote-drop' ? 'DROP SENT!' : 'SEND DROP NOW'}
+                </button>
+              </div>
+
+              <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+                <div className="form-group">
+                  <label className="label">Enabled</label>
+                  <div className={`toggle ${quoteDropsEnabled ? 'active' : ''}`} onClick={() => setQuoteDropsEnabled(!quoteDropsEnabled)}>
+                    <div className="toggle-handle"></div>
+                  </div>
                 </div>
                 <div className="form-group">
-                  <label className="label">Drop Interval (Hours)</label>
-                  <input className="input" type="number" value={quoteDropsInterval} onChange={e => {
-                    const val = parseInt(e.target.value);
-                    setQuoteDropsInterval(val);
-                    axios.post(`${API_BASE}/quote-drops/config`, { enabled: quoteDropsEnabled, interval_hours: val });
-                  }} />
+                  <label className="label">Interval (Hours)</label>
+                  <input 
+                    className="input" type="number" step="0.5"
+                    value={quoteDropsInterval} 
+                    onChange={e => setQuoteDropsInterval(parseFloat(e.target.value))} 
+                  />
                 </div>
-                <h4 style={{ margin: '1.5rem 0 0.75rem 0' }}>Drop Bank ({quoteDrops.length})</h4>
-                <div className="table-container" style={{ maxHeight: '200px' }}>
-                  <table style={{ fontSize: '0.85rem' }}>
+                <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+                   <button className="btn btn-primary" style={{ width: '100%' }} onClick={saveQuoteDropConfig}>Save Configuration</button>
+                </div>
+              </div>
+
+              <div className="card shadow-none" style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ margin: 0 }}>Quote Bank ({quoteDrops.length})</h3>
+                  <button className="btn" style={{ padding: '0.4rem', background: 'rgba(255,255,255,0.05)' }} onClick={fetchContentData} title="Refresh list from database">
+                    <RefreshCw size={16} />
+                  </button>
+                </div>
+                <div className="table-container" style={{ maxHeight: '400px' }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Quote Content</th>
+                        <th style={{ width: '120px' }}>Added By</th>
+                        <th style={{ width: '60px' }}></th>
+                      </tr>
+                    </thead>
                     <tbody>
-                      {quoteDrops.map((q, i) => (
-                        <tr key={i}>
-                          <td style={{ padding: '0.5rem' }}>{q}</td>
-                          <td style={{ width: '40px' }}><button onClick={() => deleteQuoteDrop(i)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button></td>
+                      {quoteDrops.length > 0 ? quoteDrops.map((q) => (
+                        <tr key={q.id}>
+                          <td style={{ fontSize: '0.9rem' }}>{q.quote}</td>
+                          <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{q.added_by}</td>
+                          <td>
+                            <button onClick={() => deleteQuoteDrop(q.id)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+                          </td>
                         </tr>
-                      ))}
+                      )) : (
+                        <tr><td colSpan="3" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No quotes found in bank.</td></tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                   <input className="input" placeholder="New quote..." value={newQuoteDrop} onChange={e => setNewQuoteDrop(e.target.value)} />
-                   <button className="btn btn-primary" onClick={addQuoteDrop}>Add</button>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
+                   <input 
+                    className="input" placeholder="Enter a new quote for the drop bank..." 
+                    value={newQuoteDrop} onChange={e => setNewQuoteDrop(e.target.value)} 
+                    onKeyDown={e => e.key === 'Enter' && addQuoteDrop()}
+                   />
+                   <button className="btn btn-primary" onClick={addQuoteDrop}>Add Quote</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'quotes' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <div>
+                  <h2 style={{ marginBottom: '0.25rem' }}>🌅 Daily Quotes</h2>
+                  <p style={{ color: 'var(--text-secondary)' }}>Philosophical quotes posted at sunrise and sunset.</p>
                 </div>
               </div>
 
-              <div className="card">
-                <h2 style={{ marginBottom: '1.5rem' }}>📖 Daily Quotes</h2>
-                <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                  <div className="form-group">
-                    <label className="label">Morning Hour</label>
-                    <input className="input" type="number" value={quoteSchedule.morning_hour} onChange={e => setQuoteSchedule({...quoteSchedule, morning_hour: parseInt(e.target.value)})} />
-                  </div>
-                  <div className="form-group">
-                    <label className="label">Evening Hour</label>
-                    <input className="input" type="number" value={quoteSchedule.evening_hour} onChange={e => setQuoteSchedule({...quoteSchedule, evening_hour: parseInt(e.target.value)})} />
-                  </div>
+              <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+                <div className="form-group">
+                  <label className="label">Morning Hour (Morning Post)</label>
+                  <input className="input" type="number" value={quoteSchedule.morning_hour} onChange={e => setQuoteSchedule({...quoteSchedule, morning_hour: parseInt(e.target.value)})} />
                 </div>
-                <button className="btn btn-primary" style={{ width: '100%', marginBottom: '1.5rem' }} onClick={saveQuoteSchedule}>Save Schedule</button>
-                
-                <h4 style={{ margin: '0 0 0.75rem 0' }}>Quote Pool ({dailyQuotes.length})</h4>
-                <div className="table-container" style={{ maxHeight: '200px' }}>
-                   <table style={{ fontSize: '0.85rem' }}>
-                      <tbody>
-                        {dailyQuotes.map((q, i) => (
-                          <tr key={i}>
-                            <td style={{ padding: '0.5rem' }}>{q}</td>
-                            <td style={{ width: '40px' }}><button onClick={() => deleteDailyQuote(i)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                   </table>
+                <div className="form-group">
+                  <label className="label">Evening Hour (Evening Post)</label>
+                  <input className="input" type="number" value={quoteSchedule.evening_hour} onChange={e => setQuoteSchedule({...quoteSchedule, evening_hour: parseInt(e.target.value)})} />
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                   <input className="input" placeholder="Add philosophical thought..." value={newDailyQuote} onChange={e => setNewDailyQuote(e.target.value)} />
-                   <button className="btn btn-primary" onClick={addDailyQuote}>Add</button>
+                <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+                   <button className="btn btn-primary" style={{ width: '100%' }} onClick={saveQuoteSchedule}>Save Schedule</button>
+                </div>
+              </div>
+
+              <div className="card shadow-none" style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ margin: 0 }}>Quote Pool ({dailyQuotes.length})</h3>
+                  <button className="btn" style={{ padding: '0.4rem', background: 'rgba(255,255,255,0.05)' }} onClick={fetchContentData} title="Refresh list from database">
+                    <RefreshCw size={16} />
+                  </button>
+                </div>
+                <div className="table-container" style={{ maxHeight: '400px' }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Quote Content</th>
+                        <th style={{ width: '60px' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dailyQuotes.length > 0 ? dailyQuotes.map((q) => (
+                        <tr key={q.id}>
+                          <td style={{ fontSize: '0.9rem' }}>{q.quote}</td>
+                          <td>
+                            <button onClick={() => deleteDailyQuote(q.id)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan="2" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No quotes found in master pool.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
+                   <input 
+                    className="input" placeholder="Enter a deep philosophical thought..." 
+                    value={newDailyQuote} onChange={e => setNewDailyQuote(e.target.value)} 
+                    onKeyDown={e => e.key === 'Enter' && addDailyQuote()}
+                   />
+                   <button className="btn btn-primary" onClick={addDailyQuote}>Add to Pool</button>
                 </div>
               </div>
             </div>
@@ -1415,6 +1469,20 @@ function App() {
                   <h2 style={{ marginBottom: '0.25rem' }}>🎨 Color Roles</h2>
                   <p style={{ color: 'var(--text-secondary)' }}>Server-funded vanity roles that members can vote to assign.</p>
                 </div>
+                <button
+                  className="btn"
+                  style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent)', height: 'fit-content' }}
+                  onClick={async () => {
+                    try {
+                      await axios.post(`${API_BASE}/bulletin/refresh-colors`);
+                      alert('✅ Bot commands refresh triggered! The bot will sync in a few seconds.');
+                    } catch {
+                      alert('❌ Failed to trigger refresh.');
+                    }
+                  }}
+                >
+                  <RefreshCw size={16} style={{ marginRight: '0.5rem' }} /> Refresh Bot Commands
+                </button>
               </div>
 
               <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>

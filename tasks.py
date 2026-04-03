@@ -301,8 +301,13 @@ def setup_tasks(bot, guild_id: int):
 
         try:
             now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
-            today_str = now_pt.date().isoformat()
             hour, minute = now_pt.hour, now_pt.minute
+
+            # Early exit: nothing fires on non-zero minutes — saves all DB reads
+            if minute != 0:
+                return
+
+            today_str = now_pt.date().isoformat()
 
             guild = bot.get_guild(guild_id)
             if not guild:
@@ -332,12 +337,13 @@ def setup_tasks(bot, guild_id: int):
             q_evening = int(await database.get_setting(QUOTE_EVENING_HOUR_KEY, "18"))
 
             # ── Morning quote ──────────────────────────────────────────
-            if hour == q_morning and minute == 0 and not today_quote_exists:
+            if hour == q_morning and not today_quote_exists:
                 quote = await _send_morning_quote(bot, guild, target_channels)
                 _cached_quote = quote
+                logger.info("🌅 Morning Daily Quote sent.")
 
-            # ── Evening repost + candidates ────────────────────────────
-            elif hour == q_evening and minute == 0:
+            # ── Evening repost + candidates ──────────────────────────────
+            elif hour == q_evening:
                 # Re-fetch in case we rebooted between morning and evening
                 quote_text, quote_date = await _load_quote_state()
                 if quote_text and quote_date == today_str:
@@ -347,8 +353,8 @@ def setup_tasks(bot, guild_id: int):
                 else:
                     logger.warning("6pm quote: no morning quote found in DB for today, skipping.")
 
-            # ── 7:00 PM — reset for next day ──────────────────────────
-            elif hour == 19 and minute == 0:
+            # ── 7:00 PM — reset for next day ────────────────────────────
+            elif hour == 19:
                 _cached_quote = None
                 bot.pending_quotes = []
                 bot.tomorrow_quote = None
@@ -483,8 +489,13 @@ def setup_tasks(bot, guild_id: int):
         """
         try:
             now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
-            today_str = now_pt.date().isoformat()
             hour, minute = now_pt.hour, now_pt.minute
+
+            # Early exit: nothing fires on non-zero minutes — saves all DB reads
+            if minute != 0:
+                return
+
+            today_str = now_pt.date().isoformat()
 
             guild = bot.get_guild(guild_id)
             if not guild:
@@ -494,15 +505,15 @@ def setup_tasks(bot, guild_id: int):
             evening_hour = int(await database.get_setting(NUMEROLOGY_EVENING_HOUR_KEY, "22"))
 
             # ── Morning: today's reading ────────────────────────────────────
-            if hour == morning_hour and minute == 0:
+            if hour == morning_hour:
                 already_sent = await database.get_setting(NUMEROLOGY_TODAY_DATE_KEY, "")
                 if already_sent != today_str:
                     from datetime import date as _date
                     await _send_numerology_reading(bot, guild, now_pt.date(), "Daily Numerology Reading 🌅")
                     await database.set_setting(NUMEROLOGY_TODAY_DATE_KEY, today_str)
 
-            # ── Evening: tomorrow's preview ─────────────────────────────────
-            elif hour == evening_hour and minute == 0:
+            # ── Evening: tomorrow's preview ───────────────────────────────
+            elif hour == evening_hour:
                 already_sent = await database.get_setting(NUMEROLOGY_TOMORROW_DATE_KEY, "")
                 if already_sent != today_str:
                     from datetime import date as _date, timedelta as _td
@@ -676,17 +687,22 @@ def setup_tasks(bot, guild_id: int):
     wealth_tax_loop.start()
 
     # --- 6. Automated Quote Drops (Every X hours) ---
-    @tasks.loop(minutes=15.0)
+    @tasks.loop(seconds=30.0)
     async def quote_drop_loop():
         """
         Sends a random quote from the 'quote_drops' table at configurable intervals.
         Only fires if someone has chatted within the last 30 minutes. 
         If no activity, it skips the 'turn' and waits for the next interval.
+        Also checks for manual trigger from dashboard.
         """
         try:
-            enabled = await database.get_setting(QUOTE_DROPS_ENABLED_KEY, "0") == "1"
-            if not enabled:
-                return
+            # Batch both early-exit reads together — skip all further work if
+            # neither enabled nor manually triggered
+            manual_trigger = await database.get_setting("trigger_quote_drop", "0") == "1"
+            if not manual_trigger:
+                enabled = await database.get_setting(QUOTE_DROPS_ENABLED_KEY, "0") == "1"
+                if not enabled:
+                    return
 
             # Default to 8 hours if unset
             interval_hours_str = await database.get_setting(QUOTE_DROPS_INTERVAL_KEY, "8")
@@ -702,11 +718,14 @@ def setup_tasks(bot, guild_id: int):
                 last_drop_time = 0.0
 
             now = time.time()
-            if now - last_drop_time < (interval_hours * 3600):
+            
+            # Fire if manual trigger OR interval reached
+            should_fire = manual_trigger or (now - last_drop_time >= (interval_hours * 3600))
+            if not should_fire:
                 return
 
-            # Window triggered: Check for activity in the last 30 minutes
-            if await activity_tracker.has_recent_activity(30):
+            # Window triggered: Check for activity in the last 30 minutes (skip activity check for manual)
+            if manual_trigger or await activity_tracker.has_recent_activity(30):
                 guild = bot.get_guild(guild_id)
                 if not guild:
                     return
@@ -722,25 +741,33 @@ def setup_tasks(bot, guild_id: int):
                     channel = forum
                     if not forum:
                         logger.warning("Quote drop loop: No 'main' channel or 'forum' found. Skipping.")
+                        if manual_trigger: await database.set_setting("trigger_quote_drop", "0")
                         return
                 else:
                     channel = guild.get_channel(int(channel_id))
                 
                 if not channel:
+                    if manual_trigger: await database.set_setting("trigger_quote_drop", "0")
                     return
 
                 # Pick random quote drop
                 quote = await get_random_quote_drop()
                 if not quote:
                     logger.warning("Quote drop loop: No quotes found in 'quote_drops' table.")
+                    if manual_trigger: await database.set_setting("trigger_quote_drop", "0")
                     return
 
                 # Send
                 await channel.send(quote)
-                await database.set_setting(LAST_QUOTE_DROP_TIME_KEY, str(now))
-                logger.info(f"🚀 Automated quote drop sent to {channel.name}: {quote[:50]}...")
+                
+                if manual_trigger:
+                    await database.set_setting("trigger_quote_drop", "0")
+                    logger.info(f"🚀 Manual quote drop triggered and sent to {channel.name}")
+                else:
+                    await database.set_setting(LAST_QUOTE_DROP_TIME_KEY, str(now))
+                    logger.info(f"🚀 Automated quote drop sent to {channel.name}: {quote[:50]}...")
             else:
-                # SKIP TURN: Advance 'last_drop_time' so we wait a full interval before trying again
+                # SKIP TURN (only for automated): Advance 'last_drop_time' so we wait a full interval before trying again
                 await database.set_setting(LAST_QUOTE_DROP_TIME_KEY, str(now))
                 logger.info("💤 Quote drop loop: Skipping turn due to inactivity (last 30m).")
 
@@ -757,47 +784,66 @@ def setup_tasks(bot, guild_id: int):
     @tasks.loop(seconds=10)
     async def daily_tc_task():
         try:
-            trigger_now = await database.get_setting("trigger_daily_tc", "0") == "1"
-            if not trigger_now:
-                return
+            # We skip cache for the trigger flag so it responds instantly to the dashboard
+            trigger_now = await database.get_setting("trigger_daily_tc", "0", use_cache=False) == "1"
 
             now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
             today_str = now_pt.date().isoformat()
+            hour, minute = now_pt.hour, now_pt.minute
+
+            # Check scheduled time (these use cache by default)
+            tc_time = await database.get_setting(DAILY_TC_TIME_KEY, "08:00")
+            try:
+                thour, tmin = map(int, tc_time.split(':'))
+            except ValueError:
+                thour, tmin = 8, 0
+
+            last_tc_date = await database.get_setting(DAILY_TC_DATE_KEY, "", use_cache=False)
+            scheduled_trigger = (hour == thour and minute == tmin and last_tc_date != today_str)
+
+            if not trigger_now and not scheduled_trigger:
+                return
 
             guild = bot.get_guild(guild_id)
             if not guild:
+                if trigger_now:
+                    await database.set_setting("trigger_daily_tc", "0")
                 return
 
-            if trigger_now:
-                bulletin_id = await database.get_setting(BULLETIN_CHANNEL_KEY, "")
-                if bulletin_id:
-                    channel = guild.get_channel(int(bulletin_id))
-                    if channel:
-                        import tarot
-                        import rws
-                        import manara
-                        from database import get_admin_config
-                        config = await get_admin_config()
-                        deck_name = config.get("tarot_deck", "thoth").lower().strip()
-                        
-                        dev_mode = False # Placeholder or get from config
-                        if deck_name == "rws":
-                            deck_module = rws
-                        elif deck_name == "manara":
-                            deck_module = manara
-                        else:
-                            deck_module = tarot
+            bulletin_id = await database.get_setting(BULLETIN_CHANNEL_KEY, "")
+            if bulletin_id:
+                channel = guild.get_channel(int(bulletin_id))
+                if channel:
+                    # Heavy imports moved inside the trigger block to save memory
+                    import tarot
+                    import rws
+                    import manara
+                    from database import get_admin_config
+                    
+                    config = await get_admin_config()
+                    deck_name = config.get("tarot_deck", "thoth").lower().strip()
 
-                        card_key = deck_module.draw_card()
-                        date_str = now_pt.strftime("%m/%d/%y")
-                        await channel.send(f"🎴 **Pull for {date_str}**")
-                        await deck_module.send_tarot_card(channel, card_key=card_key)
-                        await database.set_setting(DAILY_TC_DATE_KEY, today_str)
+                    if deck_name == "rws":
+                        deck_module = rws
+                    elif deck_name == "manara":
+                        deck_module = manara
+                    else:
+                        deck_module = tarot
+
+                    card_key = deck_module.draw_card()
+                    date_str = now_pt.strftime("%m/%d/%y")
+                    await channel.send(f"🎴 **Pull for {date_str}**")
+                    await deck_module.send_tarot_card(channel, card_key=card_key)
+                    await database.set_setting(DAILY_TC_DATE_KEY, today_str)
+                    
+                    if trigger_now:
                         await database.set_setting("trigger_daily_tc", "0")
                         logger.info(f"🎴 Manual Daily TC triggered and sent for {today_str}")
-                else:
-                    # If flag was set but bulletin not configured, reset it anyway to avoid loop
-                    await database.set_setting("trigger_daily_tc", "0")
+                    else:
+                        logger.info(f"🎴 Scheduled Daily TC sent for {today_str} at {tc_time}")
+            # Reset flag even if bulletin_id not configured, to avoid an infinite loop
+            if trigger_now:
+                await database.set_setting("trigger_daily_tc", "0")
 
         except Exception as e:
             logger.error(f"Error in daily_tc_task: {e}", exc_info=True)

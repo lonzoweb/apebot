@@ -1,6 +1,6 @@
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 from database import (
     is_economy_on, set_economy_status, set_yap_level, get_yap_level,
     get_top_balances, cap_all_balances, clear_user_inventory
@@ -13,6 +13,62 @@ class AdminCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.cleanse_votes = {}  # {target_id: {voter_id: timestamp}}
+        self._dynamic_color_commands = set()
+        self.color_refresh_loop.start()
+
+    def cog_unload(self):
+        self.color_refresh_loop.cancel()
+
+    async def sync_color_commands(self):
+        """
+        Dynamically registers or unregisters .{color} commands based on the database.
+        """
+        from database import get_color_role_configs
+        configs = await get_color_role_configs()
+        current_db_colors = {entry["name"].lower().strip() for entry in configs}
+
+        # 1. Remove commands that are no longer in the DB
+        to_remove = self._dynamic_color_commands - current_db_colors
+        for color in to_remove:
+            self.bot.remove_command(color)
+            self._dynamic_color_commands.remove(color)
+            logger.info(f"🎨 Removed dynamic color command: .{color}")
+
+        # 2. Add new commands from the DB
+        for color in current_db_colors:
+            # Skip if it's already registered either statically or dynamically
+            if self.bot.get_command(color):
+                continue
+
+            # Dynamically create and add the command
+            async def _color_cmd(ctx, member: discord.Member, _color=color):
+                await self._handle_color_vote(ctx, _color, member)
+
+            cmd = commands.Command(
+                _color_cmd,
+                name=color,
+                help=f"Votes to assign the {color} role to a user."
+            )
+            self.bot.add_command(cmd)
+            self._dynamic_color_commands.add(color)
+            logger.info(f"🎨 Registered new dynamic color command: .{color}")
+
+    @tasks.loop(seconds=10)
+    async def color_refresh_loop(self):
+        """Checks for the manual trigger flag 'trigger_refresh_colors' set by the dashboard."""
+        from database import get_setting, set_setting
+        try:
+            flag = await get_setting("trigger_refresh_colors", "0", use_cache=False)
+            if flag == "1":
+                await self.sync_color_commands()
+                await set_setting("trigger_refresh_colors", "0")
+                logger.info("🎨 Color role commands refreshed via dashboard trigger.")
+        except Exception as e:
+            logger.error(f"Error in color_refresh_loop: {e}")
+
+    @color_refresh_loop.before_loop
+    async def before_color_refresh(self):
+        await self.bot.wait_until_ready()
 
     @commands.command(name="economy")
     @commands.has_permissions(administrator=True)
@@ -43,13 +99,29 @@ class AdminCog(commands.Cog):
         """Votes to assign the green role to a user."""
         await self._handle_color_vote(ctx, "green", member)
 
+
+    async def cog_command_error(self, ctx, error):
+        """Cog-specific error handler for syntax guidance."""
+        if isinstance(error, commands.MissingRequiredArgument):
+            # If it's a dynamic color command (or pink/green)
+            from database import get_color_role_configs
+            configs = await get_color_role_configs()
+            color_names = [c["name"].lower() for c in configs] + ["pink", "green"]
+            
+            if ctx.command.name in color_names:
+                return await ctx.reply(f"❌ Incorrect syntax. Use: `.{ctx.command.name} <user>`", mention_author=False)
+        
+        # Fallback to global handler or just ignore if not handled here
+        pass
+
     async def _handle_color_vote(self, ctx, color_name: str, member: discord.Member):
         """Generalized logic for colour role voting system."""
         from database import (
             update_color_vote, 
             get_active_color_vote_count, 
             add_color_role_expiration, 
-            get_color_role_config
+            get_color_role_config,
+            has_color_voted
         )
         import time
         import discord
@@ -82,7 +154,12 @@ class AdminCog(commands.Cog):
             return await ctx.send(f"🛑 My role must be higher than the target role ({role.name}).")
 
         if role in member.roles:
-            return await ctx.reply(f"❌ {member.display_name} already has the role.", mention_author=False)
+            return await ctx.reply(f"❌ {member.display_name} already has the {color_name} role.", mention_author=False)
+
+        # Duplicate vote check (48h window)
+        already_voted = await has_color_voted(color_name, str(member.id), str(ctx.author.id))
+        if already_voted:
+            return await ctx.reply(f"❌ You already voted to {color_name} {member.display_name}! Your vote fades after 48 hours.", mention_author=False)
 
         await update_color_vote(color_name, str(member.id), str(ctx.author.id))
         vote_count = await get_active_color_vote_count(color_name, str(member.id))
@@ -427,4 +504,6 @@ class AdminCog(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(AdminCog(bot))
+    cog = AdminCog(bot)
+    await bot.add_cog(cog)
+    await cog.sync_color_commands()

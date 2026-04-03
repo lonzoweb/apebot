@@ -12,7 +12,7 @@ import io
 from database import (
     update_user_xp, get_user_xp_data, get_top_levels,
     get_level_settings, get_level_multipliers, get_reward_roles,
-    sync_user_profile, calculate_level_for_xp,
+    sync_user_profile, sync_multiple_user_profiles, calculate_level_for_xp,
     set_level_setting, sync_server_roles, sync_server_channels,
     get_cached_roles, init_db, get_cached_channels,
     get_user_rank, get_rank_card_prefs, set_rank_card_prefs,
@@ -152,16 +152,18 @@ class LevelingCog(commands.Cog):
             try:
                 for guild in self.bot.guilds:
                     logger.info(f"Starting full profile sync for {guild.name}...")
-                    count = 0
+                    users_data = []
                     for member in guild.members:
                         if member.bot: continue
-                        await sync_user_profile(
-                            member.id, 
+                        users_data.append((
+                            str(member.id), 
                             member.display_name, 
                             str(member.display_avatar.url)
-                        )
-                        count += 1
-                    logger.info(f"Synced {count} member profiles for {guild.name}.")
+                        ) )
+                    
+                    if users_data:
+                        await sync_multiple_user_profiles(users_data)
+                        logger.info(f"Synced {len(users_data)} member profiles for {guild.name} (Bulk).")
             except Exception as e:
                 logger.error(f"Error in profile sync task: {e}")
             await asyncio.sleep(86400) # Every 24 hours
@@ -562,14 +564,21 @@ class LevelingCog(commands.Cog):
                 await self._sync_guild_roles(guild)
             
             # Sync Members
-            count = 0
+            total_count = 0
             for guild in self.bot.guilds:
+                users_data = []
                 for member in guild.members:
                     if member.bot: continue
-                    await sync_user_profile(member.id, member.display_name, str(member.display_avatar.url))
-                    count += 1
+                    users_data.append((
+                        str(member.id), 
+                        member.display_name, 
+                        str(member.display_avatar.url)
+                    ))
+                if users_data:
+                    await sync_multiple_user_profiles(users_data)
+                    total_count += len(users_data)
             
-            await interaction.followup.send(f"✅ Sync complete! Cached {count} members and updated server roles.", ephemeral=True)
+            await interaction.followup.send(f"✅ Sync complete! Cached {total_count} members (Bulk) and updated server roles.", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"❌ Sync failed: {e}", ephemeral=True)
 

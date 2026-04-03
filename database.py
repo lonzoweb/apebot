@@ -9,8 +9,10 @@ from exceptions import InsufficientTokens, ItemNotFoundError
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# DATABASE CONTEXT MANAGER (Core Connection Logic)
+# CACHE & CONTEXT MANAGER (Core Logic)
 # ============================================================
+
+_settings_cache = {}  # key -> {"value": val, "expires": time}
 
 
 @asynccontextmanager
@@ -183,7 +185,7 @@ async def init_db():
             )
 
             await conn.execute(
-                "CREATE TABLE IF NOT EXISTS global_settings (key TEXT PRIMARY KEY, value TEXT)"
+                "CREATE TABLE IF NOT EXISTS global_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT)"
             )
             
             # 🔄 Run Migration
@@ -290,6 +292,12 @@ async def init_db():
             )
             await conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_activity_users_count ON activity_users(count DESC)"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_color_votes_target ON color_role_votes(color_name, voted_id)"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_color_votes_voter ON color_role_votes(voter_id)"
             )
 
             # Fade stats table
@@ -768,22 +776,52 @@ async def remove_masochist_role_record(user_id: str):
 # GLOBAL SETTINGS MANAGEMENT
 # ============================================================
 
+_settings_cache = {}
 
-async def get_setting(key: str, default: str = None) -> str:
-    async with get_db() as conn:
-        async with conn.execute(
+async def get_setting(key: str, default: str = None, use_cache: bool = True) -> str:
+    """Retrieve a setting value from the global_settings table with optional caching."""
+    now = time.time()
+    if use_cache and key in _settings_cache:
+        entry = _settings_cache[key]
+        if now < entry["expires"]:
+            return entry["value"]
+
+    async with get_db() as db:
+        async with db.execute(
             "SELECT setting_value FROM global_settings WHERE setting_key = ?", (key,)
         ) as cursor:
             row = await cursor.fetchone()
-            return row[0] if row else default
+            val = row[0] if row else default
+            
+            if use_cache:
+                _settings_cache[key] = {"value": val, "expires": now + 300} # 5m TTL
+            return val
 
 
 async def set_setting(key: str, value: str):
-    async with get_db() as conn:
-        await conn.execute(
-            "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES (?, ?)",
+    """Save a setting value to the global_settings table and invalidate cache."""
+    async with get_db() as db:
+        await db.execute(
+            "INSERT INTO global_settings (setting_key, setting_value) VALUES (?, ?) "
+            "ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value",
             (key, value),
         )
+        await db.commit()
+        # Invalidate cache
+        if key in _settings_cache:
+            del _settings_cache[key]
+
+
+async def has_color_voted(color_name: str, voted_id: str, voter_id: str) -> bool:
+    """Returns True if voter has already voted for voted_id for this color within the 48h window."""
+    async with get_db() as conn:
+        expiration_time = time.time() - 172800  # 48h window matches vote count
+        async with conn.execute(
+            "SELECT 1 FROM color_role_votes WHERE color_name = ? AND voted_id = ? AND voter_id = ? AND timestamp > ?",
+            (color_name, str(voted_id), str(voter_id), expiration_time)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row is not None
 
 # ============================================================
 # NUMEROLOGY CONTENT
@@ -2109,6 +2147,32 @@ async def sync_user_profile(user_id: int, username: str, avatar_url: str):
             """,
             (str(user_id), username, avatar_url, int(time.time()))
         )
+
+async def sync_multiple_user_profiles(users_data: list):
+    """
+    Update multiple user profiles in a single transaction (Bulk).
+    users_data: List of tuples (user_id, username, avatar_url)
+    """
+    if not users_data:
+        return
+    
+    last_updated = int(time.time())
+    # Format data for executemany (add last_updated to each tuple)
+    formatted_data = [ (str(u[0]), u[1], u[2], last_updated) for u in users_data ]
+    
+    async with get_db() as conn:
+        await conn.executemany(
+            """
+            INSERT INTO user_profile_cache (user_id, username, avatar_url, last_updated)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                username = excluded.username,
+                avatar_url = excluded.avatar_url,
+                last_updated = excluded.last_updated
+            """,
+            formatted_data
+        )
+        await conn.commit()
 
 # ============================================================
 # LEVELING CALCULATIONS
