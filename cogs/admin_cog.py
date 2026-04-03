@@ -35,43 +35,75 @@ class AdminCog(commands.Cog):
 
     @commands.command(name="pink")
     async def pink_command(self, ctx, member: discord.Member):
-        """Votes to assign the Masochist role to a user. Requires 7 votes in 48h."""
-        from database import update_pink_vote, get_active_pink_vote_count, add_masochist_role_removal
-        from config import MASOCHIST_ROLE_ID, VOTE_THRESHOLD, ROLE_DURATION_SECONDS
+        """Votes to assign the pink role to a user."""
+        await self._handle_color_vote(ctx, "pink", member)
+
+    @commands.command(name="green")
+    async def green_command(self, ctx, member: discord.Member):
+        """Votes to assign the green role to a user."""
+        await self._handle_color_vote(ctx, "green", member)
+
+    async def _handle_color_vote(self, ctx, color_name: str, member: discord.Member):
+        """Generalized logic for colour role voting system."""
+        from database import (
+            update_color_vote, 
+            get_active_color_vote_count, 
+            add_color_role_expiration, 
+            get_color_role_config
+        )
         import time
+        import discord
+
+        config = await get_color_role_config(color_name)
+        if not config or not config["role_id"]:
+            return await ctx.send(f"❌ The `.{color_name}` role system is not configured in the dashboard.")
+
+        try:
+            role_id = int(config["role_id"])
+        except ValueError:
+            return await ctx.send(f"❌ Invalid Role ID configured for `.{color_name}`.")
+            
+        threshold = config["vote_threshold"]
+        duration_days = config["duration_days"]
 
         if member.id == ctx.author.id:
             return await ctx.reply("❌ You can't vote for yourself... unless you're into that?", mention_author=False)
         if member.bot:
             return await ctx.reply("❌ Bots are immune to this torture.", mention_author=False)
 
-        masochist_role = ctx.guild.get_role(MASOCHIST_ROLE_ID)
-        if not masochist_role:
-            return await ctx.send(f"❌ Error: The Masochist role ({MASOCHIST_ROLE_ID}) was not found.")
+        role = ctx.guild.get_role(role_id)
+        if not role:
+            return await ctx.send(f"❌ Error: The configured role ({role_id}) was not found on this server.")
 
         # Hierarchy Checks
         if not ctx.guild.me.guild_permissions.manage_roles:
             return await ctx.send("🛑 I need `Manage Roles` permission.")
-        if ctx.guild.me.top_role.position <= masochist_role.position:
-            return await ctx.send("🛑 My role must be higher than the Masochist role.")
+        if ctx.guild.me.top_role.position <= role.position:
+            return await ctx.send(f"🛑 My role must be higher than the target role ({role.name}).")
 
-        if masochist_role in member.roles:
+        if role in member.roles:
             return await ctx.reply(f"❌ {member.display_name} already has the role.", mention_author=False)
 
-        await update_pink_vote(str(member.id), str(ctx.author.id))
-        vote_count = await get_active_pink_vote_count(str(member.id))
+        await update_color_vote(color_name, str(member.id), str(ctx.author.id))
+        vote_count = await get_active_color_vote_count(color_name, str(member.id))
 
-        if vote_count >= VOTE_THRESHOLD:
+        if vote_count >= threshold:
             try:
-                await member.add_roles(masochist_role, reason=f"Reached {VOTE_THRESHOLD} pink votes.")
-                removal_time = time.time() + ROLE_DURATION_SECONDS
-                await add_masochist_role_removal(str(member.id), removal_time)
-                await ctx.send(f"🎉 **PAYMENT DUE!** {member.mention} reached **{VOTE_THRESHOLD} votes** and is now pink for 2 days")
+                await member.add_roles(role, reason=f"Reached {threshold} {color_name} votes.")
+                removal_time = time.time() + (duration_days * 86400)
+                await add_color_role_expiration(str(member.id), str(role_id), color_name, removal_time)
+                
+                # Format duration string
+                dur_str = f"{duration_days} days" if duration_days != 1 else "1 day"
+                if duration_days < 1:
+                    dur_str = f"{duration_days * 24:.1f} hours"
+
+                await ctx.send(f"🎉 **PAYMENT DUE!** {member.mention} reached **{threshold} votes** and is now {color_name} for {dur_str}!")
             except discord.Forbidden:
-                await ctx.send("❌ permission error while assigning role.")
+                await ctx.send("❌ Permission error while assigning role.")
         else:
-            needed = VOTE_THRESHOLD - vote_count
-            await ctx.send(f"{member.display_name} has **{vote_count}/{VOTE_THRESHOLD}** pink votes. **{needed} more** needed to pink name this fool")
+            needed = threshold - vote_count
+            await ctx.send(f"{member.display_name} has **{vote_count}/{threshold}** {color_name} votes. **{needed} more** needed to {color_name} name this fool")
 
     @commands.command(name="cleanse")
     async def cleanse_command(self, ctx, member: discord.Member):

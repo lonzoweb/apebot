@@ -149,7 +149,7 @@ def _get_media_label(url: str | None) -> tuple[str, str]:
     # Discord URLs often have the filename before query params
     # e.g. https://cdn.discordapp.com/.../voice-message.ogg?ex=...
     path = url.split("?")[0].lower()
-    video_exts = (".mp4", ".mov", ".webm", ".mkv", ".avi", ".flv", ".ogv")
+    video_exts = (".mp4", ".mov", ".webm", ".mkv", ".avi", ".flv", ".ogv", ".m4v")
     if any(path.endswith(ext) for ext in video_exts):
         return "🎬", "Video"
     return "🎙️", "Voice Note"
@@ -407,6 +407,13 @@ class HofCog(commands.Cog):
                 message = await channel.fetch_message(payload.message_id)
             except Exception as e:
                 logger.info(f"🔍 HOF: Could not fetch message {payload.message_id}: {e}")
+                return
+
+            # AGE LIMIT: Ignore messages older than 7 days
+            now_utc = datetime.now(ZoneInfo("UTC"))
+            msg_age_days = (now_utc - message.created_at).total_seconds() / 86400
+            if msg_age_days > 7:
+                logger.info(f"🔍 HOF: Message {payload.message_id} is too old ({msg_age_days:.1f} days), skipping.")
                 return
 
             # Check blacklist (author)

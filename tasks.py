@@ -14,8 +14,7 @@ from discord.ext import tasks
 
 from config import CHANNEL_ID, TEST_CHANNEL_ID, GUILD_ID
 
-# Constants
-MASOCHIST_ROLE_ID = 1167184822129664113
+# (Colour Role System is now dynamic via database)
 
 import activity as activity_tracker
 import database
@@ -579,25 +578,36 @@ def setup_tasks(bot, guild_id: int):
             logger.error(f"Error in curse cleanup: {e}")
 
     async def handle_role_expirations(guild):
-        masochist_role = guild.get_role(MASOCHIST_ROLE_ID)
-        if not masochist_role:
-            return
         try:
-            users_to_remove_ids = await database.get_pending_role_removals()
-            for user_id_str in users_to_remove_ids:
-                user_id = int(user_id_str)
+            pending_expirations = await database.get_pending_color_role_expirations()
+            for exp in pending_expirations:
+                user_id = int(exp["user_id"])
+                role_id_str = exp["role_id"]
+                color_name = exp["color_name"]
+                
+                if not role_id_str:
+                    await database.remove_color_role_expiration(str(user_id), "")
+                    continue
+                    
+                role_id = int(role_id_str)
                 member = guild.get_member(user_id)
-                if member and masochist_role in member.roles:
+                role = guild.get_role(role_id)
+                
+                if member and role and role in member.roles:
                     try:
-                        await member.remove_roles(masochist_role, reason="Masochist role expired.")
+                        await member.remove_roles(role, reason=f"{color_name} role expired.")
                         try:
-                            await member.send(f"Your **{masochist_role.name}** role has expired!")
+                            await member.send(f"Your **{role.name}** role has expired!")
                         except discord.Forbidden:
                             pass
+                        logger.info(f"🔓 {color_name} role removed from {member.display_name} (expired)")
                     except Exception as e:
-                        logger.error(f"Error removing role for {user_id}: {e}")
-                await database.remove_masochist_role_record(user_id_str)
+                        logger.error(f"Error removing role {role_id} for {user_id}: {e}")
+                
+                # Always remove the record if the removal time has passed
+                await database.remove_color_role_expiration(str(user_id), role_id_str)
         except Exception as e:
+            logger.error(f"Error in handle_role_expirations: {e}")
             logger.error(f"Error in role removal: {e}")
 
     async def handle_trial_expirations(guild):

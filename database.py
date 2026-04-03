@@ -101,12 +101,48 @@ async def init_db():
                 "CREATE TABLE IF NOT EXISTS balances (user_id TEXT PRIMARY KEY, balance INTEGER DEFAULT 0)"
             )
 
-            # 💖 Pink Votes & Roles
+            # 💖 Legacy Pink Votes & Roles (will be migrated)
             await conn.execute(
                 "CREATE TABLE IF NOT EXISTS pink_votes (voted_id TEXT NOT NULL, voter_id TEXT NOT NULL, timestamp REAL NOT NULL, PRIMARY KEY (voted_id, voter_id))"
             )
             await conn.execute(
                 "CREATE TABLE IF NOT EXISTS masochist_roles (user_id TEXT PRIMARY KEY, removal_time REAL NOT NULL)"
+            )
+
+            # 🎨 Generalized Colour Roles
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS color_roles (
+                    color_name TEXT PRIMARY KEY,
+                    role_id TEXT NOT NULL,
+                    vote_threshold INTEGER NOT NULL,
+                    duration_days REAL NOT NULL
+                )
+                """
+            )
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS color_role_votes (
+                    color_name TEXT NOT NULL,
+                    voted_id TEXT NOT NULL,
+                    voter_id TEXT NOT NULL,
+                    timestamp REAL NOT NULL,
+                    PRIMARY KEY (color_name, voted_id, voter_id),
+                    FOREIGN KEY (color_name) REFERENCES color_roles(color_name) ON DELETE CASCADE
+                )
+                """
+            )
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS color_role_expirations (
+                    user_id TEXT NOT NULL,
+                    role_id TEXT NOT NULL,
+                    color_name TEXT NOT NULL,
+                    removal_time REAL NOT NULL,
+                    PRIMARY KEY (user_id, role_id),
+                    FOREIGN KEY (color_name) REFERENCES color_roles(color_name) ON DELETE CASCADE
+                )
+                """
             )
 
             # 🛡️ Trial System
@@ -146,10 +182,14 @@ async def init_db():
             """
             )
 
-            # Global Settings Table
             await conn.execute(
-                "CREATE TABLE IF NOT EXISTS global_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT)"
+                "CREATE TABLE IF NOT EXISTS global_settings (key TEXT PRIMARY KEY, value TEXT)"
             )
+            
+            # 🔄 Run Migration
+            await migrate_to_color_roles(conn)
+        
+            logger.info("✅ Database tables and migrations verified.")
 
             # Shard Claim Tracking Table
             await conn.execute(
@@ -571,51 +611,157 @@ async def set_rank_card_prefs(user_id: int, font: str = None, theme: str = None,
 
 
 # ============================================================
-# PINK VOTE MANAGEMENT
+# COLOUR ROLE MANAGEMENT
 # ============================================================
 
+async def migrate_to_color_roles(conn):
+    """One-time migration from static pink tables to dynamic color_roles."""
+    from config import MASOCHIST_ROLE_ID, VOTE_THRESHOLD
+    
+    # Check if migration already ran
+    async with conn.execute("SELECT COUNT(*) FROM color_roles") as cur:
+        row = await cur.fetchone()
+        if row and row[0] > 0:
+            return
 
-async def update_pink_vote(voted_id: str, voter_id: str):
-    now = time.time()
+    # Seed initial roles
+    await conn.execute(
+        "INSERT OR IGNORE INTO color_roles (color_name, role_id, vote_threshold, duration_days) VALUES (?, ?, ?, ?)",
+        ('pink', str(MASOCHIST_ROLE_ID), VOTE_THRESHOLD, 2.0)
+    )
+    await conn.execute(
+        "INSERT OR IGNORE INTO color_roles (color_name, role_id, vote_threshold, duration_days) VALUES (?, ?, ?, ?)",
+        ('green', '', 7, 2.0)
+    )
+
+    # Migrate pink votes if table exists
+    try:
+        await conn.execute(
+            "INSERT OR IGNORE INTO color_role_votes (color_name, voted_id, voter_id, timestamp) "
+            "SELECT 'pink', voted_id, voter_id, timestamp FROM pink_votes"
+        )
+    except Exception as e:
+        logger.debug(f"Migration: pink_votes table not found or already empty: {e}")
+
+    # Migrate pink expirations if table exists
+    try:
+        await conn.execute(
+            "INSERT OR IGNORE INTO color_role_expirations (user_id, role_id, color_name, removal_time) "
+            "SELECT user_id, ?, 'pink', removal_time FROM masochist_roles",
+            (str(MASOCHIST_ROLE_ID),)
+        )
+    except Exception as e:
+        logger.debug(f"Migration: masochist_roles table not found or already empty: {e}")
+
+
+async def get_color_role_configs() -> list:
+    """Returns all configured color roles."""
+    async with get_db() as conn:
+        async with conn.execute("SELECT color_name, role_id, vote_threshold, duration_days FROM color_roles") as cursor:
+            rows = await cursor.fetchall()
+            return [
+                {"name": r[0], "role_id": r[1], "vote_threshold": r[2], "duration_days": r[3]}
+                for r in rows
+            ]
+
+
+async def get_color_role_config(name: str) -> dict:
+    """Returns configuration for a specific color role."""
+    async with get_db() as conn:
+        async with conn.execute(
+            "SELECT role_id, vote_threshold, duration_days FROM color_roles WHERE color_name = ?",
+            (name,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return {"role_id": row[0], "vote_threshold": row[1], "duration_days": row[2]}
+            return None
+
+
+async def set_color_role_config(name: str, role_id: str, threshold: int, duration: float):
+    """Upserts a color role configuration."""
     async with get_db() as conn:
         await conn.execute(
-            "INSERT OR REPLACE INTO pink_votes (voted_id, voter_id, timestamp) VALUES (?, ?, ?)",
-            (voted_id, voter_id, now),
+            "INSERT OR REPLACE INTO color_roles (color_name, role_id, vote_threshold, duration_days) VALUES (?, ?, ?, ?)",
+            (name, str(role_id), threshold, duration)
         )
 
 
-async def get_active_pink_vote_count(voted_id: str) -> int:
+async def delete_color_role_config(name: str):
+    """Deletes a color role configuration."""
     async with get_db() as conn:
-        expiration_time = time.time() - 172800
+        await conn.execute("DELETE FROM color_roles WHERE color_name = ?", (name,))
+
+
+async def update_color_vote(color_name: str, voted_id: str, voter_id: str):
+    """Records a vote for a color role."""
+    now = time.time()
+    async with get_db() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO color_role_votes (color_name, voted_id, voter_id, timestamp) VALUES (?, ?, ?, ?)",
+            (color_name, str(voted_id), str(voter_id), now)
+        )
+
+
+async def get_active_color_vote_count(color_name: str, voted_id: str) -> int:
+    """Counts active votes for a color role within the 48h expiration window."""
+    async with get_db() as conn:
+        expiration_time = time.time() - 172800 # Fixed 48h vote window
         async with conn.execute(
-            "SELECT COUNT(voter_id) FROM pink_votes WHERE voted_id = ? AND timestamp > ?",
-            (voted_id, expiration_time),
+            "SELECT COUNT(voter_id) FROM color_role_votes WHERE color_name = ? AND voted_id = ? AND timestamp > ?",
+            (color_name, str(voted_id), expiration_time)
         ) as cursor:
             row = await cursor.fetchone()
             return row[0] if row else 0
 
 
-async def add_masochist_role_removal(user_id: str, removal_time: float):
+async def add_color_role_expiration(user_id: str, role_id: str, color_name: str, removal_time: float):
+    """Schedules a color role for removal."""
     async with get_db() as conn:
         await conn.execute(
-            "INSERT OR REPLACE INTO masochist_roles (user_id, removal_time) VALUES (?, ?)",
-            (user_id, removal_time),
+            "INSERT OR REPLACE INTO color_role_expirations (user_id, role_id, color_name, removal_time) VALUES (?, ?, ?, ?)",
+            (str(user_id), str(role_id), color_name, removal_time)
         )
 
 
-async def get_pending_role_removals() -> list:
+async def get_pending_color_role_expirations() -> list:
+    """Returns roles that are due for removal."""
     async with get_db() as conn:
         now = time.time()
         async with conn.execute(
-            "SELECT user_id FROM masochist_roles WHERE removal_time <= ?", (now,)
+            "SELECT user_id, role_id, color_name FROM color_role_expirations WHERE removal_time <= ?", (now,)
         ) as cursor:
             rows = await cursor.fetchall()
-            return [row[0] for row in rows]
+            return [{"user_id": r[0], "role_id": r[1], "color_name": r[2]} for r in rows]
 
+
+async def remove_color_role_expiration(user_id: str, role_id: str):
+    """Deletes a role expiration record."""
+    async with get_db() as conn:
+        await conn.execute(
+            "DELETE FROM color_role_expirations WHERE user_id = ? AND role_id = ?",
+            (str(user_id), str(role_id))
+        )
+
+
+# Backward compatibility helpers (delegates to new generalized functions)
+async def update_pink_vote(voted_id: str, voter_id: str):
+    await update_color_vote('pink', voted_id, voter_id)
+
+async def get_active_pink_vote_count(voted_id: str) -> int:
+    return await get_active_color_vote_count('pink', voted_id)
+
+async def add_masochist_role_removal(user_id: str, removal_time: float):
+    from config import MASOCHIST_ROLE_ID
+    await add_color_role_expiration(user_id, str(MASOCHIST_ROLE_ID), 'pink', removal_time)
+
+async def get_pending_role_removals() -> list:
+    pending = await get_pending_color_role_expirations()
+    return [p["user_id"] for p in pending if p["color_name"] == 'pink']
 
 async def remove_masochist_role_record(user_id: str):
-    async with get_db() as conn:
-        await conn.execute("DELETE FROM masochist_roles WHERE user_id = ?", (user_id,))
+    from config import MASOCHIST_ROLE_ID
+    await remove_color_role_expiration(user_id, str(MASOCHIST_ROLE_ID))
 
 
 # ============================================================

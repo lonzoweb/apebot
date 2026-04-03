@@ -1480,9 +1480,11 @@ class GamesCog(commands.Cog):
                 
                 is_cursed = (uwu_effect and uwu_effect > current_time) or (muzzle_effect and muzzle_effect > current_time)
                 
-                # PREVENT Spooking while Tortured (Masochist Role)
-                from config import MASOCHIST_ROLE_ID
-                has_torture_role = any(r.id == MASOCHIST_ROLE_ID for r in target.roles)
+                # PREVENT Spooking while Tortured (Any Colour Role from Dashboard)
+                from database import get_color_role_configs
+                color_roles_config = await get_color_role_configs()
+                color_role_ids = {int(r["role_id"]) for r in color_roles_config if r["role_id"]}
+                has_torture_role = any(r.id in color_role_ids for r in target.roles)
                 
                 if is_cursed or has_torture_role:
                     reason = "CURSED" if is_cursed else "TORTURED"

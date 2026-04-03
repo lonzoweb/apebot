@@ -913,9 +913,44 @@ async def api_set_bulletin_settings(data: dict):
     return {"status": "ok"}
 
 @app.post("/bulletin/trigger-tarot")
-async def api_trigger_daily_tarot():
-    """Manually trigger the daily tarot drawing."""
-    await database.set_setting("trigger_daily_tc", "1")
+async def api_trigger_tarot():
+    """Manually trigger the Tarot draw for today."""
+    from tasks import draw_tarot_task
+    # We call it without the loop context
+    await draw_tarot_task(app.state.bot)
+    return {"status": "ok"}
+
+@app.post("/bulletin/trigger-daily-tc")
+async def api_trigger_daily_tc():
+    """Manually trigger the Daily TC (numerology/quotes) for today."""
+    from tasks import daily_tc_task
+    await daily_tc_task(app.state.bot)
+    return {"status": "ok"}
+
+@app.get("/bulletin/color-roles")
+async def api_get_color_roles():
+    """Get all configured color roles."""
+    roles = await database.get_color_role_configs()
+    return roles
+
+@app.post("/bulletin/color-roles")
+async def api_set_color_role(data: dict):
+    """Upsert a color role configuration."""
+    name = data.get("name")
+    role_id = data.get("role_id")
+    threshold = data.get("vote_threshold")
+    duration = data.get("duration_days")
+    
+    if not name or role_id is None or threshold is None or duration is None:
+        raise HTTPException(status_code=400, detail="Missing required fields: name, role_id, vote_threshold, duration_days")
+    
+    await database.set_color_role_config(name.lower().strip(), str(role_id), int(threshold), float(duration))
+    return {"status": "ok"}
+
+@app.delete("/bulletin/color-roles/{name}")
+async def api_delete_color_role(name: str):
+    """Delete a color role configuration."""
+    await database.delete_color_role_config(name.lower().strip())
     return {"status": "ok"}
 
 @app.get("/numerology/preview")

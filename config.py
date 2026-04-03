@@ -58,10 +58,7 @@ GUILD_ID = 1167166210610298910
 DAILY_COMMAND_ROLE = "Patrizio"
 ROLE_ADD_QUOTE = "Caporegime"
 
-# Pink Vote System
-MASOCHIST_ROLE_ID = 1167184822129664113
-VOTE_THRESHOLD = 7
-ROLE_DURATION_SECONDS = 172800 # 48 hours
+# (Colour Role System is now dynamic via dashboard)
 
 # Role Aliases for .gr command
 ROLE_ALIASES = {
