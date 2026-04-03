@@ -44,13 +44,13 @@ class AdminCog(commands.Cog):
                 continue
 
             # Dynamically create and add the command
-            async def _color_cmd(ctx, member: discord.Member, _color=color):
-                await self._handle_color_vote(ctx, _color, member)
+            async def _color_cmd(ctx, member: discord.Member, now: str = "", _color=color):
+                await self._handle_color_vote(ctx, _color, member, now)
 
             cmd = commands.Command(
                 _color_cmd,
                 name=color,
-                help=f"Votes to assign the {color} role to a user."
+                help=f"Votes to assign the {color} role to a user. Admins can add 'now' to bypass."
             )
             self.bot.add_command(cmd)
             self._dynamic_color_commands.add(color)
@@ -93,14 +93,14 @@ class AdminCog(commands.Cog):
             await ctx.reply("❌ Invalid status. Use `on` or `off`.", mention_author=False)
 
     @commands.command(name="pink")
-    async def pink_command(self, ctx, member: discord.Member):
-        """Votes to assign the pink role to a user."""
-        await self._handle_color_vote(ctx, "pink", member)
+    async def pink_command(self, ctx, member: discord.Member, now: str = ""):
+        """Votes to assign the pink role to a user. Admins can add 'now' to bypass."""
+        await self._handle_color_vote(ctx, "pink", member, now)
 
     @commands.command(name="green")
-    async def green_command(self, ctx, member: discord.Member):
-        """Votes to assign the green role to a user."""
-        await self._handle_color_vote(ctx, "green", member)
+    async def green_command(self, ctx, member: discord.Member, now: str = ""):
+        """Votes to assign the green role to a user. Admins can add 'now' to bypass."""
+        await self._handle_color_vote(ctx, "green", member, now)
 
 
     async def cog_command_error(self, ctx, error):
@@ -112,12 +112,12 @@ class AdminCog(commands.Cog):
             color_names = [c["name"].lower() for c in configs] + ["pink", "green"]
             
             if ctx.command.name in color_names:
-                return await ctx.reply(f"❌ Incorrect syntax. Use: `.{ctx.command.name} <user>`", mention_author=False)
+                return await ctx.reply(f"❌ Incorrect syntax. Use: `.{ctx.command.name} <user> [now]`", mention_author=False)
         
         # Fallback to global handler or just ignore if not handled here
         pass
 
-    async def _handle_color_vote(self, ctx, color_name: str, member: discord.Member):
+    async def _handle_color_vote(self, ctx, color_name: str, member: discord.Member, now: str = ""):
         """Generalized logic for colour role voting system."""
         from database import (
             update_color_vote, 
@@ -159,6 +159,21 @@ class AdminCog(commands.Cog):
         if role in member.roles:
             return await ctx.reply(f"❌ {member.display_name} already has the {color_name} role.", mention_author=False)
 
+        # Format duration string for later use
+        dur_str = f"{duration_days} days" if duration_days != 1 else "1 day"
+        if duration_days < 1:
+            dur_str = f"{duration_days * 24:.1f} hours"
+
+        # ADMIN INSTANT BYPASS
+        if now.lower() == "now" and ctx.author.guild_permissions.administrator:
+            try:
+                await member.add_roles(role, reason=f"Manual Admin assignment by {ctx.author}.")
+                removal_time = time.time() + (duration_days * 86400)
+                await add_color_role_expiration(str(member.id), str(role_id), color_name, removal_time)
+                return await ctx.send(f"⚖️ **ADMIN DECREE!** {member.mention} has been manually assigned the {color_name} role for {dur_str}.")
+            except discord.Forbidden:
+                return await ctx.send("❌ Permission error while assigning role.")
+
         # Duplicate vote check (48h window)
         already_voted = await has_color_voted(color_name, str(member.id), str(ctx.author.id))
         if already_voted:
@@ -172,12 +187,6 @@ class AdminCog(commands.Cog):
                 await member.add_roles(role, reason=f"Reached {threshold} {color_name} votes.")
                 removal_time = time.time() + (duration_days * 86400)
                 await add_color_role_expiration(str(member.id), str(role_id), color_name, removal_time)
-                
-                # Format duration string
-                dur_str = f"{duration_days} days" if duration_days != 1 else "1 day"
-                if duration_days < 1:
-                    dur_str = f"{duration_days * 24:.1f} hours"
-
                 await ctx.send(f"🎉 **PAYMENT DUE!** {member.mention} reached **{threshold} votes** and is now {color_name} for {dur_str}!")
             except discord.Forbidden:
                 await ctx.send("❌ Permission error while assigning role.")
