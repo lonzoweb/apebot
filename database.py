@@ -754,6 +754,15 @@ async def remove_color_role_expiration(user_id: str, role_id: str):
         )
 
 
+async def clear_user_color_expirations(user_id: str):
+    """Removes all active color role expiration records for a user."""
+    async with get_db() as conn:
+        await conn.execute(
+            "DELETE FROM color_role_expirations WHERE user_id = ?",
+            (str(user_id),)
+        )
+
+
 # Backward compatibility helpers (delegates to new generalized functions)
 async def update_pink_vote(voted_id: str, voter_id: str):
     await update_color_vote('pink', voted_id, voter_id)

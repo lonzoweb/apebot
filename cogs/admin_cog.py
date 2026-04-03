@@ -124,7 +124,9 @@ class AdminCog(commands.Cog):
             get_active_color_vote_count, 
             add_color_role_expiration, 
             get_color_role_config,
-            has_color_voted
+            get_color_role_configs,
+            has_color_voted,
+            clear_user_color_expirations
         )
         import time
         import discord
@@ -146,6 +148,21 @@ class AdminCog(commands.Cog):
         if duration_days < 1:
             dur_str = f"{duration_days * 24:.1f} hours"
 
+        # Helper to cleanse OTHER color roles
+        async def cleanse_existing_colors(target_member):
+            all_configs = await get_color_role_configs()
+            role_ids_to_check = [int(c["role_id"]) for c in all_configs if c["role_id"] and c["role_id"].isdigit()]
+            
+            roles_to_remove = [ctx.guild.get_role(rid) for rid in role_ids_to_check if ctx.guild.get_role(rid)]
+            active_roles_to_remove = [r for r in roles_to_remove if r in target_member.roles]
+            
+            if active_roles_to_remove:
+                try:
+                    await target_member.remove_roles(*active_roles_to_remove, reason="New color role assignment (mutual exclusivity)")
+                    await clear_user_color_expirations(str(target_member.id))
+                except discord.Forbidden:
+                    pass
+
         # ADMIN INSTANT BYPASS (Move this above self-vote check)
         if now.lower() == "now" and ctx.author.guild_permissions.administrator:
             try:
@@ -161,6 +178,9 @@ class AdminCog(commands.Cog):
                 
                 if role in member.roles:
                     return await ctx.reply(f"❌ {member.display_name} already has the {color_name} role.", mention_author=False)
+
+                # Cleanse others first
+                await cleanse_existing_colors(member)
 
                 await member.add_roles(role, reason=f"Manual Admin assignment by {ctx.author}.")
                 removal_time = time.time() + (duration_days * 86400)
@@ -197,6 +217,9 @@ class AdminCog(commands.Cog):
 
         if vote_count >= threshold:
             try:
+                # Cleanse others first
+                await cleanse_existing_colors(member)
+
                 await member.add_roles(role, reason=f"Reached {threshold} {color_name} votes.")
                 removal_time = time.time() + (duration_days * 86400)
                 await add_color_role_expiration(str(member.id), str(role_id), color_name, removal_time)
