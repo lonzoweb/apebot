@@ -99,6 +99,7 @@ function App() {
 
 
   useEffect(() => {
+    console.log('[Dashboard] API_BASE identified as:', API_BASE);
     fetchData();
   }, []);
 
@@ -127,7 +128,8 @@ function App() {
   const fetchColorRoles = async () => {
     try {
       const response = await axios.get(`${API_BASE}/bulletin/color-roles`);
-      setColorRoles(response.data);
+      console.log('[Dashboard] Color Roles fetched:', response.data);
+      setColorRoles(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error('Failed to fetch color roles:', err);
     }
@@ -1457,19 +1459,28 @@ function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {colorRoles.map(cr => (
-                      <tr key={cr.name}>
-                        <td style={{ fontWeight: 'bold', color: 'var(--accent)' }}>.{cr.name.replace(/^\./, '')}</td>
-                        <td><code style={{ fontSize: '0.8rem' }}>{cr.role_id}</code></td>
-                        <td>{cr.vote_threshold} votes</td>
-                        <td>{cr.duration_days} days</td>
-                        <td><button className="btn" style={{ color: 'var(--danger)' }} onClick={async () => {
-                          await axios.delete(`${API_BASE}/bulletin/color-roles/${cr.name}`);
-                          const res = await axios.get(`${API_BASE}/bulletin/color-roles`);
-                          setColorRoles(res.data);
-                        }}><Trash2 size={16}/></button></td>
+                    {!colorRoles || colorRoles.length === 0 ? (
+                      <tr>
+                        <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                          No color roles defined yet. Add one above!
+                        </td>
                       </tr>
-                    ))}
+                    ) : (
+                      colorRoles.map(cr => (
+                        <tr key={cr?.name || Math.random()}>
+                          <td style={{ fontWeight: 'bold', color: 'var(--accent)' }}>.{cr?.name?.replace(/^\./, '') || 'unknown'}</td>
+                          <td><code style={{ fontSize: '0.8rem' }}>{cr?.role_id || '???'}</code></td>
+                          <td>{cr?.vote_threshold || 7} votes</td>
+                          <td>{cr?.duration_days || 2} days</td>
+                          <td><button className="btn" style={{ color: 'var(--danger)' }} onClick={async () => {
+                            if (!cr?.name) return;
+                            await axios.delete(`${API_BASE}/bulletin/color-roles/${cr.name}`);
+                            const res = await axios.get(`${API_BASE}/bulletin/color-roles`);
+                            setColorRoles(res.data);
+                          }}><Trash2 size={16}/></button></td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
