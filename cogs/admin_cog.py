@@ -5,7 +5,10 @@ from database import (
     is_economy_on, set_economy_status, set_yap_level, get_yap_level,
     get_top_balances, cap_all_balances, clear_user_inventory
 )
+import logging
 from main import remove_muzzle_role
+
+logger = logging.getLogger(__name__)
 
 class AdminCog(commands.Cog):
     """Admin-only commands for system control."""
