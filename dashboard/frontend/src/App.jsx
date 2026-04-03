@@ -123,10 +123,19 @@ function App() {
     }
   }, [sendSuccess]);
 
-  useEffect(() => {
-    if (activeTab === 'content') {
-      // Fetch Bulletins, Quotes, and Numerology
-      Promise.all([
+  // --- GLOBAL FETCHING logic ---
+  const fetchColorRoles = async () => {
+    try {
+      const response = await axios.get(`${API_BASE}/bulletin/color-roles`);
+      setColorRoles(response.data);
+    } catch (err) {
+      console.error('Failed to fetch color roles:', err);
+    }
+  };
+
+  const fetchContentData = async () => {
+    try {
+      const [bRes, qdRes, qdsRes, qRes, qsRes, nsRes, nnRes, ncRes] = await Promise.all([
         axios.get(`${API_BASE}/bulletin/settings`),
         axios.get(`${API_BASE}/quote-drops`),
         axios.get(`${API_BASE}/quote-drops/settings`),
@@ -135,23 +144,28 @@ function App() {
         axios.get(`${API_BASE}/numerology/settings`),
         axios.get(`${API_BASE}/numerology/numbers`),
         axios.get(`${API_BASE}/numerology/combos`),
-      ]).then(([bRes, qdRes, qdsRes, qRes, qsRes, nsRes, nnRes, ncRes]) => {
-        setBulletinSettings(bRes.data);
-        setQuoteDrops(qdRes.data);
-        setQuoteDropsEnabled(qdsRes.data.quote_drops_enabled);
-        setQuoteDropsInterval(qdsRes.data.quote_drops_interval_hours);
-        setDailyQuotes(qRes.data);
-        setQuoteSchedule(qsRes.data);
-        setNumerologySettings(nsRes.data);
-        setNumerologyNumbers(nnRes.data);
-        setNumerologyCombos(ncRes.data);
-      }).catch(err => console.error('Failed to fetch content data:', err));
+      ]);
+      setBulletinSettings(bRes.data);
+      setQuoteDrops(qdRes.data);
+      setQuoteDropsEnabled(qdsRes.data.quote_drops_enabled);
+      setQuoteDropsInterval(qdsRes.data.quote_drops_interval_hours);
+      setDailyQuotes(qRes.data);
+      setQuoteSchedule(qsRes.data);
+      setNumerologySettings(nsRes.data);
+      setNumerologyNumbers(nnRes.data);
+      setNumerologyCombos(ncRes.data);
+    } catch (err) {
+      console.error('Failed to fetch content data:', err);
     }
+  };
 
+  useEffect(() => {
+    if (activeTab === 'content') {
+      fetchContentData();
+    }
     if (activeTab === 'moderation') {
       fetchColorRoles();
     }
-
     if (activeTab === 'economy') {
       Promise.all([
         axios.get(`${API_BASE}/shop/items`),
@@ -252,6 +266,91 @@ function App() {
     setHasPending(true);
   };
 
+  // --- RESTORED MISSING HELPER FUNCTIONS ---
+  const savePrice = async (key, price) => {
+    try {
+      await axios.post(`${API_BASE}/shop/items`, { item_key: key, price: parseInt(price) });
+      setShopSaveMsg('✅ Price updated!');
+      setTimeout(() => setShopSaveMsg(null), 3000);
+    } catch { 
+      setShopSaveMsg('❌ Error saving price');
+      setTimeout(() => setShopSaveMsg(null), 3000);
+    }
+  };
+
+  const saveNumDesc = async (num, description) => {
+    try {
+      await axios.post(`${API_BASE}/numerology/numbers`, { num: parseInt(num), description });
+      setNumerologyNumbers(prev => ({ ...prev, [num]: description }));
+      alert('Forecast saved!');
+    } catch { alert('Failed to save forecast'); }
+  };
+
+  const addQuoteDrop = async () => {
+    if (!newQuoteDrop.trim()) return;
+    try {
+      await axios.post(`${API_BASE}/quote-drops`, { quote: newQuoteDrop });
+      const res = await axios.get(`${API_BASE}/quote-drops`);
+      setQuoteDrops(res.data);
+      setNewQuoteDrop('');
+    } catch { alert('Failed to add quote'); }
+  };
+
+  const deleteQuoteDrop = async (id) => {
+    try {
+      await axios.delete(`${API_BASE}/quote-drops/${id}`);
+      const res = await axios.get(`${API_BASE}/quote-drops`);
+      setQuoteDrops(res.data);
+    } catch { alert('Delete failed'); }
+  };
+
+  const addDailyQuote = async () => {
+    if (!newDailyQuote.trim()) return;
+    try {
+      await axios.post(`${API_BASE}/quotes`, { quote: newDailyQuote });
+      const res = await axios.get(`${API_BASE}/quotes`);
+      setDailyQuotes(res.data);
+      setNewDailyQuote('');
+    } catch { alert('Failed to add quote'); }
+  };
+
+  const deleteDailyQuote = async (id) => {
+    try {
+      await axios.delete(`${API_BASE}/quotes/${id}`);
+      const res = await axios.get(`${API_BASE}/quotes`);
+      setDailyQuotes(res.data);
+    } catch { alert('Delete failed'); }
+  };
+
+  const saveQuoteSchedule = async () => {
+    try {
+      await axios.post(`${API_BASE}/quote-schedule`, quoteSchedule);
+      setQuoteScheduleSaveMsg('✅ Schedule saved!');
+      setTimeout(() => setQuoteScheduleSaveMsg(''), 3000);
+    } catch { alert('Failed to save schedule'); }
+  };
+
+  const saveAdmin = async (updates) => {
+    try {
+      await axios.post(`${API_BASE}/admin-config`, updates);
+      setAdminConfig(prev => ({ ...prev, ...updates }));
+    } catch { alert('Failed to save admin config'); }
+  };
+
+  const saveBulletinSettings = async () => {
+    setSaving(true);
+    try {
+      await axios.post(`${API_BASE}/bulletin/settings`, bulletinSettings);
+      setBulletinSaveMsg('✅ Bulletin settings saved!');
+      setTimeout(() => setBulletinSaveMsg(null), 3000);
+    } catch (err) {
+      console.error('Failed to save bulletin settings:', err);
+      setBulletinSaveMsg('❌ Error saving settings.');
+      setTimeout(() => setBulletinSaveMsg(null), 3000);
+    }
+    setSaving(false);
+  };
+
   const addReward = async () => {
     if (!newReward.level || !newReward.role_id) return;
     try {
@@ -336,20 +435,6 @@ function App() {
     }
   };
 
-  const handleSaveBulletinSettings = async () => {
-    setSaving(true);
-    try {
-      await axios.post(`${API_BASE}/bulletin/settings`, bulletinSettings);
-      setBulletinSaveMsg('✅ Bulletin settings saved!');
-      setTimeout(() => setBulletinSaveMsg(null), 3000);
-    } catch (err) {
-      console.error('Failed to save bulletin settings:', err);
-      setBulletinSaveMsg('❌ Error saving settings.');
-      setTimeout(() => setBulletinSaveMsg(null), 3000);
-    }
-    setSaving(false);
-  };
-
   const handleTriggerTarot = async () => {
     setSaving(true);
     try {
@@ -376,39 +461,6 @@ function App() {
       setTimeout(() => setBulletinSaveMsg(null), 3000);
     }
     setSaving(false);
-  };
-
-  const fetchColorRoles = async () => {
-    try {
-      const response = await axios.get(`${API_BASE}/bulletin/color-roles`);
-      setColorRoles(response.data);
-    } catch (err) {
-      console.error('Failed to fetch color roles:', err);
-    }
-  };
-
-  const handleSaveColorRole = async (role) => {
-    setColorRoleSaveMsg('Saving...');
-    try {
-      await axios.post(`${API_BASE}/bulletin/color-roles`, role);
-      await fetchColorRoles();
-      setColorRoleSaveMsg('✅ Role saved!');
-      setTimeout(() => setColorRoleSaveMsg(null), 3000);
-    } catch (err) {
-      console.error('Failed to save color role:', err);
-      setColorRoleSaveMsg('❌ Error saving role.');
-      setTimeout(() => setColorRoleSaveMsg(null), 3000);
-    }
-  };
-
-  const handleDeleteColorRole = async (name) => {
-    if (!window.confirm(`Are you sure you want to delete the .${name} role?`)) return;
-    try {
-      await axios.delete(`${API_BASE}/bulletin/color-roles/${name}`);
-      await fetchColorRoles();
-    } catch (err) {
-      console.error('Failed to delete color role:', err);
-    }
   };
 
   const navItems = [
@@ -1406,13 +1458,13 @@ function App() {
                   </thead>
                   <tbody>
                     {colorRoles.map(cr => (
-                      <tr key={cr.id}>
+                      <tr key={cr.name}>
                         <td style={{ fontWeight: 'bold', color: 'var(--accent)' }}>.{cr.name.replace(/^\./, '')}</td>
                         <td><code style={{ fontSize: '0.8rem' }}>{cr.role_id}</code></td>
                         <td>{cr.vote_threshold} votes</td>
                         <td>{cr.duration_days} days</td>
                         <td><button className="btn" style={{ color: 'var(--danger)' }} onClick={async () => {
-                          await axios.delete(`${API_BASE}/bulletin/color-roles/${cr.id}`);
+                          await axios.delete(`${API_BASE}/bulletin/color-roles/${cr.name}`);
                           const res = await axios.get(`${API_BASE}/bulletin/color-roles`);
                           setColorRoles(res.data);
                         }}><Trash2 size={16}/></button></td>
