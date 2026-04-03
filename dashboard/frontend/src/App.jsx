@@ -24,7 +24,7 @@ const NUM_LABELS = {
 };
 
 function App() {
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stats, setStats] = useState({ total_users: 0, total_xp: 0 });
   const [settings, setSettings] = useState({});
@@ -488,16 +488,16 @@ function App() {
   };
 
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: '📊', category: 'General' },
-    { id: 'progression', label: 'Progression & XP', icon: '📈', category: 'Community' },
-    { id: 'roles', label: 'Colour Roles', icon: '🎨', category: 'Community' },
-    { id: 'social', label: 'Social & HoF', icon: '🌟', category: 'Community' },
-    { id: 'bulletins', label: 'Bulletins & Numerology', icon: '📋', category: 'Content' },
-    { id: 'quotedrops', label: 'Quote Drops', icon: '🚀', category: 'Content' },
-    { id: 'quotes', label: 'Daily Quotes', icon: '🌅', category: 'Content' },
-    { id: 'moderation', label: 'Moderation & Access', icon: '🛡️', category: 'Management' },
-    { id: 'economy', label: 'Economy & Shop', icon: '💰', category: 'Management' },
-    { id: 'system', label: 'System & Technical', icon: '⚙️', category: 'Management' },
+    { id: 'overview', label: 'Overview', icon: Home, category: 'General' },
+    { id: 'progression', label: 'Progression & XP', icon: TrendingUp, category: 'Community' },
+    { id: 'roles', label: 'Colour Roles', icon: Palette, category: 'Community' },
+    { id: 'social', label: 'Social & HoF', icon: Users, category: 'Community' },
+    { id: 'bulletins', label: 'Bulletins & Numerology', icon: Bell, category: 'Content' },
+    { id: 'quotedrops', label: 'Quote Drops', icon: Zap, category: 'Content' },
+    { id: 'quotes', label: 'Daily Quotes', icon: Sparkles, category: 'Content' },
+    { id: 'moderation', label: 'Moderation & Access', icon: Shield, category: 'Management' },
+    { id: 'economy', label: 'Economy & Shop', icon: CircleDollarSign, category: 'Management' },
+    { id: 'system', label: 'System & Technical', icon: Cpu, category: 'Management' },
   ];
 
   const closeSidebar = () => setSidebarOpen(false);
@@ -574,19 +574,22 @@ function App() {
       {/* Main Content */}
       <div className="main-content">
         <header className="header">
-          <h1>{navItems.find(i => i.id === activeTab).label}</h1>
+          <h1>{navItems.find(i => i.id === activeTab)?.label || 'Apeiron'}</h1>
           <p>{{
-            home: "Server stats and leaderboard at a glance.",
+            overview: "Server stats and leaderboard at a glance.",
             progression: "Configure XP curves, rewards, and multipliers.",
             social: "Customize level-up messages and rank cards.",
-            content: "Bulletins, Daily Tarot, Numerology, and Quotes.",
+            roles: "Manage server-funded vanity color roles.",
+            bulletins: "Daily automated TC posts and purge schedules.",
+            quotedrops: "Configure automated random quote drops.",
+            quotes: "Philosophical quotes posted at sunrise and sunset.",
             moderation: "Access control, starboards, and color roles.",
             economy: "Shop items, deposit info, and currency.",
             system: "Bot persona and database maintenance."
-          }[activeTab]}</p>
+          }[activeTab] || 'Configuration and management dashboard.'}</p>
         </header>
 
-        {activeTab === 'home' && (
+        {activeTab === 'overview' && (
           <>
             <div className="grid">
               <div className="card">
