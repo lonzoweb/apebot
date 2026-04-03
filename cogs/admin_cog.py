@@ -141,6 +141,34 @@ class AdminCog(commands.Cog):
         threshold = config["vote_threshold"]
         duration_days = config["duration_days"]
 
+        # Format duration string for later use
+        dur_str = f"{duration_days} days" if duration_days != 1 else "1 day"
+        if duration_days < 1:
+            dur_str = f"{duration_days * 24:.1f} hours"
+
+        # ADMIN INSTANT BYPASS (Move this above self-vote check)
+        if now.lower() == "now" and ctx.author.guild_permissions.administrator:
+            try:
+                role = ctx.guild.get_role(role_id)
+                if not role:
+                    return await ctx.send(f"❌ Error: The configured role ({role_id}) was not found on this server.")
+                
+                # Hierarchy Checks
+                if not ctx.guild.me.guild_permissions.manage_roles:
+                    return await ctx.send("🛑 I need `Manage Roles` permission.")
+                if ctx.guild.me.top_role.position <= role.position:
+                    return await ctx.send(f"🛑 My role must be higher than the target role ({role.name}).")
+                
+                if role in member.roles:
+                    return await ctx.reply(f"❌ {member.display_name} already has the {color_name} role.", mention_author=False)
+
+                await member.add_roles(role, reason=f"Manual Admin assignment by {ctx.author}.")
+                removal_time = time.time() + (duration_days * 86400)
+                await add_color_role_expiration(str(member.id), str(role_id), color_name, removal_time)
+                return await ctx.send(f"⚖️ **ADMIN DECREE!** {member.mention} has been manually assigned the {color_name} role for {dur_str}.")
+            except discord.Forbidden:
+                return await ctx.send("❌ Permission error while assigning role.")
+
         if member.id == ctx.author.id:
             return await ctx.reply("❌ You can't vote for yourself... unless you're into that?", mention_author=False)
         if member.bot:
@@ -158,21 +186,6 @@ class AdminCog(commands.Cog):
 
         if role in member.roles:
             return await ctx.reply(f"❌ {member.display_name} already has the {color_name} role.", mention_author=False)
-
-        # Format duration string for later use
-        dur_str = f"{duration_days} days" if duration_days != 1 else "1 day"
-        if duration_days < 1:
-            dur_str = f"{duration_days * 24:.1f} hours"
-
-        # ADMIN INSTANT BYPASS
-        if now.lower() == "now" and ctx.author.guild_permissions.administrator:
-            try:
-                await member.add_roles(role, reason=f"Manual Admin assignment by {ctx.author}.")
-                removal_time = time.time() + (duration_days * 86400)
-                await add_color_role_expiration(str(member.id), str(role_id), color_name, removal_time)
-                return await ctx.send(f"⚖️ **ADMIN DECREE!** {member.mention} has been manually assigned the {color_name} role for {dur_str}.")
-            except discord.Forbidden:
-                return await ctx.send("❌ Permission error while assigning role.")
 
         # Duplicate vote check (48h window)
         already_voted = await has_color_voted(color_name, str(member.id), str(ctx.author.id))
