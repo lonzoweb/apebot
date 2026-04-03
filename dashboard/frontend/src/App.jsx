@@ -124,48 +124,42 @@ function App() {
   }, [sendSuccess]);
 
   useEffect(() => {
-    if (activeTab === 'quotes') {
+    if (activeTab === 'content') {
+      // Fetch Bulletins, Quotes, and Numerology
       Promise.all([
+        axios.get(`${API_BASE}/bulletin/settings`),
         axios.get(`${API_BASE}/quote-drops`),
         axios.get(`${API_BASE}/quote-drops/settings`),
-      ]).then(([qRes, sRes]) => {
-        setQuoteDrops(qRes.data);
-        setQuoteDropsEnabled(sRes.data.quote_drops_enabled);
-        setQuoteDropsInterval(sRes.data.quote_drops_interval_hours);
-      }).catch(err => console.error('Failed to fetch quote drops:', err));
-    }
-    if (activeTab === 'daily_quotes') {
-      axios.get(`${API_BASE}/quotes`).then(res => {
-        setDailyQuotes(res.data);
-      }).catch(err => console.error('Failed to fetch daily quotes:', err));
-      axios.get(`${API_BASE}/quote-schedule`).then(res => {
-        setQuoteSchedule(res.data);
-      }).catch(err => console.error('Failed to fetch quote schedule:', err));
-    }
-    if (activeTab === 'numerology') {
-      Promise.all([
+        axios.get(`${API_BASE}/quotes`),
+        axios.get(`${API_BASE}/quote-schedule`),
         axios.get(`${API_BASE}/numerology/settings`),
         axios.get(`${API_BASE}/numerology/numbers`),
         axios.get(`${API_BASE}/numerology/combos`),
-      ]).then(([sRes, nRes, cRes]) => {
-        setNumerologySettings(sRes.data);
-        setNumerologyNumbers(nRes.data);
-        setNumerologyCombos(cRes.data);
-      }).catch(err => console.error('Failed to fetch numerology data:', err));
-    }
-    if (activeTab === 'shop') {
-      axios.get(`${API_BASE}/shop/items`).then(res => {
-        setShopItems(res.data);
-      }).catch(err => console.error('Failed to fetch shop items:', err));
-    }
-    if (activeTab === 'misc') {
-      Promise.all([
-        axios.get(`${API_BASE}/deposit-info`),
-        axios.get(`${API_BASE}/bulletin/settings`)
-      ]).then(([dRes, bRes]) => {
-        setDepositInfo(dRes.data.deposit_info);
+      ]).then(([bRes, qdRes, qdsRes, qRes, qsRes, nsRes, nnRes, ncRes]) => {
         setBulletinSettings(bRes.data);
-      }).catch(err => console.error('Failed to fetch misc data:', err));
+        setQuoteDrops(qdRes.data);
+        setQuoteDropsEnabled(qdsRes.data.quote_drops_enabled);
+        setQuoteDropsInterval(qdsRes.data.quote_drops_interval_hours);
+        setDailyQuotes(qRes.data);
+        setQuoteSchedule(qsRes.data);
+        setNumerologySettings(nsRes.data);
+        setNumerologyNumbers(nnRes.data);
+        setNumerologyCombos(ncRes.data);
+      }).catch(err => console.error('Failed to fetch content data:', err));
+    }
+
+    if (activeTab === 'moderation') {
+      fetchColorRoles();
+    }
+
+    if (activeTab === 'economy') {
+      Promise.all([
+        axios.get(`${API_BASE}/shop/items`),
+        axios.get(`${API_BASE}/deposit-info`),
+      ]).then(([sRes, dRes]) => {
+        setShopItems(sRes.data);
+        setDepositInfo(dRes.data.deposit_info);
+      }).catch(err => console.error('Failed to fetch economy data:', err));
     }
   }, [activeTab]);
 
