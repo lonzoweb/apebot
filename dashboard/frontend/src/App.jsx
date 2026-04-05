@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   Home, Sparkles, Gift, Layers, Database, 
-  Settings, TrendingUp, Users, Trophy, Trash2, Plus, Save, Download, RefreshCw, Bell, Info, Mail, CreditCard, BookOpen, MessageCircle, Send, Hash, Wind, Palette, Shield, Zap, CircleDollarSign, Terminal, ShoppingBag, Cpu
+  Settings, TrendingUp, Users, Trophy, Trash2, Plus, Save, Download, RefreshCw, Bell, Info, Mail, CreditCard, BookOpen, MessageCircle, Send, Hash, Wind, Palette, Shield, Zap, CircleDollarSign, Terminal, ShoppingBag, Cpu, Key
 } from 'lucide-react';
 
 const API_BASE = window.location.origin;
@@ -489,6 +489,7 @@ function App() {
     { id: 'progression', label: 'Progression & XP', icon: TrendingUp, category: 'Community' },
     { id: 'roles', label: 'Colour Roles', icon: Palette, category: 'Community' },
     { id: 'social', label: 'Social & HoF', icon: Users, category: 'Community' },
+    { id: 'keygallery', label: 'Key Gallery', icon: Key, category: 'Community' },
     { id: 'bulletins', label: 'Bulletins & Numerology', icon: Bell, category: 'Content' },
     { id: 'quotedrops', label: 'Quote Drops', icon: Zap, category: 'Content' },
     { id: 'quotes', label: 'Daily Quotes', icon: Sparkles, category: 'Content' },
@@ -1302,6 +1303,105 @@ function App() {
           </div>
         )}
 
+        {activeTab === 'keygallery' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div>
+                  <h2 style={{ marginBottom: '0.25rem' }}>🔑 Key Command Gallery</h2>
+                  <p style={{ color: 'var(--text-secondary)' }}>Manage the images and limits for the <code>.key</code> command.</p>
+                </div>
+                {keySaveMsg && <span className="badge badge-success">{keySaveMsg}</span>}
+              </div>
+
+              <div className="grid" style={{ gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+                <div className="form-group">
+                  <label className="label">Active Image Repository URL</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input 
+                      className="input" style={{ flex: 1 }}
+                      value={keySettings.active_url} 
+                      onChange={e => setKeySettings({...keySettings, active_url: e.target.value})}
+                    />
+                    <button className="btn btn-primary" onClick={async () => {
+                       await axios.post(`${API_BASE}/key-settings/config`, { 
+                         send_count_user: keySendUser, 
+                         send_count_admin: keySendAdmin 
+                       });
+                       setKeySaveMsg('Saved!');
+                       setTimeout(() => setKeySaveMsg(''), 2000);
+                    }}>Save</button>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="label">Send Limit (User/Admin)</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                       <span style={{ fontSize: '0.75rem' }}>User:</span>
+                       <input className="input" type="number" style={{ width: '60px' }} value={keySendUser} onChange={e => setKeySendUser(parseInt(e.target.value))} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                       <span style={{ fontSize: '0.75rem' }}>Admin:</span>
+                       <input className="input" type="number" style={{ width: '60px' }} value={keySendAdmin} onChange={e => setKeySendAdmin(parseInt(e.target.value))} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card shadow-none" style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', marginTop: '1.5rem' }}>
+                 <h3 style={{ marginBottom: '1rem' }}>Image Bank ({keySettings.images?.length || 0})</h3>
+                 <div className="table-container" style={{ maxHeight: '400px' }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Label</th>
+                          <th>URL Fragment</th>
+                          <th style={{ width: '100px' }}>Status</th>
+                          <th style={{ width: '60px' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {keySettings.images?.map(img => (
+                          <tr key={img.id} style={{ opacity: img.active ? 1 : 0.6 }}>
+                            <td style={{ fontWeight: img.active ? 'bold' : 'normal' }}>{img.label}</td>
+                            <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{img.url}</td>
+                            <td>
+                              {img.active ? 
+                                <span className="badge badge-success">Active</span> : 
+                                <button className="btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }} onClick={async () => {
+                                  await axios.post(`${API_BASE}/key-settings/images/${img.id}/activate`);
+                                  const ks = await axios.get(`${API_BASE}/key-settings`);
+                                  setKeySettings(ks.data);
+                                }}>Activate</button>
+                              }
+                            </td>
+                            <td>
+                               <button onClick={async () => {
+                                 await axios.delete(`${API_BASE}/key-settings/images/${img.id}`);
+                                 const ks = await axios.get(`${API_BASE}/key-settings`);
+                                 setKeySettings(ks.data);
+                               }} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                 </div>
+                 <div className="grid" style={{ gridTemplateColumns: '1fr 1fr auto', gap: '0.5rem', marginTop: '1.5rem' }}>
+                    <input className="input" placeholder="Image URL Fragment..." value={keyImageInput} onChange={e => setKeyImageInput(e.target.value)} />
+                    <input className="input" placeholder="Label (e.g. Thoth)..." value={keyLabelInput} onChange={e => setKeyLabelInput(e.target.value)} />
+                    <button className="btn btn-primary" onClick={async () => {
+                        await axios.post(`${API_BASE}/key-settings/images`, { url: keyImageInput, label: keyLabelInput });
+                        setKeyImageInput(''); setKeyLabelInput('');
+                        const ks = await axios.get(`${API_BASE}/key-settings`);
+                        setKeySettings(ks.data);
+                    }}>Add Image</button>
+                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'quotedrops' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div className="card">
@@ -1393,99 +1493,6 @@ function App() {
           </div>
         )}
 
-        {/* RESTORED: Tarot Image Keys Section */}
-        {activeTab === 'content' && (
-          <div style={{ marginTop: '2rem' }}>
-            <div className="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <div>
-                  <h2 style={{ marginBottom: '0.25rem' }}>🃏 Tarot Image Keys</h2>
-                  <p style={{ color: 'var(--text-secondary)' }}>Map Tarot card names to specific image URLs for daily readings.</p>
-                </div>
-                {keySaveMsg && <span className="badge badge-success">{keySaveMsg}</span>}
-              </div>
-
-              <div className="grid" style={{ gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
-                <div className="form-group">
-                  <label className="label">Active Image Repository URL</label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <input 
-                      className="input" style={{ flex: 1 }}
-                      value={keySettings.active_url} 
-                      onChange={e => setKeySettings({...keySettings, active_url: e.target.value})}
-                    />
-                    <button className="btn btn-primary" onClick={async () => {
-                       await axios.post(`${API_BASE}/key-settings/config`, { 
-                         send_count_user: keySendUser, 
-                         send_count_admin: keySendAdmin 
-                       });
-                       setKeySaveMsg('Saved!');
-                       setTimeout(() => setKeySaveMsg(''), 2000);
-                    }}>Save</button>
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label className="label">Send Limit (User/Admin)</label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <input className="input" type="number" style={{ width: '60px' }} value={keySendUser} onChange={e => setKeySendUser(parseInt(e.target.value))} />
-                    <input className="input" type="number" style={{ width: '60px' }} value={keySendAdmin} onChange={e => setKeySendAdmin(parseInt(e.target.value))} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="card shadow-none" style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', marginTop: '1.5rem' }}>
-                 <h3 style={{ marginBottom: '1rem' }}>Image Bank ({keySettings.images?.length || 0})</h3>
-                 <div className="table-container" style={{ maxHeight: '300px' }}>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Label</th>
-                          <th>URL Fragment</th>
-                          <th style={{ width: '100px' }}>Status</th>
-                          <th style={{ width: '60px' }}></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {keySettings.images?.map(img => (
-                          <tr key={img.id} style={{ opacity: img.active ? 1 : 0.6 }}>
-                            <td style={{ fontWeight: img.active ? 'bold' : 'normal' }}>{img.label}</td>
-                            <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{img.url}</td>
-                            <td>
-                              {img.active ? 
-                                <span className="badge badge-success">Active</span> : 
-                                <button className="btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }} onClick={async () => {
-                                  await axios.post(`${API_BASE}/key-settings/images/${img.id}/activate`);
-                                  const ks = await axios.get(`${API_BASE}/key-settings`);
-                                  setKeySettings(ks.data);
-                                }}>Activate</button>
-                              }
-                            </td>
-                            <td>
-                               <button onClick={async () => {
-                                 await axios.delete(`${API_BASE}/key-settings/images/${img.id}`);
-                                 const ks = await axios.get(`${API_BASE}/key-settings`);
-                                 setKeySettings(ks.data);
-                               }} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                 </div>
-                 <div className="grid" style={{ gridTemplateColumns: '1fr 1fr auto', gap: '0.5rem', marginTop: '1.5rem' }}>
-                    <input className="input" placeholder="Image URL Fragment..." value={keyImageInput} onChange={e => setKeyImageInput(e.target.value)} />
-                    <input className="input" placeholder="Label (e.g. Thoth)..." value={keyLabelInput} onChange={e => setKeyLabelInput(e.target.value)} />
-                    <button className="btn btn-primary" onClick={async () => {
-                        await axios.post(`${API_BASE}/key-settings/images`, { url: keyImageInput, label: keyLabelInput });
-                        setKeyImageInput(''); setKeyLabelInput('');
-                        const ks = await axios.get(`${API_BASE}/key-settings`);
-                        setKeySettings(ks.data);
-                    }}>Add Image</button>
-                 </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {activeTab === 'quotes' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
