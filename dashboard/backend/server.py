@@ -1007,6 +1007,15 @@ async def api_set_combo(data: dict):
     return {"status": "ok"}
 
 
+@app.post("/quote-drops/{quote_id}/send")
+async def api_send_quote_drop(quote_id: int):
+    """Trigger a specific quote drop manually."""
+    from database import set_setting
+    await set_setting("manual_quote_id", str(quote_id))
+    await set_setting("trigger_quote_drop", "1")
+    return {"status": "ok"}
+
+
 # --- Serve Frontend ---
 
 # Search for frontend/dist relative to project root

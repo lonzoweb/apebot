@@ -312,6 +312,17 @@ function App() {
     } catch { alert('Trigger failed'); }
   };
 
+  const sendQuoteDrop = async (id) => {
+    try {
+      await axios.post(`${API_BASE}/quote-drops/${id}/send`);
+      setBulletinSaveMsg('🚀 Quote drop triggered!');
+      setTimeout(() => setBulletinSaveMsg(''), 3000);
+    } catch (err) {
+      console.error('Failed to send quote:', err);
+      setBulletinSaveMsg('❌ Error sending quote.');
+    }
+  };
+
   const addDailyQuote = async () => {
     if (!newDailyQuote.trim()) return;
     try {
@@ -1350,8 +1361,17 @@ function App() {
                         <tr key={q.id}>
                           <td style={{ fontSize: '0.9rem' }}>{q.quote}</td>
                           <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{q.added_by}</td>
-                          <td>
-                            <button onClick={() => deleteQuoteDrop(q.id)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                              <button 
+                                onClick={() => sendQuoteDrop(q.id)} 
+                                title="Send this quote now"
+                                style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}
+                              >
+                                <Send size={16} />
+                              </button>
+                              <button onClick={() => deleteQuoteDrop(q.id)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+                            </div>
                           </td>
                         </tr>
                       )) : (
@@ -1368,6 +1388,100 @@ function App() {
                    />
                    <button className="btn btn-primary" onClick={addQuoteDrop}>Add Quote</button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* RESTORED: Tarot Image Keys Section */}
+        {activeTab === 'content' && (
+          <div style={{ marginTop: '2rem' }}>
+            <div className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div>
+                  <h2 style={{ marginBottom: '0.25rem' }}>🃏 Tarot Image Keys</h2>
+                  <p style={{ color: 'var(--text-secondary)' }}>Map Tarot card names to specific image URLs for daily readings.</p>
+                </div>
+                {keySaveMsg && <span className="badge badge-success">{keySaveMsg}</span>}
+              </div>
+
+              <div className="grid" style={{ gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+                <div className="form-group">
+                  <label className="label">Active Image Repository URL</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input 
+                      className="input" style={{ flex: 1 }}
+                      value={keySettings.active_url} 
+                      onChange={e => setKeySettings({...keySettings, active_url: e.target.value})}
+                    />
+                    <button className="btn btn-primary" onClick={async () => {
+                       await axios.post(`${API_BASE}/key-settings/config`, { 
+                         send_count_user: keySendUser, 
+                         send_count_admin: keySendAdmin 
+                       });
+                       setKeySaveMsg('Saved!');
+                       setTimeout(() => setKeySaveMsg(''), 2000);
+                    }}>Save</button>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="label">Send Limit (User/Admin)</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input className="input" type="number" style={{ width: '60px' }} value={keySendUser} onChange={e => setKeySendUser(parseInt(e.target.value))} />
+                    <input className="input" type="number" style={{ width: '60px' }} value={keySendAdmin} onChange={e => setKeySendAdmin(parseInt(e.target.value))} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="card shadow-none" style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', marginTop: '1.5rem' }}>
+                 <h3 style={{ marginBottom: '1rem' }}>Image Bank ({keySettings.images?.length || 0})</h3>
+                 <div className="table-container" style={{ maxHeight: '300px' }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Label</th>
+                          <th>URL Fragment</th>
+                          <th style={{ width: '100px' }}>Status</th>
+                          <th style={{ width: '60px' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {keySettings.images?.map(img => (
+                          <tr key={img.id} style={{ opacity: img.active ? 1 : 0.6 }}>
+                            <td style={{ fontWeight: img.active ? 'bold' : 'normal' }}>{img.label}</td>
+                            <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{img.url}</td>
+                            <td>
+                              {img.active ? 
+                                <span className="badge badge-success">Active</span> : 
+                                <button className="btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }} onClick={async () => {
+                                  await axios.post(`${API_BASE}/key-settings/images/${img.id}/activate`);
+                                  const ks = await axios.get(`${API_BASE}/key-settings`);
+                                  setKeySettings(ks.data);
+                                }}>Activate</button>
+                              }
+                            </td>
+                            <td>
+                               <button onClick={async () => {
+                                 await axios.delete(`${API_BASE}/key-settings/images/${img.id}`);
+                                 const ks = await axios.get(`${API_BASE}/key-settings`);
+                                 setKeySettings(ks.data);
+                               }} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                 </div>
+                 <div className="grid" style={{ gridTemplateColumns: '1fr 1fr auto', gap: '0.5rem', marginTop: '1.5rem' }}>
+                    <input className="input" placeholder="Image URL Fragment..." value={keyImageInput} onChange={e => setKeyImageInput(e.target.value)} />
+                    <input className="input" placeholder="Label (e.g. Thoth)..." value={keyLabelInput} onChange={e => setKeyLabelInput(e.target.value)} />
+                    <button className="btn btn-primary" onClick={async () => {
+                        await axios.post(`${API_BASE}/key-settings/images`, { url: keyImageInput, label: keyLabelInput });
+                        setKeyImageInput(''); setKeyLabelInput('');
+                        const ks = await axios.get(`${API_BASE}/key-settings`);
+                        setKeySettings(ks.data);
+                    }}>Add Image</button>
+                 </div>
               </div>
             </div>
           </div>

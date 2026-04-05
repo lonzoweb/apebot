@@ -342,23 +342,12 @@ def setup_tasks(bot, guild_id: int):
                 _cached_quote = quote
                 logger.info("🌅 Morning Daily Quote sent.")
 
-            # ── Evening repost + candidates ──────────────────────────────
-            elif hour == q_evening:
-                # Re-fetch in case we rebooted between morning and evening
-                quote_text, quote_date = await _load_quote_state()
-                if quote_text and quote_date == today_str:
-                    await _send_evening_quote(
-                        bot, guild, target_channels, emperor_channel, quote_text
-                    )
-                else:
-                    logger.warning("6pm quote: no morning quote found in DB for today, skipping.")
-
-            # ── 7:00 PM — reset for next day ────────────────────────────
-            elif hour == 19:
+            # ── 12:00 AM — reset for next day ────────────────────────────
+            elif hour == 0:
                 _cached_quote = None
                 bot.pending_quotes = []
                 bot.tomorrow_quote = None
-                # Clear DB state so morning fires fresh tomorrow
+                # Clear DB state so morning fires fresh tomorrow at [q_morning]
                 await database.set_setting(QUOTE_DATE_KEY, "")
                 await database.set_setting(QUOTE_TEXT_KEY, "")
 
@@ -750,10 +739,17 @@ def setup_tasks(bot, guild_id: int):
                     if manual_trigger: await database.set_setting("trigger_quote_drop", "0")
                     return
 
-                # Pick random quote drop
-                quote = await get_random_quote_drop()
+                # Pick quote (manual or random)
+                manual_id = await database.get_setting("manual_quote_id", "")
+                if manual_id:
+                    from database import get_quote_drop_by_id
+                    quote = await get_quote_drop_by_id(manual_id)
+                    await database.set_setting("manual_quote_id", "") # Clear it
+                else:
+                    quote = await get_random_quote_drop()
+
                 if not quote:
-                    logger.warning("Quote drop loop: No quotes found in 'quote_drops' table.")
+                    logger.warning("Quote drop loop: No quote found.")
                     if manual_trigger: await database.set_setting("trigger_quote_drop", "0")
                     return
 
@@ -797,13 +793,11 @@ def setup_tasks(bot, guild_id: int):
             now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
             purge_interval = await database.get_setting("bulletin_purge_interval", "weekly")
             
-            # Condition for purge: 
-            # - Daily: midnight (hour 0)
-            # - Weekly: Sunday (weekday 6) at 11:59 PM (hour 23)
+            # Condition for purge: 5:00 AM PT
             do_purge = False
-            if purge_interval == "daily" and now_pt.hour == 0:
+            if purge_interval == "daily" and now_pt.hour == 5:
                 do_purge = True
-            elif purge_interval == "weekly" and now_pt.weekday() == 6 and now_pt.hour == 23:
+            elif purge_interval == "weekly" and now_pt.weekday() == 6 and now_pt.hour == 5:
                 do_purge = True
 
             if do_purge:
